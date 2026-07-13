@@ -3,6 +3,7 @@ import { Entry } from "@/lib/journal";
 import { Share2, Copy, Check, Globe, Lock, X, Link as LinkIcon, ChevronDown, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { sendShareInviteEmail } from "@/lib/email";
 
 interface Props {
   entry: Entry;
@@ -122,12 +123,20 @@ export function ShareMenu({ entry, onUpdate }: Props) {
     } else if (data) {
       setShares((prev) => [...prev, data as ShareRecord]);
       const invitedEmail = email.trim().toLowerCase();
-      setLastInvited({ email: invitedEmail, url: window.location.href });
+      const inviteUrl = window.location.href;
+      setLastInvited({ email: invitedEmail, url: inviteUrl });
       setInviteLinkCopied(false);
       setEmail("");
+      void sendShareInviteEmail({
+        to: invitedEmail,
+        entryId: entry.id,
+        entryTitle: entry.title || "Untitled",
+        role: selectedRole,
+        url: inviteUrl,
+      });
     }
     setInviting(false);
-  }, [email, selectedRole, entry.id, user]);
+  }, [email, selectedRole, entry.id, entry.title, user]);
 
   const updateRole = useCallback(async (shareId: string, newRole: Role) => {
     await supabase
@@ -211,7 +220,7 @@ export function ShareMenu({ entry, onUpdate }: Props) {
           {lastInvited && !error && (
             <div className="mt-3 rounded-md border border-border bg-secondary/40 p-2.5">
               <p className="text-[10px] text-muted-foreground font-mono mb-1.5">
-                Invited <span className="text-foreground">{lastInvited.email}</span>. Send them this link:
+                Invited <span className="text-foreground">{lastInvited.email}</span> — we sent an email. Or share this link:
               </p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0 flex items-center gap-2 bg-background rounded px-2 py-1.5 border border-border">

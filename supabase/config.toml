@@ -2,3 +2,9 @@ project_id = "vqrknuyiacjczmyykrpi"
 
 [functions.create-checkout-session]
 verify_jwt = false
+
+[functions.auth-send-email]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = true
