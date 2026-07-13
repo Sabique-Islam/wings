@@ -20,9 +20,21 @@ interface AsciiProps {
 }
 
 /** Base primitive: a non-selectable monospace <pre>. */
-export function Ascii({ children, className, size = "text-[10px]" }: AsciiProps) {
+export function Ascii({
+  children,
+  className,
+  size = "text-[10px]",
+  box = false,
+}: AsciiProps & { box?: boolean }) {
   return (
-    <pre className={cn("font-mono leading-tight select-none whitespace-pre", size, className)}>
+    <pre
+      className={cn(
+        "font-mono select-none whitespace-pre",
+        box ? "nw-ascii-box leading-[1.18] tracking-[0]" : "leading-tight",
+        size,
+        className,
+      )}
+    >
       {children}
     </pre>
   );

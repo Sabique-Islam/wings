@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { motionEase } from "./constants";
+import { Ascii, SHOWCASE_BY_TAG } from "@/lib/ascii";
 
 const CARDS = [
   { tag: "writing", title: "blocks, not boxes.", body: "every paragraph is a block. drag, nest, transform. markdown shortcuts. latex inline. code with syntax." },
@@ -26,19 +27,14 @@ export function StackedScroll() {
                 <div className="font-display font-bold text-3xl sm:text-4xl md:text-5xl tracking-tight leading-[1.05]">{c.title}</div>
                 <div className="text-sm sm:text-base md:text-lg text-ink-1 font-sans leading-relaxed max-w-md">{c.body}</div>
               </div>
-              <div className="relative bg-surface-0 border-t md:border-t-0 md:border-l border-border-subtle min-h-[200px] sm:min-h-[280px] flex items-center justify-center p-6 sm:p-8 font-mono text-xs text-ink-2 overflow-hidden">
-                <div className="dither dither--grain absolute inset-0 opacity-50" aria-hidden />
-                <pre className="relative z-10 leading-tight text-[10px] sm:text-[11px] opacity-80">{`┌──────────── ${c.tag} ────────────┐
-│                                  │
-│   ▌ ${c.title.slice(0, 22).padEnd(22, " ")}      │
-│                                  │
-│   ░░░░░░░░░░░░░░░░░░░░░░░░░░░░   │
-│   ░░░░░░░░░░░░░░░░░░░░░░░░       │
-│   ░░░░░░░░░░░░░░░░░░░░░░░░░░     │
-│                                  │
-│            ◉  ◉  ◉              │
-│                                  │
-└──────────────────────────────────┘`}</pre>
+              <div className="dither-viewbox relative flex items-center justify-center border-t md:border-t-0 md:border-l border-border-subtle min-h-[220px] sm:min-h-[300px] p-4 sm:p-6 overflow-x-auto">
+                <Ascii
+                  box
+                  size="text-[7px] xs:text-[8px] sm:text-[9px]"
+                  className="text-white/80 shrink-0"
+                >
+                  {SHOWCASE_BY_TAG[c.tag]}
+                </Ascii>
               </div>
             </div>
           </motion.div>
