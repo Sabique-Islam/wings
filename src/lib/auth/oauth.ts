@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { authRedirectUrl } from "./redirect";
 
 export interface OAuthOutcome {
   redirected?: boolean;
@@ -6,7 +7,7 @@ export interface OAuthOutcome {
 }
 
 /** Google OAuth via Supabase Auth — browser redirects and returns with a session. */
-export async function signInWithGoogle(redirectTo: string = window.location.origin): Promise<OAuthOutcome> {
+export async function signInWithGoogle(redirectTo: string = authRedirectUrl()): Promise<OAuthOutcome> {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

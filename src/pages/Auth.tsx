@@ -7,6 +7,9 @@ import { Logo } from "@/components/Logo";
 import { Dither } from "@/components/ui/Dither";
 import { Ascii, WINGS_TAGLINE } from "@/lib/ascii";
 import { Link } from "react-router-dom";
+import { useRedirectIfAuthed } from "@/hooks/useRedirectIfAuthed";
+import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { useAuth } from "@/hooks/useAuth";
 
 type Stage = "request" | "sent";
 
@@ -15,6 +18,16 @@ export default function Auth() {
   const [stage, setStage] = useState<Stage>("request");
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
+  const { loading: authLoading } = useAuth();
+  useRedirectIfAuthed();
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <AsciiSpinner />
+      </div>
+    );
+  }
 
   const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();

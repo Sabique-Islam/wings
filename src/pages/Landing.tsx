@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getMyUsername } from "@/lib/profile";
+import { getDashboardPath } from "@/lib/auth/redirect";
+import { useNavigate } from "react-router-dom";
 import { Hero } from "@/components/landing/Hero";
 import { NavBar } from "@/components/landing/NavBar";
 import { InfiniteMarquee } from "@/components/landing/InfiniteMarquee";
@@ -12,18 +13,29 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { motionEase } from "@/components/landing/constants";
+import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { Dither } from "@/components/ui/Dither";
 
 export default function Landing() {
-  const { user } = useAuth();
-  const [username, setUsername] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) getMyUsername(user.id).then(setUsername);
-  }, [user]);
+    if (authLoading) return;
+    if (!user) return;
+    getDashboardPath(user.id).then((path) => navigate(path, { replace: true }));
+  }, [user, authLoading, navigate]);
 
-  const ctaHref = user ? (username ? `/${username}` : "/app") : "/auth";
-  const ctaLabel = user ? "open app" : "sign in";
+  if (authLoading || user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <AsciiSpinner />
+      </div>
+    );
+  }
+
+  const ctaHref = "/auth";
+  const ctaLabel = "sign in";
 
   return (
     <>

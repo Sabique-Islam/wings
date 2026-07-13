@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getMyUsername } from "@/lib/profile";
 import { Seo } from "@/components/Seo";
 import { PRICING_TIERS, INCLUDED_TODAY, type PricingTier } from "@/config/pricing";
 import { PricingCard } from "@/components/pricing/PricingCard";
@@ -12,20 +11,22 @@ import { toast } from "sonner";
 import { NavBar } from "@/components/landing/NavBar";
 import { Dither } from "@/components/ui/Dither";
 import { Check } from "lucide-react";
+import { getDashboardPath } from "@/lib/auth/redirect";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
 export default function Pricing() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState<string | null>(null);
+  const [dashboardPath, setDashboardPath] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) getMyUsername(user.id).then(setUsername);
+    if (user) getDashboardPath(user.id).then(setDashboardPath);
+    else setDashboardPath(null);
   }, [user]);
 
-  const ctaHref = user ? (username ? `/${username}` : "/app") : "/auth";
+  const ctaHref = user ? (dashboardPath ?? "/app") : "/auth";
   const ctaLabel = user ? "open app" : "sign in";
 
   async function onSelect(tier: PricingTier) {

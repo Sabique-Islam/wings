@@ -1,9 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
+import { authRedirectUrl } from "./auth/redirect";
 
 export async function sendMagicLink(email: string) {
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim(),
-    options: { emailRedirectTo: window.location.origin },
+    options: {
+      emailRedirectTo: authRedirectUrl(),
+      shouldCreateUser: true,
+    },
   });
   return { error };
 }

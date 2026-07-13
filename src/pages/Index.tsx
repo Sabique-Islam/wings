@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { fetchEntries, createEntry, updateEntry, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
 import { saveDraft, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
 
@@ -16,8 +16,9 @@ import { AsciiSpinner } from "@/components/AsciiAnimation";
 export default function Index() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: routeId, username } = useParams<{ id?: string; username?: string }>();
-  const basePath = username ? `/${username}` : "";
+  const basePath = username ? `/${username}` : location.pathname.startsWith("/app") ? "/app" : "";
   const [entries, setEntries] = useState<Entry[]>([]);
   const [roleMap, setRoleMap] = useState<Record<string, ShareRole>>({});
   const [activeId, setActiveIdRaw] = useState<string | null>(routeId ?? null);
@@ -30,7 +31,7 @@ export default function Index() {
 
   const setActiveId = useCallback((id: string | null) => {
     setActiveIdRaw(id);
-    navigate(id ? `${basePath}/n/${id}` : `${basePath || "/"}`);
+    navigate(id ? `${basePath}/n/${id}` : basePath || "/app");
   }, [navigate, basePath]);
 
   // Sync state from URL changes (back/forward, deep link)

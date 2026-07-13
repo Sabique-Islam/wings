@@ -17,6 +17,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Legacy magic links that still point at / instead of /auth/callback
+    const { pathname, search, hash } = window.location;
+    if (pathname !== "/auth/callback") {
+      const params = new URLSearchParams(search);
+      const hasCode = params.has("code");
+      const hasHashTokens = hash.includes("access_token") || hash.includes("type=magiclink") || hash.includes("type=signup");
+      if (hasCode || hasHashTokens) {
+        window.location.replace(`/auth/callback${search}${hash}`);
+        return;
+      }
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);

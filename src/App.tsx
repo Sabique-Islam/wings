@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import SharedEntry from "./pages/SharedEntry";
 import NotFound from "./pages/NotFound";
 import Landing from "./pages/Landing";
@@ -19,7 +20,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DitherFilterDefs } from "@/lib/dither/filters";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { useEffect, useState } from "react";
-import { getMyUsername, getUserIdByUsername } from "@/lib/profile";
+import { getMyUsername } from "@/lib/profile";
 
 const queryClient = new QueryClient();
 
@@ -55,23 +56,6 @@ function UsernameGate() {
   return <Index />;
 }
 
-function AppRedirector() {
-  // /app → redirect to /:username
-  const { user } = useAuth();
-  const [target, setTarget] = useState<string | null>(null);
-  useEffect(() => {
-    if (!user) { setTarget("/auth"); return; }
-    getMyUsername(user.id).then((u) => setTarget(u ? `/${u}` : "/auth"));
-  }, [user]);
-  if (!target) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
-  }
-  return <Navigate to={target} replace />;
-}
 
 function AppRoutes() {
   const { loading } = useAuth();
@@ -106,10 +90,12 @@ function AppRoutes() {
       <Route path="/__editor-e2e" element={import.meta.env.DEV ? <EditorE2E /> : <NotFound />} />
 
       <Route path="/auth" element={<Auth />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/s/:token" element={<SharedEntry />} />
 
       {/* Authenticated app */}
-      <Route path="/app" element={<AppRedirector />} />
+      <Route path="/app" element={<RequireAuth><Index /></RequireAuth>} />
+      <Route path="/app/n/:id" element={<RequireAuth><Index /></RequireAuth>} />
       <Route path="/n/:id" element={<RequireAuth><Index /></RequireAuth>} />
       <Route path="/:username" element={<UsernameGate />} />
       <Route path="/:username/n/:id" element={<UsernameGate />} />
