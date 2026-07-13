@@ -25,7 +25,7 @@ export function HeroScreenshot() {
           </aside>
           <main className="col-span-12 md:col-span-9 p-4 sm:p-6 md:p-8 space-y-3 bg-background">
             <div className="text-[10px] font-mono text-ink-2">▌ daily / 2026-05-06</div>
-            <div className="text-xl sm:text-2xl md:text-3xl font-mono font-medium tracking-tight">notes that don't get in the way.</div>
+            <div className="text-xl sm:text-2xl md:text-3xl font-mono font-medium tracking-tight">topology lecture notes</div>
             <div className="space-y-2 pt-3">
               <div className="h-2 rounded bg-surface-2 w-11/12" />
               <div className="h-2 rounded bg-surface-2 w-10/12" />

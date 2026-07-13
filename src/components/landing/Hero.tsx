@@ -24,8 +24,8 @@ export function Hero({ ctaHref }: Props) {
           transition={{ duration: 0.9, ease: motionEase }}
           className="font-display font-bold text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem] tracking-[-0.045em] leading-[0.92]"
         >
-          think in plain text.<br />
-          render in <span className="text-accent-strong">everything.</span>
+          write pages.<br />
+          add <span className="text-accent-strong">math & drawings.</span>
         </motion.h1>
         <motion.p
           initial={{ opacity: 0 }}
@@ -33,7 +33,7 @@ export function Hero({ ctaHref }: Props) {
           transition={{ duration: 0.9, delay: 0.2, ease: motionEase }}
           className="text-sm sm:text-base md:text-lg text-ink-1 font-sans max-w-xl mx-auto leading-relaxed px-2"
         >
-          a writing app that does math, drawings, and ai — without ever pulling you out of the keyboard.
+          nested pages, slash commands, LaTeX, Excalidraw, and an AI panel that reads the page you have open. sign in with Google or a magic link.
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 12 }}

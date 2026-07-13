@@ -9,7 +9,7 @@ export const WINGS_WORDMARK = `
   ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝
 `;
 
-export const WINGS_TAGLINE = "a quiet place for loud ideas";
+export const WINGS_TAGLINE = "notes, math, drawings, and ai";
 
 export const WINGS_MARK_COMPACT = `┌──────────────────────┐
 │  ◼  wings · write    │

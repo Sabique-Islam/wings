@@ -1,7 +1,7 @@
 {
   "name": "Wings",
   "short_name": "Wings",
-  "description": "Wings — a quiet place for loud ideas. Markdown, LaTeX, drawings, and an agentic AI.",
+  "description": "Block editor for notes with LaTeX math, Excalidraw drawings, and an AI panel.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",

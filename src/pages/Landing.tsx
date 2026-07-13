@@ -32,9 +32,9 @@ export default function Landing() {
         <Dither variant="grain" fade="radial" density="sparse" className="opacity-100" />
         <NavBar ctaHref={ctaHref} ctaLabel={ctaLabel} />
         <Hero ctaHref={ctaHref} />
-        <InfiniteMarquee items={["markdown", "latex", "excalidraw", "agentic ai", "block editor", "offline-first", "share & publish", "keyboard-first"]} />
+        <InfiniteMarquee items={["markdown", "latex", "excalidraw", "ai panel", "block editor", "draft cache", "share links", "slash commands"]} />
         <FeatureGrid />
-        <InfiniteMarquee reverse items={["⌘J summon", "/slash command", "$$ math $$", "≡ blocks", "✎ canvas", "↗ publish", "◉ private"]} />
+        <InfiniteMarquee reverse items={["⌘J ai", "/ slash", "$$ math $$", "≡ blocks", "✎ drawings", "↗ /s/", "⌘K palette"]} />
         <StackedScroll />
         <section className="relative py-24 sm:py-32 px-4 sm:px-6">
           <div className="max-w-3xl mx-auto text-center space-y-6">
@@ -44,7 +44,7 @@ export default function Landing() {
               viewport={{ once: true }}
               transition={{ duration: 0.8, ease: motionEase }}
               className="font-display font-bold text-3xl sm:text-4xl md:text-6xl tracking-tight leading-tight"
-            >ready when you are.</motion.h2>
+            >try it — it's free.</motion.h2>
             <Link
               to={ctaHref}
               className="inline-flex items-center gap-2 rounded-full bg-accent-strong text-accent-strong-foreground px-7 sm:px-8 py-3.5 sm:py-4 text-[11px] sm:text-xs font-mono uppercase tracking-[0.2em] hover:scale-[1.03] transition-transform"

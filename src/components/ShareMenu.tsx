@@ -220,7 +220,7 @@ export function ShareMenu({ entry, onUpdate }: Props) {
           {lastInvited && !error && (
             <div className="mt-3 rounded-md border border-border bg-secondary/40 p-2.5">
               <p className="text-[10px] text-muted-foreground font-mono mb-1.5">
-                Invited <span className="text-foreground">{lastInvited.email}</span> — we sent an email. Or share this link:
+                Invited <span className="text-foreground">{lastInvited.email}</span> — share this link with them:
               </p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0 flex items-center gap-2 bg-background rounded px-2 py-1.5 border border-border">

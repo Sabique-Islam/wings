@@ -3,9 +3,9 @@ import { motionEase } from "./constants";
 import { Ascii, SHOWCASE_BY_TAG } from "@/lib/ascii";
 
 const CARDS = [
-  { tag: "writing", title: "blocks, not boxes.", body: "every paragraph is a block. drag, nest, transform. markdown shortcuts. latex inline. code with syntax." },
-  { tag: "thinking", title: "an ai that reads with you.", body: "the agent has full context of the open page. ask, draft, refactor — without leaving the keyboard." },
-  { tag: "sharing", title: "permissions that respect you.", body: "viewer, editor, admin. publish a page to the web with one click. revoke just as fast." },
+  { tag: "writing", title: "blocks you can move.", body: "each paragraph, heading, or embed is its own block. drag to reorder, nest sub-pages in the sidebar, pin favorites, and soft-delete to trash." },
+  { tag: "thinking", title: "ai with page context.", body: "the assistant panel reads the page you have open — not a blank chat. draft the next section, shorten a selection, or spin up a new page from a prompt. API keys stay in your browser." },
+  { tag: "sharing", title: "links and invites.", body: "turn on a public link so anyone can read. or invite a specific email as viewer, editor, or admin. roles are enforced per page." },
 ];
 
 export function StackedScroll() {

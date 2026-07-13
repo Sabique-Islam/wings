@@ -4,8 +4,8 @@ export const SITE = {
   domain: "wings.nopejs.me",
   url: "https://wings.nopejs.me",
   description:
-    "A quiet place for loud ideas. Markdown, LaTeX, drawings and an agentic AI — without ever leaving the keyboard.",
-  tagline: "think in plain text. render in everything.",
+    "Block editor for notes with nested pages, LaTeX math, Excalidraw drawings, and an AI panel. Share pages by link, export markdown, drafts cache locally.",
+  tagline: "notes, math, drawings, and ai in one editor.",
   email: "hello@mail.wings.nopejs.me",
   mail: {
     domain: "mail.wings.nopejs.me",

@@ -1,6 +1,6 @@
 # Wings
 
-A quiet place for loud ideas — markdown, math, drawings, and agentic AI.
+Block editor for notes with nested pages, LaTeX math, Excalidraw drawings, and an AI panel.
 
 ## Development
 

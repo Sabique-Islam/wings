@@ -40,7 +40,7 @@ export function PricingCard({ tier, index, onSelect, busy }: Props) {
           <div className="flex items-center justify-between">
             <div className={cn("text-xs font-mono uppercase tracking-[0.3em]", tier.accent ? "opacity-90" : "text-ink-2")}>{tier.name}</div>
             {tier.accent && (
-              <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent-strong-foreground text-accent-strong">most loved</span>
+              <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-accent-strong-foreground text-accent-strong">planned</span>
             )}
           </div>
           <div className="text-xl font-display tracking-tight">{tier.tagline}</div>

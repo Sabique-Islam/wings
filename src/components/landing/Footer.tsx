@@ -14,7 +14,7 @@ export function Footer() {
           <div className="col-span-2 space-y-3">
             <Logo size={28} withWordmark wordmarkClassName="text-sm" />
             <p className="text-xs text-ink-2 font-mono leading-relaxed max-w-[18rem]">
-              a quiet place for loud ideas. markdown, math, drawings — local-first.
+              block editor for notes — markdown, LaTeX, Excalidraw, and AI. hosted on Supabase.
             </p>
             <div className="flex items-center gap-2 pt-2">
               <a href={SOCIAL.discord} target="_blank" rel="noreferrer" aria-label="discord" className="w-8 h-8 grid place-items-center rounded border border-border-subtle hover:bg-accent/40 hover:border-border-strong transition-colors">
@@ -38,7 +38,7 @@ export function Footer() {
           ))}
         </div>
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pt-8 border-t border-border-subtle">
-          <div className="text-[10px] font-mono text-ink-2">© {year} {SITE.brand} · made for thinkers</div>
+          <div className="text-[10px] font-mono text-ink-2">© {year} {SITE.brand}</div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("wings:open-cookie-prefs"))}
@@ -46,7 +46,7 @@ export function Footer() {
             >
               manage cookies
             </button>
-            <Link to="/status" className="text-[10px] font-mono text-ink-2 hover:text-foreground transition-colors">{SITE.domain} · all systems nominal ◉</Link>
+            <Link to="/status" className="text-[10px] font-mono text-ink-2 hover:text-foreground transition-colors">{SITE.domain}</Link>
           </div>
         </div>
       </div>

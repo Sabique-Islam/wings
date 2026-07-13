@@ -55,7 +55,7 @@ export default function Auth() {
             </Ascii>
             <p className="font-display text-2xl tracking-tight max-w-sm">{WINGS_TAGLINE}.</p>
           </div>
-          <div className="relative z-10 text-[10px] font-mono text-ink-2">markdown · math · drawings · agentic ai</div>
+          <div className="relative z-10 text-[10px] font-mono text-ink-2">pages · math · drawings · ai</div>
         </div>
 
         {/* Right — form */}
@@ -65,7 +65,7 @@ export default function Auth() {
 
             <div className="space-y-1 text-center lg:text-left">
               <h1 className="font-display font-bold text-2xl tracking-tight">welcome back</h1>
-              <p className="text-sm text-ink-2 font-sans">sign in to your quiet place for loud ideas.</p>
+              <p className="text-sm text-ink-2 font-sans">sign in to create and edit pages.</p>
             </div>
 
             <div className="border border-border-subtle rounded-xl bg-surface-1 p-6 space-y-5">
@@ -130,7 +130,7 @@ export default function Auth() {
               )}
             </div>
 
-            <p className="text-center text-[10px] text-ink-3 font-mono">⌘ wings · minimal markdown journal</p>
+            <p className="text-center text-[10px] text-ink-3 font-mono">block editor · magic link or Google</p>
           </div>
         </div>
       </div>

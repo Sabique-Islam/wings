@@ -15,28 +15,28 @@ const SHOWCASE: ShowcaseFeature[] = [
   {
     t: "compose",
     headline: "block editor",
-    d: "slash commands, markdown, latex, drawings — every line is a block you can drag and transform.",
+    d: "headings, lists, tasks, tables, code, callouts, toggles, and two-column layouts. type / for slash commands or use markdown shortcuts.",
     tag: "/  →  table",
     graphic: "block editor",
   },
   {
     t: "summon",
-    headline: "agentic ai",
-    d: "summon ⌘J. it reads your open page and drafts the next paragraph, inline.",
+    headline: "ai panel",
+    d: "press ⌘J to open the assistant. it sees the active page, can append or replace text, create a new page, or run inline edits on a selection. connect your own provider key in settings.",
     tag: "⌘J",
     graphic: "agentic ai",
   },
   {
     t: "publish",
-    headline: "share & publish",
-    d: "role-based access. public read links. one click to the world.",
+    headline: "share pages",
+    d: "create a public read link at /s/…, or invite someone by email as viewer, editor, or admin. revoke access any time.",
     tag: "↗ /s/",
     graphic: "share & publish",
   },
   {
     t: "persist",
-    headline: "offline first",
-    d: "drafts cached locally. retries on reconnect. your words stay yours.",
+    headline: "draft cache",
+    d: "unsaved edits are stored in your browser. if the network drops, Wings retries the write when you reconnect. export any page as markdown or JSON.",
     tag: "◉ local",
     graphic: "offline first",
   },
@@ -45,9 +45,9 @@ const SHOWCASE: ShowcaseFeature[] = [
 type CompactFeature = { t: string; d: string; a: string };
 
 const MORE: CompactFeature[] = [
-  { t: "excalidraw inline", d: "sketch on any page. resize, persist, share.", a: "✎ canvas" },
-  { t: "live latex", d: "type $$…$$ — pmatrix, implies, all of it.", a: "Σ live" },
-  { t: "databases", d: "table, board, gallery — inline or full-page.", a: "▦ /table" },
+  { t: "excalidraw", d: "insert a drawing block on any page or open the full canvas modal. scenes are saved with the page.", a: "✎ canvas" },
+  { t: "latex math", d: "inline $…$ or block $$…$$. matrices, fractions, and symbols render as you type.", a: "Σ math" },
+  { t: "keyboard", d: "⌘K command palette, ⌘N new page, ⌘P quick switcher, ⌘B sidebar, ⌘/ sidebar search.", a: "⌘K" },
 ];
 
 export function FeatureGrid() {
@@ -63,7 +63,7 @@ export function FeatureGrid() {
         >
           <motion.div variants={fadeUp} transition={{ duration: 0.7, ease: motionEase }} className="text-[11px] font-mono uppercase tracking-[0.3em] text-ink-2">— features</motion.div>
           <motion.h2 variants={fadeUp} transition={{ duration: 0.7, ease: motionEase }} className="font-display font-bold text-3xl sm:text-4xl md:text-5xl tracking-tight leading-[1.05]">
-            built for the way you<br className="hidden sm:block" /> actually think.
+            what the app<br className="hidden sm:block" /> does today.
           </motion.h2>
         </motion.div>
 

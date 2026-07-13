@@ -1,27 +1,17 @@
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { getMyUsername } from "@/lib/profile";
 import { Seo } from "@/components/Seo";
-import { PRICING_TIERS, type PricingTier } from "@/config/pricing";
+import { PRICING_TIERS, INCLUDED_TODAY, type PricingTier } from "@/config/pricing";
 import { PricingCard } from "@/components/pricing/PricingCard";
 import { dodo } from "@/lib/payments/dodo";
 import { toast } from "sonner";
-import { Logo } from "@/components/Logo";
+import { NavBar } from "@/components/landing/NavBar";
 import { Dither } from "@/components/ui/Dither";
-import { Check, Minus } from "lucide-react";
-
-const COMPARE: { label: string; tiers: [boolean, boolean, boolean] }[] = [
-  { label: "unlimited pages & sub-pages", tiers: [false, true, true] },
-  { label: "guest collaboration", tiers: [false, true, true] },
-  { label: "agentic ai credits", tiers: [false, true, true] },
-  { label: "databases (table / board / gallery)", tiers: [true, true, true] },
-  { label: "offline-first + markdown export", tiers: [true, true, true] },
-  { label: "private publishing", tiers: [false, false, true] },
-  { label: "version history", tiers: [false, true, true] },
-];
+import { Check } from "lucide-react";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -36,6 +26,7 @@ export default function Pricing() {
   }, [user]);
 
   const ctaHref = user ? (username ? `/${username}` : "/app") : "/auth";
+  const ctaLabel = user ? "open app" : "sign in";
 
   async function onSelect(tier: PricingTier) {
     if (tier.id === "free") {
@@ -47,7 +38,7 @@ export default function Pricing() {
       return;
     }
     if (!tier.productId) {
-      toast.message("payments coming soon", { description: `${tier.name} tier isn't connected yet.` });
+      toast.message("not available yet", { description: `${tier.name} is planned but payments aren't connected.` });
       return;
     }
     setBusyId(tier.id);
@@ -69,19 +60,10 @@ export default function Pricing() {
 
   return (
     <>
-      <Seo title="pricing" path="/pricing" description="Three tiers. Free, Explorer, and Scholar. Pay for the depth you want — cancel any time." />
+      <Seo title="pricing" path="/pricing" description="Wings is free today. Paid plans for hosted AI and higher limits are planned but not live yet." />
       <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
-        <Dither variant="dot" fade="radial" density="sparse" className="opacity-40" />
-        <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border-subtle">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <Logo size={26} withWordmark wordmarkClassName="text-sm font-display font-semibold" />
-            </Link>
-            <Link to={ctaHref} className="rounded-full bg-accent-strong text-accent-strong-foreground text-[10px] sm:text-[11px] font-mono uppercase tracking-widest px-3 sm:px-4 py-1.5">
-              {user ? "open app" : "sign in"}
-            </Link>
-          </div>
-        </header>
+        <Dither variant="grain" fade="radial" density="sparse" className="opacity-100" />
+        <NavBar ctaHref={ctaHref} ctaLabel={ctaLabel} />
 
         <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-24 px-4 sm:px-6">
           <div className="max-w-6xl mx-auto text-center space-y-4 sm:space-y-5 mb-12 sm:mb-16">
@@ -94,9 +76,11 @@ export default function Pricing() {
               transition={{ duration: 0.8, ease }}
               className="font-display font-bold text-4xl sm:text-5xl md:text-7xl tracking-[-0.045em] leading-[0.95]"
             >
-              simple. honest.<br /><span className="text-accent-strong">unbundled.</span>
+              free<br /><span className="text-accent-strong">for now.</span>
             </motion.h1>
-            <p className="text-sm sm:text-base text-ink-1 font-sans max-w-lg mx-auto">pay for the depth you want. cancel any time. no dark patterns.</p>
+            <p className="text-sm sm:text-base text-ink-1 font-sans max-w-lg mx-auto">
+              every feature listed on the site works on the free tier today. paid plans below are placeholders — checkout isn't wired up yet.
+            </p>
           </div>
 
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
@@ -111,28 +95,20 @@ export default function Pricing() {
             ))}
           </div>
 
-          <div className="max-w-3xl mx-auto mt-20 sm:mt-28">
-            <div className="text-[11px] font-mono uppercase tracking-[0.3em] text-ink-2 mb-6">— compared</div>
-            <div className="grid grid-cols-[1fr_repeat(3,3rem)] sm:grid-cols-[1fr_repeat(3,5rem)] items-center gap-y-1 border-y border-border-subtle">
-              <div />
-              {PRICING_TIERS.map((t) => (
-                <div key={t.id} className="text-center font-mono text-[10px] uppercase tracking-widest text-ink-2 py-3">{t.name}</div>
+          <div className="max-w-2xl mx-auto mt-20 sm:mt-28">
+            <div className="text-[11px] font-mono uppercase tracking-[0.3em] text-ink-2 mb-6">— included today on free</div>
+            <ul className="space-y-3 border-y border-border-subtle py-6">
+              {INCLUDED_TODAY.map((item) => (
+                <li key={item} className="flex items-start gap-3 text-sm text-ink-1 font-sans">
+                  <Check className="w-4 h-4 text-accent-strong shrink-0 mt-0.5" />
+                  {item}
+                </li>
               ))}
-              {COMPARE.map((row) => (
-                <div key={row.label} className="contents">
-                  <div className="font-sans text-sm text-ink-1 py-3 border-t border-border-subtle/60">{row.label}</div>
-                  {row.tiers.map((has, i) => (
-                    <div key={i} className="flex justify-center py-3 border-t border-border-subtle/60">
-                      {has ? <Check className="w-4 h-4 text-accent-strong" /> : <Minus className="w-4 h-4 text-ink-3" />}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+            </ul>
           </div>
 
           <div className="max-w-2xl mx-auto text-center mt-12 sm:mt-16 text-xs font-mono text-ink-2">
-            all plans include offline mode, end-to-end RLS, and a soul. ✦
+            data is stored in Supabase with row-level security. AI requests go directly from your browser to the provider you configure.
           </div>
         </section>
       </div>
