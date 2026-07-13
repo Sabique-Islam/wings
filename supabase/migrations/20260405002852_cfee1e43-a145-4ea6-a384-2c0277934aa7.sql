@@ -1,0 +1,1 @@
+ALTER VIEW public.shared_entries_view SET (security_invoker = on);

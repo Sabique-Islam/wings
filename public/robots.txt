@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /about
+Allow: /careers
+Allow: /blog
+Allow: /contact
+Allow: /roadmap
+Allow: /docs
+Allow: /support
+Allow: /status
+Allow: /press
+Allow: /legal/
+
+# Private user dashboards and app routes
+Disallow: /auth
+Disallow: /app
+Disallow: /n/
+Disallow: /s/
+Disallow: /checkout/
+
+Sitemap: https://wings.nopejs.me/sitemap.xml

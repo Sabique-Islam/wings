@@ -1,0 +1,452 @@
+import { Extension } from "@tiptap/core";
+import { ReactRenderer } from "@tiptap/react";
+import Suggestion, { SuggestionOptions } from "@tiptap/suggestion";
+import tippy, { Instance as TippyInstance } from "tippy.js";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useState,
+  useCallback,
+} from "react";
+import {
+  Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Quote, Minus,
+  Code2, Image, Type, AlertCircle, ChevronRight, FileText, Table,
+  Link as LinkIcon, ExternalLink, Columns, Sigma, Calculator, Calendar,
+  Sparkles, FilePlus2, Layout,
+} from "lucide-react";
+import { TEMPLATES } from "@/lib/templates";
+
+export interface CommandItem {
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  category: string;
+  command: (props: { editor: any; range: any }) => void;
+}
+
+interface SlashHandlers {
+  onImageUpload?: () => void;
+  onLinkPage?: () => void;
+  onNewPage?: (title: string) => void;
+  onAskAI?: () => void;
+}
+
+const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
+  {
+    title: "Ask AI",
+    description: "Write with AI from a prompt",
+    icon: Sparkles,
+    category: "AI",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      h.onAskAI?.();
+    },
+  },
+  {
+    title: "Text",
+    description: "Plain text block",
+    icon: Type,
+    category: "Basic",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setParagraph().run();
+    },
+  },
+  {
+    title: "Heading 1",
+    description: "Large heading",
+    icon: Heading1,
+    category: "Basic",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run();
+    },
+  },
+  {
+    title: "Heading 2",
+    description: "Medium heading",
+    icon: Heading2,
+    category: "Basic",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run();
+    },
+  },
+  {
+    title: "Heading 3",
+    description: "Small heading",
+    icon: Heading3,
+    category: "Basic",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run();
+    },
+  },
+  {
+    title: "Bullet List",
+    description: "Unordered list",
+    icon: List,
+    category: "Lists",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleBulletList().run();
+    },
+  },
+  {
+    title: "Numbered List",
+    description: "Ordered list",
+    icon: ListOrdered,
+    category: "Lists",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleOrderedList().run();
+    },
+  },
+  {
+    title: "To-do List",
+    description: "Checklist with toggles",
+    icon: CheckSquare,
+    category: "Lists",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleTaskList().run();
+    },
+  },
+  {
+    title: "Table",
+    description: "Add a simple table",
+    icon: Table,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    },
+  },
+  {
+    title: "Quote",
+    description: "Block quote",
+    icon: Quote,
+    category: "Basic",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setBlockquote().run();
+    },
+  },
+  {
+    title: "Code Block",
+    description: "Code with syntax highlighting",
+    icon: Code2,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setCodeBlock().run();
+    },
+  },
+  {
+    title: "Divider",
+    description: "Horizontal rule",
+    icon: Minus,
+    category: "Basic",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setHorizontalRule().run();
+    },
+  },
+  {
+    title: "Callout",
+    description: "Highlighted info block",
+    icon: AlertCircle,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setCallout().run();
+    },
+  },
+  {
+    title: "Toggle",
+    description: "Collapsible content",
+    icon: ChevronRight,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setToggleBlock().run();
+    },
+  },
+  {
+    title: "Image",
+    description: "Upload or paste image",
+    icon: Image,
+    category: "Media",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      h.onImageUpload?.();
+    },
+  },
+  {
+    title: "Math (block)",
+    description: "LaTeX equation block — $$…$$",
+    icon: Sigma,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setBlockMath("").run();
+    },
+  },
+  {
+    title: "Math (inline)",
+    description: "Inline LaTeX — $E=mc^2$",
+    icon: Calculator,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).setInlineMath("").run();
+    },
+  },
+  {
+    title: "Date",
+    description: "Insert today's date",
+    icon: Calendar,
+    category: "Inline",
+    command: ({ editor, range }) => {
+      const today = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+      editor.chain().focus().deleteRange(range).insertContent(today).run();
+    },
+  },
+  {
+    title: "Two columns",
+    description: "Side-by-side layout",
+    icon: Layout,
+    category: "Advanced",
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent(
+          `<div class="nw-columns"><div class="nw-col"><p>Left</p></div><div class="nw-col"><p>Right</p></div></div>`
+        )
+        .run();
+    },
+  },
+  {
+    title: "New sub-page",
+    description: "Create a new page nested here",
+    icon: FilePlus2,
+    category: "Pages",
+    command: ({ editor, range }) => {
+      const title = window.prompt("Title for the new page", "Untitled") || "Untitled";
+      editor.chain().focus().deleteRange(range).run();
+      h.onNewPage?.(title);
+    },
+  },
+  {
+    title: "Link to Page",
+    description: "Insert link to another page",
+    icon: FileText,
+    category: "Pages",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      h.onLinkPage?.();
+    },
+  },
+  {
+    title: "Web Bookmark",
+    description: "Embed a link with preview",
+    icon: ExternalLink,
+    category: "Media",
+    command: ({ editor, range }) => {
+      const url = window.prompt("Paste URL");
+      if (!url) return;
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent(`<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`)
+        .run();
+    },
+  },
+  {
+    title: "Embed",
+    description: "YouTube, Figma, or any iframe",
+    icon: Columns,
+    category: "Media",
+    command: ({ editor, range }) => {
+      const url = window.prompt("Paste embed URL (YouTube, Figma, etc.)");
+      if (!url) return;
+      let embedUrl = url;
+      const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+      if (ytMatch) {
+        embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
+      }
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent(
+          `<div data-type="embed"><iframe src="${embedUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;border-radius:8px;"></iframe></div>`
+        )
+        .run();
+    },
+  },
+  // Templates
+  ...TEMPLATES.map<CommandItem>((tpl) => ({
+    title: `${tpl.emoji} ${tpl.name}`,
+    description: tpl.description,
+    icon: FileText,
+    category: "Templates",
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertContent(tpl.content).run();
+    },
+  })),
+];
+
+interface CommandListProps {
+  items: CommandItem[];
+  command: (item: CommandItem) => void;
+}
+
+export const CommandList = forwardRef<any, CommandListProps>(
+  ({ items, command }, ref) => {
+    const [selectedIndex, setSelectedIndex] = useState(0);
+
+    useEffect(() => setSelectedIndex(0), [items]);
+
+    const selectItem = useCallback(
+      (index: number) => {
+        const item = items[index];
+        if (item) command(item);
+      },
+      [items, command]
+    );
+
+    useImperativeHandle(ref, () => ({
+      onKeyDown: ({ event }: { event: KeyboardEvent }) => {
+        if (!items.length) return false;
+        if (event.key === "ArrowUp") {
+          setSelectedIndex((i) => (i + items.length - 1) % items.length);
+          return true;
+        }
+        if (event.key === "ArrowDown") {
+          setSelectedIndex((i) => (i + 1) % items.length);
+          return true;
+        }
+        if (event.key === "Enter") {
+          selectItem(selectedIndex);
+          return true;
+        }
+        return false;
+      },
+    }));
+
+    if (!items.length) {
+      return (
+        <div className="bg-card border border-border rounded-md p-2 shadow-lg">
+          <p className="text-[11px] text-muted-foreground px-2 py-1">No results</p>
+        </div>
+      );
+    }
+
+    // Group by category
+    const categories: { label: string; items: { item: CommandItem; globalIndex: number }[] }[] = [];
+    const catMap = new Map<string, { item: CommandItem; globalIndex: number }[]>();
+    items.forEach((item, index) => {
+      const cat = item.category || "Other";
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat)!.push({ item, globalIndex: index });
+    });
+    catMap.forEach((catItems, label) => categories.push({ label, items: catItems }));
+
+    return (
+      <div className="bg-card border border-border rounded-md shadow-lg overflow-hidden max-h-[360px] overflow-y-auto min-w-[240px]">
+        {categories.map((cat) => (
+          <div key={cat.label}>
+            <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 px-3 pt-2 pb-1">{cat.label}</p>
+            {cat.items.map(({ item, globalIndex }) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.title}
+                  onClick={() => selectItem(globalIndex)}
+                  className={`flex items-center gap-3 w-full px-3 py-2 text-left transition-colors ${
+                    globalIndex === selectedIndex
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:bg-accent/50"
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium truncate">{item.title}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{item.description}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+);
+CommandList.displayName = "CommandList";
+
+export function createSlashCommandExtension(handlers: SlashHandlers = {}) {
+  return Extension.create({
+    name: "slashCommand",
+    addOptions() {
+      return {
+        suggestion: {
+          char: "/",
+          command: ({ editor, range, props }: any) => {
+            props.command({ editor, range });
+          },
+          items: ({ query }: { query: string }) => {
+            return getSuggestionItems(handlers).filter((item) =>
+              item.title.toLowerCase().includes(query.toLowerCase()) ||
+              item.description.toLowerCase().includes(query.toLowerCase())
+            );
+          },
+          render: () => {
+            let component: ReactRenderer | null = null;
+            let popup: TippyInstance[] | null = null;
+
+            return {
+              onStart: (props: any) => {
+                component = new ReactRenderer(CommandList, {
+                  props,
+                  editor: props.editor,
+                });
+
+                if (!props.clientRect) return;
+
+                popup = tippy("body", {
+                  getReferenceClientRect: props.clientRect,
+                  appendTo: () => document.body,
+                  content: component.element,
+                  showOnCreate: true,
+                  interactive: true,
+                  trigger: "manual",
+                  placement: "bottom-start",
+                });
+              },
+              onUpdate(props: any) {
+                component?.updateProps(props);
+                if (popup?.[0] && props.clientRect) {
+                  popup[0].setProps({
+                    getReferenceClientRect: props.clientRect,
+                  });
+                }
+              },
+              onKeyDown(props: any) {
+                if (props.event.key === "Escape") {
+                  popup?.[0]?.hide();
+                  return true;
+                }
+                return (component?.ref as any)?.onKeyDown(props) ?? false;
+              },
+              onExit() {
+                popup?.[0]?.destroy();
+                component?.destroy();
+              },
+            };
+          },
+        } satisfies Partial<SuggestionOptions>,
+      };
+    },
+    addProseMirrorPlugins() {
+      return [
+        Suggestion({
+          editor: this.editor,
+          ...this.options.suggestion,
+        }),
+      ];
+    },
+  });
+}

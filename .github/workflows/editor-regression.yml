@@ -1,0 +1,29 @@
+name: Editor regression tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  markdown-blockeditor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run Markdown and BlockEditor suites
+        run: bun run test:editor
+
+      - name: Run editor end-to-end suite
+        run: bun run test:e2e

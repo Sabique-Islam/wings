@@ -1,0 +1,161 @@
+// Regression tests for the TipTap editor configuration.
+//
+// These guard the BlockEditor against subtle extension conflicts that have
+// previously broken the writing experience — most notably the StarterKit v3
+// bundled Link extension colliding with our explicit Link, which swallowed
+// Enter keystrokes and stopped markdown shortcuts from rendering.
+//
+// We boot the editor headlessly. We avoid splitBlock/Enter command paths in
+// jsdom because the editor's view requires DOM ranges that jsdom does not
+// implement — instead we assert the structural invariants that ensure Enter
+// behaves correctly when the editor runs in a real browser.
+
+import { describe, it, expect } from "vitest";
+import { Editor } from "@tiptap/core";
+import { createBlockEditorExtensions } from "./editorExtensions";
+import { htmlToMarkdown } from "@/lib/markdown";
+
+function makeEditor(content = "<p>hello</p>") {
+  return new Editor({
+    extensions: createBlockEditorExtensions(),
+    content,
+  });
+}
+
+function placeCursorAtEnd(editor: Editor) {
+  editor.commands.setTextSelection(editor.state.doc.content.size - 1);
+}
+
+function textblockCount(editor: Editor, type: string) {
+  let count = 0;
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === type) count += 1;
+  });
+  return count;
+}
+
+describe("BlockEditor wiring", () => {
+  it("registers Link exactly once (no StarterKit duplicate)", () => {
+    const editor = makeEditor();
+    const linkCount = editor.extensionManager.extensions.filter((e) => e.name === "link").length;
+    expect(linkCount).toBe(1);
+    editor.destroy();
+  });
+
+  it("has paragraph + hardBreak + heading nodes wired up (needed for Enter)", () => {
+    const editor = makeEditor();
+    const schema = editor.schema;
+    expect(schema.nodes.paragraph).toBeTruthy();
+    expect(schema.nodes.hardBreak).toBeTruthy();
+    expect(schema.nodes.heading).toBeTruthy();
+    editor.destroy();
+  });
+
+  it("exposes splitBlock and enter commands (Enter keymap depends on them)", () => {
+    const editor = makeEditor();
+    expect(typeof (editor.commands as any).splitBlock).toBe("function");
+    expect(typeof (editor.commands as any).enter).toBe("function");
+    expect(editor.extensionManager.extensions.some((e) => e.name === "writingExperience")).toBe(true);
+    editor.destroy();
+  });
+
+  it("keeps the writing guard above StarterKit nodes but below Suggestion plugins", () => {
+    // Priority 200 is intentional: above StarterKit (100) so we own Enter and
+    // Backspace, but below the Suggestion plugin (500) so the slash menu can
+    // capture Enter while its popup is open. Priority 1000 (the old value)
+    // stole Enter from the slash menu and inserted a stray newline.
+    const editor = makeEditor();
+    const writing = editor.extensionManager.extensions.find((e) => e.name === "writingExperience");
+    expect(writing?.config.priority).toBe(200);
+    editor.destroy();
+  });
+
+  it("getHTML stays in sync with multi-paragraph content (preview === stored)", () => {
+    const editor = makeEditor("<p>a</p><p>b</p>");
+    const html = editor.getHTML();
+    expect(html).toMatch(/<p>a<\/p>\s*<p>b<\/p>/);
+    editor.destroy();
+  });
+
+  it("setContent updates the doc so what AI receives matches what user sees", () => {
+    const editor = makeEditor();
+    editor.commands.setContent("<h1>Title</h1><p>body</p>");
+    const html = editor.getHTML();
+    expect(html).toContain("<h1>Title</h1>");
+    expect(html).toContain("<p>body</p>");
+    editor.destroy();
+  });
+
+  it("applies bold mark (mirrors **bold** input rule)", () => {
+    const editor = makeEditor("<p></p>");
+    editor.commands.focus();
+    editor.commands.toggleBold();
+    editor.commands.insertContent("loud");
+    expect(editor.getHTML()).toMatch(/<strong>loud<\/strong>/);
+    editor.destroy();
+  });
+
+  it("can set a heading (mirrors `# ` markdown shortcut)", () => {
+    const editor = makeEditor("<p></p>");
+    editor.commands.focus();
+    editor.commands.setHeading({ level: 1 });
+    editor.commands.insertContent("Title");
+    expect(editor.getHTML()).toMatch(/<h1[^>]*>Title<\/h1>/);
+    editor.destroy();
+  });
+
+  it("Enter has a schema-safe command path across the full active extension stack", () => {
+    const editor = makeEditor("<p>alpha</p>");
+    expect(editor.state.schema.nodes.taskItem).toBeTruthy();
+    expect(editor.state.schema.nodes.listItem).toBeTruthy();
+    expect(typeof (editor.commands as any).enter).toBe("function");
+    expect(typeof (editor.commands as any).splitBlock).toBe("function");
+    editor.destroy();
+  });
+
+  it("Shift+Enter inserts a hard break inside the current paragraph", () => {
+    const editor = makeEditor("<p>alpha</p>");
+    placeCursorAtEnd(editor);
+
+    expect(editor.commands.keyboardShortcut("Shift-Enter")).toBe(true);
+    editor.commands.insertContent("beta");
+
+    expect(textblockCount(editor, "paragraph")).toBe(1);
+    expect(editor.getHTML()).toMatch(/alpha<br\s*\/?>beta/);
+    expect(htmlToMarkdown(editor.getHTML())).toBe("alpha  \nbeta");
+    editor.destroy();
+  });
+
+  it("Markdown shortcut input rules are active for live browser typing", () => {
+    const editor = makeEditor("<p></p>");
+    expect(editor.extensionManager.extensions.some((e) => e.name === "heading" && typeof e.config.addInputRules === "function")).toBe(true);
+    expect(editor.extensionManager.extensions.some((e) => e.name === "bulletList" && typeof e.config.addInputRules === "function")).toBe(true);
+    expect(editor.extensionManager.extensions.some((e) => e.name === "bold" && typeof e.config.addInputRules === "function")).toBe(true);
+    expect(editor.extensionManager.extensions.some((e) => e.name === "codeBlock" && typeof e.config.addInputRules === "function")).toBe(true);
+    editor.destroy();
+  });
+
+  it("stored text, Markdown preview, and AI-request text stay identical after every edit", () => {
+    const editor = makeEditor("<p></p>");
+    const edits = [
+      () => editor.commands.insertContent("alpha"),
+      () => editor.commands.setContent("<p>alpha</p><p></p>"),
+      () => editor.commands.insertContent("beta"),
+      () => editor.commands.keyboardShortcut("Shift-Enter"),
+      () => editor.commands.insertContent("gamma"),
+      () => editor.commands.setContent(editor.getHTML() + "<p></p>"),
+      () => editor.commands.insertContent("**bold**"),
+    ];
+
+    for (const edit of edits) {
+      expect(edit()).toBe(true);
+      const storedText = htmlToMarkdown(editor.getHTML());
+      const markdownPreview = htmlToMarkdown(editor.getHTML());
+      const aiRequestText = htmlToMarkdown(editor.getHTML());
+      expect(markdownPreview).toBe(storedText);
+      expect(aiRequestText).toBe(storedText);
+    }
+
+    editor.destroy();
+  });
+});

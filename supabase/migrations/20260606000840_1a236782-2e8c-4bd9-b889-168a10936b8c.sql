@@ -1,0 +1,1 @@
+ALTER TABLE public.entries ADD COLUMN IF NOT EXISTS layout JSONB NOT NULL DEFAULT '{}'::jsonb;

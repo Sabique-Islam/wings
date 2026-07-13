@@ -1,0 +1,888 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ============================================================
+     Token architecture — monochrome layered scale + themeable accent.
+     Theme is driven by [data-theme="light|dark"] on <html> (set by
+     ThemeProvider; "system" resolves to one of these). The shadcn
+     semantic tokens are kept and mapped onto the same scale so every
+     existing surface keeps working.
+     ============================================================ */
+  :root,
+  [data-theme="dark"] {
+    /* Layered monochrome surfaces (bg) + text (fg) */
+    --bg-0: 0 0% 7%;    /* canvas */
+    --bg-1: 0 0% 10%;   /* surface */
+    --bg-2: 0 0% 13%;   /* raised */
+    --bg-3: 0 0% 16%;   /* overlay */
+    --fg-0: 0 0% 92%;   /* primary text */
+    --fg-1: 0 0% 72%;   /* secondary */
+    --fg-2: 0 0% 50%;   /* tertiary / muted */
+    --fg-3: 0 0% 32%;   /* disabled */
+    --fg-inverse: 0 0% 7%;
+    --border-subtle: 0 0% 16%;
+    --border-strong: 0 0% 26%;
+    --border-focus: 0 0% 45%;
+
+    /* shadcn semantic tokens (values mirror the prior dark theme) */
+    --background: 0 0% 7%;
+    --foreground: 0 0% 85%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 85%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 85%;
+    --primary: 0 0% 85%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 70%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 85%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 40%;
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 65%;
+    --sidebar-primary: 0 0% 85%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 0 0% 40%;
+
+    /* Accent fallback channels — monochrome until the user picks a hex.
+       ThemeProvider overrides --accent-h/s/l (+ fg) inline at runtime. */
+    --accent-h: 0;
+    --accent-s: 0%;
+    --accent-l: 85%;
+    --accent-strong-fg: 0 0% 8%;
+
+    /* Modal scrim */
+    --overlay: 0 0% 0%;
+
+    /* Elevation — cool-tinted shadow for dark surfaces */
+    --shadow-1: 0 1px 2px 0 hsl(220 20% 2% / 0.4);
+    --shadow-2: 0 2px 8px -2px hsl(220 20% 2% / 0.5);
+    --shadow-3: 0 8px 24px -6px hsl(220 20% 2% / 0.55);
+    --shadow-4: 0 24px 60px -12px hsl(220 20% 2% / 0.65);
+  }
+
+  [data-theme="light"] {
+    --bg-0: 0 0% 100%;
+    --bg-1: 0 0% 98%;
+    --bg-2: 0 0% 95%;
+    --bg-3: 0 0% 92%;
+    --fg-0: 0 0% 10%;
+    --fg-1: 0 0% 30%;
+    --fg-2: 0 0% 45%;
+    --fg-3: 0 0% 62%;
+    --fg-inverse: 0 0% 100%;
+    --border-subtle: 0 0% 90%;
+    --border-strong: 0 0% 80%;
+    --border-focus: 0 0% 55%;
+
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 98%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 0 0% 15%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 30%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 0 0% 60%;
+    --sidebar-background: 0 0% 96%;
+    --sidebar-foreground: 0 0% 35%;
+    --sidebar-primary: 0 0% 15%;
+    --sidebar-primary-foreground: 0 0% 96%;
+    --sidebar-accent: 0 0% 92%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 88%;
+    --sidebar-ring: 0 0% 60%;
+
+    --accent-h: 0;
+    --accent-s: 0%;
+    --accent-l: 20%;
+    --accent-strong-fg: 0 0% 98%;
+
+    /* Modal scrim */
+    --overlay: 0 0% 12%;
+
+    /* Elevation — warm-tinted shadow for light surfaces */
+    --shadow-1: 0 1px 2px 0 hsl(30 20% 20% / 0.08);
+    --shadow-2: 0 2px 8px -2px hsl(30 20% 20% / 0.12);
+    --shadow-3: 0 8px 24px -6px hsl(30 20% 20% / 0.16);
+    --shadow-4: 0 24px 60px -12px hsl(30 20% 20% / 0.22);
+  }
+
+  :root {
+    --radius: 0.375rem;
+
+    /* Derived accent tokens — nested channels resolve at use-time, so a
+       single user pick (h/s/l) drives all of these. Consumed as
+       hsl(var(--accent-strong)) etc. */
+    --accent-strong: var(--accent-h) var(--accent-s) var(--accent-l);
+    --accent-hover: var(--accent-h) var(--accent-s) calc(var(--accent-l) - 6%);
+    --accent-ring: var(--accent-h) var(--accent-s) var(--accent-l);
+    --accent-soft: var(--accent-h) var(--accent-s) var(--accent-l) / 0.15;
+
+    /* Motion tokens */
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --dur-fast: 120ms;
+    --dur-base: 220ms;
+    --dur-slow: 420ms;
+
+    /* Dither texture tokens */
+    --dither-size: 4px;
+    --dither-dot: hsl(var(--fg-2) / 0.5);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  /* Themed selection — follows accent color. */
+  ::selection {
+    background: hsl(var(--accent-soft));
+    color: hsl(var(--foreground));
+  }
+  /* Themed focus ring uses accent. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--accent-strong) / 0.6);
+    outline-offset: 2px;
+  }
+}
+
+/* Markdown prose styling */
+.prose-journal {
+  @apply text-foreground leading-relaxed;
+}
+.prose-journal h1 { @apply text-xl font-semibold text-primary mb-3 mt-5; }
+.prose-journal h2 { @apply text-lg font-medium text-primary mb-2 mt-4; }
+.prose-journal h3 { @apply text-base font-medium text-secondary-foreground mb-2 mt-3; }
+.prose-journal p { @apply mb-3 text-sm text-muted-foreground; }
+.prose-journal ul { @apply list-disc pl-5 mb-3 text-sm text-muted-foreground; }
+.prose-journal ol { @apply list-decimal pl-5 mb-3 text-sm text-muted-foreground; }
+.prose-journal li { @apply mb-1; }
+.prose-journal code { @apply bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded text-xs; }
+.prose-journal pre { @apply bg-secondary p-3 rounded mb-3 overflow-x-auto; }
+.prose-journal pre code { @apply bg-transparent p-0; }
+.prose-journal blockquote { @apply border-l-2 border-muted-foreground/30 pl-3 italic text-muted-foreground text-sm mb-3; }
+.prose-journal strong { @apply text-foreground font-medium; }
+.prose-journal a { @apply text-foreground underline underline-offset-2; }
+.prose-journal hr { @apply border-border my-4; }
+
+/* Block Editor */
+.block-editor-wrapper {
+  @apply min-h-full relative;
+}
+
+.block-editor-content {
+  @apply text-sm font-mono leading-[1.8] tracking-wide text-foreground relative;
+}
+
+/* Free-canvas floating block toolbar buttons */
+.nw-tb-btn {
+  @apply inline-flex items-center justify-center w-5 h-5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors;
+}
+.nw-tb-btn.active {
+  @apply text-foreground bg-secondary;
+}
+.nw-float-wrapper.is-floating {
+  /* float above surrounding text */
+  user-select: none;
+}
+
+
+.block-editor-content > * + * {
+  margin-top: 0.5em;
+}
+
+/* Headings */
+.block-editor-content h1 {
+  @apply text-xl font-semibold text-primary mb-2 mt-4;
+}
+.block-editor-content h2 {
+  @apply text-lg font-medium text-primary mb-2 mt-3;
+}
+.block-editor-content h3 {
+  @apply text-base font-medium text-secondary-foreground mb-1 mt-2;
+}
+
+/* Paragraphs */
+.block-editor-content p {
+  @apply text-sm text-foreground;
+}
+
+/* Placeholder */
+.block-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-muted-foreground/30 float-left h-0 pointer-events-none;
+}
+
+.block-editor-content .is-empty::before {
+  content: attr(data-placeholder);
+  @apply text-muted-foreground/30 float-left h-0 pointer-events-none;
+}
+
+/* Lists */
+.block-editor-content ul {
+  @apply list-disc pl-5 text-sm;
+}
+.block-editor-content ol {
+  @apply list-decimal pl-5 text-sm;
+}
+.block-editor-content li {
+  @apply mb-0.5;
+}
+.block-editor-content li p {
+  @apply mb-0;
+}
+
+/* Task list */
+.block-editor-content ul[data-type="taskList"] {
+  @apply list-none pl-0;
+}
+.block-editor-content ul[data-type="taskList"] li {
+  @apply flex items-start gap-2;
+}
+.block-editor-content ul[data-type="taskList"] li > label {
+  @apply mt-0.5;
+}
+.block-editor-content ul[data-type="taskList"] li > label input[type="checkbox"] {
+  @apply h-4 w-4 rounded border-muted-foreground/40 bg-transparent accent-foreground cursor-pointer;
+}
+.block-editor-content ul[data-type="taskList"] li > div {
+  @apply flex-1;
+}
+.block-editor-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  @apply line-through text-muted-foreground/50;
+}
+
+/* Blockquote */
+.block-editor-content blockquote {
+  @apply border-l-2 border-muted-foreground/30 pl-3 italic text-muted-foreground text-sm;
+}
+
+/* Code */
+.block-editor-content code {
+  @apply bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded text-xs;
+}
+.block-editor-content pre {
+  @apply bg-secondary p-4 rounded text-xs overflow-x-auto my-2;
+}
+.block-editor-content pre code {
+  @apply bg-transparent p-0 text-secondary-foreground;
+}
+
+/* Horizontal rule */
+.block-editor-content hr,
+.block-editor-content .editor-hr {
+  @apply border-border my-4;
+}
+
+/* Links */
+.block-editor-content a,
+.block-editor-content .editor-link {
+  @apply text-accent-foreground underline underline-offset-2 cursor-pointer decoration-accent-foreground/40;
+}
+.block-editor-content a:hover,
+.block-editor-content .editor-link:hover {
+  @apply decoration-accent-foreground;
+}
+
+/* Images */
+.block-editor-content .editor-image,
+.block-editor-content img {
+  @apply rounded-md max-w-full mx-auto block my-4;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+/* Strong / emphasis */
+.block-editor-content strong {
+  @apply text-foreground font-semibold;
+}
+.block-editor-content em {
+  @apply italic;
+}
+.block-editor-content s {
+  @apply line-through text-muted-foreground/60;
+}
+
+/* Callout */
+.callout-block {
+  @apply flex items-start gap-3 bg-secondary/50 border border-border rounded-md p-3 my-2 text-sm;
+}
+.callout-emoji {
+  @apply text-base leading-none mt-0.5 select-none;
+}
+.callout-content {
+  @apply flex-1;
+}
+
+/* Toggle */
+.toggle-block {
+  @apply border border-border rounded-md my-2;
+}
+.toggle-block summary {
+  @apply px-3 py-2 cursor-pointer text-sm text-foreground select-none hover:bg-accent/50 transition-colors;
+}
+.toggle-block .toggle-content {
+  @apply px-3 pb-2;
+}
+
+/* Bubble menu */
+.bubble-menu {
+  @apply flex items-center gap-0.5 bg-card border border-border rounded-md shadow-lg p-1;
+}
+.bubble-btn {
+  @apply p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors;
+}
+.bubble-btn.is-active {
+  @apply text-foreground bg-accent;
+}
+
+/* Table */
+.block-editor-content table {
+  @apply w-full border-collapse my-3;
+}
+.block-editor-content th,
+.block-editor-content td {
+  @apply border border-border px-3 py-2 text-xs text-foreground text-left align-top;
+}
+.block-editor-content th {
+  @apply bg-secondary font-medium text-xs;
+}
+.block-editor-content td p,
+.block-editor-content th p {
+  @apply mb-0;
+}
+.block-editor-content .selectedCell {
+  @apply bg-accent/40;
+}
+.block-editor-content .column-resize-handle {
+  @apply bg-ring;
+  width: 2px;
+  position: absolute;
+  right: -1px;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.tableWrapper {
+  @apply overflow-x-auto my-2;
+}
+
+/* Embed */
+.block-editor-content [data-type="embed"] {
+  @apply my-4 rounded-lg overflow-hidden;
+}
+.block-editor-content [data-type="embed"] iframe {
+  @apply w-full rounded-lg;
+  min-height: 300px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(0 0% 25%); border-radius: 2px; }
+
+/* ============ Math (KaTeX) ============ */
+.math-block {
+  @apply my-4 px-4 py-3 rounded-md bg-secondary/40 border border-border/60 text-foreground overflow-x-auto;
+  cursor: pointer;
+}
+.math-inline {
+  @apply px-1 rounded;
+  cursor: pointer;
+}
+.math-inline:hover, .math-block:hover {
+  @apply bg-accent/40;
+}
+.math-render-block {
+  @apply text-base;
+}
+.math-input {
+  @apply w-full bg-background border border-border rounded px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring;
+}
+.math-block-edit {
+  @apply my-3;
+}
+.math-inline-edit {
+  @apply inline-block mx-0.5;
+}
+.math-inline-edit .math-input {
+  @apply inline-block w-auto min-w-[120px];
+}
+
+/* ============ Columns layout ============ */
+.block-editor-content .nw-columns {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-4 my-3 p-3 rounded-md border border-dashed border-border/50;
+}
+.block-editor-content .nw-col {
+  @apply min-h-[60px];
+}
+.block-editor-content .nw-col p {
+  @apply mb-1;
+}
+
+/* ============ Bubble menu — AI button ============ */
+.bubble-btn-ai {
+  @apply px-2 py-1.5 rounded text-primary hover:bg-accent flex items-center font-medium;
+}
+
+/* ============ AI Assistant chat prose ============ */
+.ai-msg-prose {
+  @apply text-xs leading-relaxed;
+}
+.ai-msg-prose p { @apply mb-2 last:mb-0; }
+.ai-msg-prose h1 { @apply text-sm font-semibold mt-2 mb-1; }
+.ai-msg-prose h2 { @apply text-xs font-semibold mt-2 mb-1; }
+.ai-msg-prose h3 { @apply text-xs font-medium mt-2 mb-1; }
+.ai-msg-prose ul { @apply list-disc pl-4 mb-2 space-y-0.5; }
+.ai-msg-prose ol { @apply list-decimal pl-4 mb-2 space-y-0.5; }
+.ai-msg-prose li { @apply text-xs; }
+.ai-msg-prose code {
+  @apply bg-background/40 px-1 py-0.5 rounded text-[10.5px] font-mono;
+}
+.ai-msg-prose pre {
+  @apply bg-background/60 p-2 rounded my-2 overflow-x-auto;
+}
+.ai-msg-prose pre code {
+  @apply bg-transparent p-0;
+}
+.ai-msg-prose a {
+  @apply underline underline-offset-2;
+}
+.ai-msg-prose blockquote {
+  @apply border-l-2 pl-2 italic my-2 opacity-80;
+  border-color: currentColor;
+  border-left-color: rgb(from currentColor r g b / 0.3);
+}
+.ai-msg-prose table {
+  @apply w-full border-collapse my-2 text-[10.5px];
+}
+.ai-msg-prose th, .ai-msg-prose td {
+  @apply border px-1.5 py-1 text-left;
+  border-color: rgb(from currentColor r g b / 0.2);
+}
+
+/* ============ Slash menu polish ============ */
+.tippy-box[data-theme] { background: transparent !important; }
+
+/* ============ General editor aesthetic polish ============ */
+.block-editor-wrapper {
+  @apply max-w-[1100px] mx-auto px-6 md:px-10 lg:px-14 py-8;
+}
+@media (min-width: 1600px) {
+  .block-editor-wrapper { max-width: 1280px; }
+}
+.block-editor-content h1 {
+  @apply text-2xl font-semibold tracking-tight text-foreground mt-6 mb-3;
+  letter-spacing: -0.02em;
+}
+.block-editor-content h2 {
+  @apply text-xl font-semibold text-foreground mt-5 mb-2;
+  letter-spacing: -0.015em;
+}
+.block-editor-content h3 {
+  @apply text-base font-semibold text-foreground mt-4 mb-2;
+}
+.block-editor-content p {
+  @apply text-foreground/90;
+}
+.block-editor-content blockquote {
+  @apply border-l-2 border-primary/40 pl-4 italic text-muted-foreground my-3;
+}
+
+/* slash command popup animation */
+.tippy-box {
+  animation: nw-slash-in 0.12s ease-out;
+}
+@keyframes nw-slash-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ Line numbers (CSS counter on top-level blocks) ============ */
+.nw-line-numbers .block-editor-content {
+  counter-reset: nw-line;
+}
+.nw-line-numbers .block-editor-content > p,
+.nw-line-numbers .block-editor-content > h1,
+.nw-line-numbers .block-editor-content > h2,
+.nw-line-numbers .block-editor-content > h3,
+.nw-line-numbers .block-editor-content > ul,
+.nw-line-numbers .block-editor-content > ol,
+.nw-line-numbers .block-editor-content > blockquote,
+.nw-line-numbers .block-editor-content > pre,
+.nw-line-numbers .block-editor-content > .tableWrapper,
+.nw-line-numbers .block-editor-content > div {
+  counter-increment: nw-line;
+  position: relative;
+}
+.nw-line-numbers .block-editor-content > p::before,
+.nw-line-numbers .block-editor-content > h1::before,
+.nw-line-numbers .block-editor-content > h2::before,
+.nw-line-numbers .block-editor-content > h3::before,
+.nw-line-numbers .block-editor-content > ul::before,
+.nw-line-numbers .block-editor-content > ol::before,
+.nw-line-numbers .block-editor-content > blockquote::before,
+.nw-line-numbers .block-editor-content > pre::before,
+.nw-line-numbers .block-editor-content > .tableWrapper::before {
+  content: counter(nw-line);
+  position: absolute;
+  left: -3.25rem;
+  top: 0.35em;
+  width: 2.25rem;
+  text-align: right;
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: hsl(var(--muted-foreground) / 0.4);
+  user-select: none;
+  pointer-events: none;
+  letter-spacing: 0;
+}
+@media (max-width: 768px) {
+  .nw-line-numbers .block-editor-content > *::before { display: none; }
+}
+
+/* ============ AI Sidebar — production polish ============ */
+.ai-msg-bubble {
+  @apply rounded-lg px-3 py-2 text-xs leading-relaxed transition-colors;
+  border: 1px solid transparent;
+}
+.ai-msg-bubble.user {
+  @apply bg-primary text-primary-foreground;
+}
+.ai-msg-bubble.assistant {
+  @apply bg-secondary/70 text-foreground;
+  border-color: hsl(var(--border) / 0.6);
+}
+.ai-msg-bubble.assistant:hover { border-color: hsl(var(--border)); }
+
+@keyframes nw-pulse-caret {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+.nw-caret {
+  display: inline-block;
+  width: 6px;
+  height: 12px;
+  margin-left: 2px;
+  background: currentColor;
+  vertical-align: middle;
+  animation: nw-pulse-caret 1s ease-in-out infinite;
+}
+
+@keyframes nw-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.nw-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground) / 0.4) 0%,
+    hsl(var(--foreground)) 50%,
+    hsl(var(--muted-foreground) / 0.4) 100%
+  );
+  background-size: 200% 100%;
+  animation: nw-shimmer 1.6s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes nw-ascii-flow {
+  0%   { content: "·· ── ·· ── ··"; }
+  25%  { content: "── ·· ── ·· ──"; }
+  50%  { content: "·─ ─· ─· ·─ ─·"; }
+  75%  { content: "─· ·─ ·─ ─· ·─"; }
+  100% { content: "·· ── ·· ── ··"; }
+}
+.nw-ascii-bar::before {
+  content: "·· ── ·· ── ··";
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+  letter-spacing: 1px;
+  color: hsl(var(--muted-foreground) / 0.5);
+  animation: nw-ascii-flow 3.2s steps(4, end) infinite;
+  font-size: 10px;
+}
+
+.nw-ai-chip {
+  @apply flex items-center gap-2 text-left text-[11px] text-muted-foreground hover:text-foreground rounded-md px-2.5 py-2 transition-all duration-150;
+  border: 1px solid hsl(var(--border) / 0.6);
+  background: hsl(var(--secondary) / 0.3);
+}
+.nw-ai-chip:hover {
+  border-color: hsl(var(--border));
+  background: hsl(var(--accent) / 0.5);
+  transform: translateX(2px);
+}
+
+.nw-ai-input {
+  @apply w-full bg-background border border-border rounded-md px-2.5 py-2 pr-9 text-xs font-mono resize-none transition-all;
+}
+.nw-ai-input:focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.15);
+}
+
+@keyframes nw-sparkle-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+.nw-sparkle-anim { animation: nw-sparkle-pulse 2.4s ease-in-out infinite; }
+
+.nw-resize-handle { position: relative; }
+.nw-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 32px;
+  background: hsl(var(--border));
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.nw-resize-handle:hover::after,
+.nw-resize-handle:active::after { opacity: 1; }
+
+/* Excalidraw theming */
+.excalidraw {
+  --color-primary: hsl(var(--primary));
+  --color-primary-darker: hsl(var(--primary));
+  --color-primary-darkest: hsl(var(--primary));
+}
+
+/* Inline drawing node toolbar */
+.nw-tb-btn {
+  @apply p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors;
+}
+.nw-tb-btn.active {
+  @apply bg-accent text-foreground;
+}
+.nw-drawing-node img { user-select: none; -webkit-user-drag: none; }
+
+/* Math textarea (block math editing) */
+.math-textarea {
+  min-height: 80px;
+  font-family: 'Geist Mono', 'JetBrains Mono', monospace;
+  white-space: pre;
+  line-height: 1.5;
+}
+.math-block .katex-display {
+  margin: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+.math-block .katex {
+  font-size: 1.05em;
+}
+.math-block .katex-display > .katex {
+  white-space: normal;
+}
+
+/* Mobile responsive overrides */
+@media (max-width: 768px) {
+  .block-editor-wrapper {
+    padding: 1rem 0.875rem !important;
+    max-width: 100% !important;
+  }
+  .block-editor-content {
+    font-size: 14px;
+    line-height: 1.7;
+    letter-spacing: 0;
+  }
+  .block-editor-content h1 { font-size: 1.4rem; }
+  .block-editor-content h2 { font-size: 1.2rem; }
+  .block-editor-content h3 { font-size: 1.05rem; }
+  .math-block { padding: 0.75rem; font-size: 0.9rem; }
+  .math-block .katex { font-size: 0.95em; }
+  .bubble-menu { flex-wrap: wrap; max-width: 92vw; }
+  .tableWrapper { -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 480px) {
+  .block-editor-wrapper { padding: 0.75rem 0.625rem !important; }
+  .block-editor-content { font-size: 13.5px; }
+}
+
+
+/* ============ Themed text selection ============ */
+::selection {
+  background-color: hsl(var(--foreground) / 0.18);
+  color: hsl(var(--foreground));
+}
+::-moz-selection {
+  background-color: hsl(var(--foreground) / 0.18);
+  color: hsl(var(--foreground));
+}
+.ProseMirror ::selection,
+.block-editor-content ::selection {
+  background-color: hsl(var(--foreground) / 0.22);
+  color: hsl(var(--foreground));
+}
+/* Tiptap "gap" / node selection (for atoms like math, drawings, images) */
+.ProseMirror-selectednode {
+  outline: 2px solid hsl(var(--ring) / 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============ Empty-block placeholder (Notion-style) ============ */
+.block-editor-content .is-empty::before,
+.block-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground) / 0.45);
+  pointer-events: none;
+  height: 0;
+  float: left;
+}
+
+/* ============ Block hover handle (Notion-style gutter) ============ */
+.nw-block-handle {
+  position: absolute;
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  z-index: 20;
+  pointer-events: auto;
+  user-select: none;
+  transition: opacity 120ms ease;
+}
+.nw-block-handle-btn {
+  width: 18px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: transparent;
+  color: hsl(var(--muted-foreground) / 0.6);
+  font-size: 12px;
+  line-height: 1;
+  cursor: grab;
+  border: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+.nw-block-handle-btn:hover {
+  background: hsl(var(--accent) / 0.7);
+  color: hsl(var(--foreground));
+}
+.nw-block-handle-add { cursor: pointer; font-weight: 600; font-size: 14px; }
+.nw-block-handle-drag:active { cursor: grabbing; }
+
+@media (max-width: 768px) {
+  /* Handles rely on hover; hide on touch for cleanliness. */
+  .nw-block-handle { display: none !important; }
+}
+
+
+/* ============ Accent-aware surfaces ============ */
+/* Editor links follow the picked accent, not the flat foreground gray. */
+.block-editor-content a,
+.block-editor-content .editor-link {
+  color: hsl(var(--accent-strong));
+  text-decoration-color: hsl(var(--accent-strong) / 0.5);
+}
+.block-editor-content a:hover,
+.block-editor-content .editor-link:hover {
+  text-decoration-color: hsl(var(--accent-strong));
+}
+/* Editor caret takes the accent color. */
+.block-editor-content { caret-color: hsl(var(--accent-strong)); }
+/* ProseMirror text selection inside the editor uses the soft accent tint. */
+.block-editor-content ::selection,
+.ProseMirror ::selection {
+  background: hsl(var(--accent-soft));
+}
+/* Block-handle hover uses accent. */
+.nw-block-handle-btn:hover {
+  background: hsl(var(--accent-soft));
+  color: hsl(var(--accent-strong));
+}
+
+/* ============================================================
+   Dither system — the signature texture. Monochrome by default,
+   accent-tintable, and fully driven by CSS custom properties so it
+   re-themes with light/dark and the user's accent pick.
+   ============================================================ */
+.dither {
+  --dither-size: 4px;
+  --dither-dot: hsl(var(--fg-2) / 0.5);
+  background-image: radial-gradient(var(--dither-dot) 0.5px, transparent 0.6px);
+  background-size: var(--dither-size) var(--dither-size);
+  background-position: 0 0;
+}
+.dither--dense { --dither-size: 3px; }
+.dither--sparse { --dither-size: 7px; }
+.dither--coarse { --dither-size: 10px; }
+.dither--accent { --dither-dot: hsl(var(--accent-strong) / 0.55); }
+.dither--strong { --dither-dot: hsl(var(--fg-1) / 0.6); }
+
+/* Ramp masks — dense→sparse fades like the energy-dashboard timeline. */
+.dither--fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+.dither--fade-up {
+  -webkit-mask-image: linear-gradient(to top, #000, transparent);
+  mask-image: linear-gradient(to top, #000, transparent);
+}
+.dither--radial {
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
+  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
+}
+
+/* Ordered 4x4 Bayer dither via a repeating inline SVG (crisp, retro). */
+.dither--bayer {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cg fill='%23808080'%3E%3Crect x='0' y='0' width='1' height='1'/%3E%3Crect x='2' y='2' width='1' height='1'/%3E%3Crect x='2' y='0' width='1' height='1' opacity='0.5'/%3E%3Crect x='0' y='2' width='1' height='1' opacity='0.5'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: var(--dither-size) var(--dither-size);
+  opacity: 0.4;
+}
+
+/* Diagonal hatch texture. */
+.dither--hatch {
+  background-image: repeating-linear-gradient(45deg, var(--dither-dot) 0 1px, transparent 1px 6px);
+}
+
+/* Slow drift for "live" surfaces; disabled under reduced-motion. */
+@keyframes nw-dither-drift {
+  from { background-position: 0 0; }
+  to { background-position: var(--dither-size, 4px) var(--dither-size, 4px); }
+}
+.dither--animate { animation: nw-dither-drift 1.2s steps(2, end) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dither--animate { animation: none; }
+}
+
+/* ============ Iconography ============ */
+/* Uniform lucide stroke — CSS wins over the presentation attribute. */
+.lucide { stroke-width: 1.5px; }
