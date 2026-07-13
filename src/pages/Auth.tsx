@@ -41,7 +41,7 @@ export default function Auth() {
       <div className="min-h-screen bg-background text-foreground grid lg:grid-cols-2">
         {/* Left — dither illustration + wordmark */}
         <div className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-border-subtle p-10">
-          <Dither variant="dot" fade="radial" density="normal" className="opacity-50" />
+          <Dither variant="grain" fade="radial" density="sparse" />
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] rounded-full bg-accent-strong/[0.06] blur-3xl" />
           <Link to="/" className="relative z-10"><Logo size={30} withWordmark wordmarkClassName="text-sm font-display font-semibold" /></Link>
           <div className="relative z-10 space-y-4">

@@ -8,7 +8,7 @@ export function Footer() {
   const year = new Date().getFullYear();
   return (
     <footer className="relative border-t border-border-subtle bg-background pt-16 sm:pt-20 pb-10 px-4 sm:px-6 overflow-hidden">
-      <div className="dither dither--coarse pointer-events-none absolute inset-x-0 top-0 h-24 opacity-20 [mask-image:linear-gradient(to_bottom,#000,transparent)]" aria-hidden />
+      <div className="dither dither--grain dither--fade-up pointer-events-none absolute inset-x-0 top-0 h-24 opacity-100" aria-hidden />
       <div className="relative max-w-6xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8 sm:gap-10 mb-12 sm:mb-16">
           <div className="col-span-2 space-y-3">

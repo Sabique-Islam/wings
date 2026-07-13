@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 
-type DitherVariant = "dot" | "bayer" | "hatch";
+type DitherVariant = "grain" | "bayer" | "hatch" | "dots";
 type DitherFade = "none" | "down" | "up" | "radial";
 type DitherDensity = "dense" | "normal" | "sparse" | "coarse";
 
@@ -18,9 +18,10 @@ interface DitherProps {
 }
 
 const variantClass: Record<DitherVariant, string> = {
-  dot: "dither",
+  grain: "dither dither--grain",
   bayer: "dither dither--bayer",
   hatch: "dither dither--hatch",
+  dots: "dither dither--dots",
 };
 
 const fadeClass: Record<DitherFade, string> = {
@@ -38,11 +39,11 @@ const densityClass: Record<DitherDensity, string> = {
 };
 
 /**
- * Dither — the signature monochrome texture. Defaults to a full-bleed,
- * pointer-transparent background layer; set `layer={false}` to render inline.
+ * Dither — stochastic printer grain (default) or ordered Bayer fills.
+ * Grain uses SVG feTurbulence filters mounted via DitherFilterDefs.
  */
 export function Dither({
-  variant = "dot",
+  variant = "grain",
   fade = "none",
   density = "normal",
   accent = false,
@@ -77,10 +78,7 @@ interface DitherSparklineProps {
   accent?: boolean;
 }
 
-/**
- * DitherSparkline — a compact bar chart whose columns are filled with the
- * dither texture (energy-dashboard style). Values are normalized to the max.
- */
+/** Bar chart columns filled with ordered Bayer dither. */
 export function DitherSparkline({ data, className, height = 40, accent = true }: DitherSparklineProps) {
   const max = Math.max(1, ...data);
   return (
@@ -94,7 +92,7 @@ export function DitherSparkline({ data, className, height = 40, accent = true }:
         <div
           key={i}
           className={cn(
-            "dither flex-1 rounded-[1px]",
+            "dither dither--bayer dither--dense flex-1 rounded-[1px]",
             accent ? "dither--accent" : "dither--strong",
           )}
           style={{ height: `${Math.max(6, (v / max) * 100)}%` }}
@@ -110,7 +108,7 @@ interface DitherMeterProps {
   accent?: boolean;
 }
 
-/** DitherMeter — a horizontal progress bar with a dither-filled track. */
+/** Horizontal progress bar with ordered Bayer fill. */
 export function DitherMeter({ value, className, accent = true }: DitherMeterProps) {
   const pct = Math.min(100, Math.max(0, value * 100));
   return (
@@ -122,7 +120,7 @@ export function DitherMeter({ value, className, accent = true }: DitherMeterProp
       aria-valuemax={100}
     >
       <div
-        className={cn("dither h-full", accent ? "dither--accent" : "dither--strong")}
+        className={cn("dither dither--bayer h-full", accent ? "dither--accent" : "dither--strong")}
         style={{ width: `${pct}%` }}
       />
     </div>

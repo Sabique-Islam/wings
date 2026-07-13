@@ -4,17 +4,12 @@ import { ArrowRight } from "lucide-react";
 import { motionEase } from "./constants";
 import { HeroScreenshot } from "./HeroScreenshot";
 import { AsciiWordmark } from "@/lib/ascii";
-import { Dither } from "@/components/ui/Dither";
 
 interface Props { ctaHref: string }
 
 export function Hero({ ctaHref }: Props) {
   return (
     <section className="relative isolate pt-28 sm:pt-32 md:pt-36 pb-16 sm:pb-24 px-4 sm:px-6">
-      <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[40rem] sm:w-[60rem] h-[40rem] sm:h-[60rem] rounded-full bg-accent-strong/[0.07] blur-3xl" />
-        <Dither variant="dot" fade="radial" density="sparse" className="opacity-[0.5]" />
-      </div>
       <div className="max-w-5xl mx-auto text-center flex flex-col items-center gap-6 sm:gap-7">
         <motion.div
           initial={{ opacity: 0, y: 10 }}

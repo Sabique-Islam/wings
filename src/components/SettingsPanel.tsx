@@ -253,7 +253,7 @@ export function SettingsPanel() {
                     </div>
                     <p className="text-xs text-ink-1 font-sans">
                       an <a className="text-accent-strong underline underline-offset-2" href="#">accent link</a> and a{" "}
-                      <span className="dither dither--accent inline-block h-3 w-16 align-middle rounded-sm" />
+                      <span className="dither dither--bayer dither--accent inline-block h-3 w-16 align-middle rounded-sm" />
                     </p>
                   </div>
                 </Field>

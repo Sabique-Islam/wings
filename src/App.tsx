@@ -16,6 +16,7 @@ import EditorE2E from "./pages/EditorE2E";
 import { About, Careers, Blog, Contact, Roadmap, Docs, Support, Status, Press } from "./pages/StaticPages";
 import { CookieBanner } from "@/components/CookieBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DitherFilterDefs } from "@/lib/dither/filters";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { useEffect, useState } from "react";
 import { getMyUsername, getUserIdByUsername } from "@/lib/profile";
@@ -127,6 +128,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
+      <DitherFilterDefs />
       <TooltipProvider>
         <Toaster />
         <Sonner />

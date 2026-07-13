@@ -830,55 +830,109 @@
 }
 
 /* ============================================================
-   Dither system — the signature texture. Monochrome by default,
-   accent-tintable, and fully driven by CSS custom properties so it
-   re-themes with light/dark and the user's accent pick.
+   Dither system — stochastic printer grain + ordered Bayer fills.
+   Grain uses SVG feTurbulence filters (see lib/dither/filters.tsx).
    ============================================================ */
-.dither {
-  --dither-size: 4px;
-  --dither-dot: hsl(var(--fg-2) / 0.5);
-  background-image: radial-gradient(var(--dither-dot) 0.5px, transparent 0.6px);
-  background-size: var(--dither-size) var(--dither-size);
-  background-position: 0 0;
-}
-.dither--dense { --dither-size: 3px; }
-.dither--sparse { --dither-size: 7px; }
-.dither--coarse { --dither-size: 10px; }
-.dither--accent { --dither-dot: hsl(var(--accent-strong) / 0.55); }
-.dither--strong { --dither-dot: hsl(var(--fg-1) / 0.6); }
 
-/* Ramp masks — dense→sparse fades like the energy-dashboard timeline. */
+/* 8×8 ordered Bayer threshold mask — 1-bit gradient fills */
+:root {
+  --dither-bayer-8: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23fff'/%3E%3Crect x='4' y='0' width='1' height='1' fill='%23fff'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%23fff'/%3E%3Crect x='6' y='1' width='1' height='1' fill='%23fff'/%3E%3Crect x='1' y='2' width='1' height='1' fill='%23fff'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%23fff'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%23fff'/%3E%3Crect x='7' y='3' width='1' height='1' fill='%23fff'/%3E%3Crect x='0' y='4' width='1' height='1' fill='%23fff'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%23fff'/%3E%3Crect x='2' y='5' width='1' height='1' fill='%23fff'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%23fff'/%3E%3Crect x='1' y='6' width='1' height='1' fill='%23fff'/%3E%3Crect x='5' y='6' width='1' height='1' fill='%23fff'/%3E%3Crect x='3' y='7' width='1' height='1' fill='%23fff'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%23fff'/%3E%3C/svg%3E");
+}
+
+/* Default: stochastic diffusion grain (printer / film look) */
+.dither,
+.dither--grain {
+  --dither-alpha: 0.14;
+  --dither-blend: soft-light;
+  background: hsl(var(--foreground));
+  filter: url(#nw-dither-grain);
+  opacity: var(--dither-alpha);
+  mix-blend-mode: var(--dither-blend);
+}
+[data-theme="light"] .dither,
+[data-theme="light"] .dither--grain {
+  --dither-blend: multiply;
+  --dither-alpha: 0.1;
+}
+
+.dither--dense { filter: url(#nw-dither-grain-dense); --dither-alpha: 0.18; }
+.dither--sparse { filter: url(#nw-dither-grain-sparse); --dither-alpha: 0.09; }
+.dither--coarse { filter: url(#nw-dither-grain-coarse); --dither-alpha: 0.07; }
+
+.dither--accent {
+  background: hsl(var(--accent-strong));
+  --dither-alpha: 0.22;
+}
+.dither--strong {
+  background: hsl(var(--fg-1));
+  --dither-alpha: 0.2;
+}
+
+/* Ordered 8×8 Bayer — square-pixel 1-bit fills (sparklines, meters) */
+.dither--bayer {
+  background-color: hsl(var(--fg-2) / var(--dither-alpha, 0.2));
+  filter: none;
+  mix-blend-mode: normal;
+  opacity: 1;
+  -webkit-mask-image: var(--dither-bayer-8);
+  mask-image: var(--dither-bayer-8);
+  -webkit-mask-size: var(--dither-size, 3px) var(--dither-size, 3px);
+  mask-size: var(--dither-size, 3px) var(--dither-size, 3px);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+.dither--bayer.dither--dense { --dither-size: 2px; --dither-alpha: 0.24; }
+.dither--bayer.dither--sparse { --dither-size: 4px; --dither-alpha: 0.14; }
+.dither--bayer.dither--coarse { --dither-size: 5px; --dither-alpha: 0.1; }
+.dither--bayer.dither--accent { background-color: hsl(var(--accent-strong) / var(--dither-alpha, 0.22)); }
+.dither--bayer.dither--strong { background-color: hsl(var(--fg-1) / var(--dither-alpha, 0.28)); }
+
+/* Legacy halftone dots — opt-in only */
+.dither--dots {
+  background: transparent;
+  filter: none;
+  mix-blend-mode: normal;
+  opacity: 1;
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-image: radial-gradient(hsl(var(--fg-2) / 0.45) 0.5px, transparent 0.6px);
+  background-size: var(--dither-size, 4px) var(--dither-size, 4px);
+}
+
+/* Diagonal hatch */
+.dither--hatch {
+  background: transparent;
+  filter: none;
+  mix-blend-mode: normal;
+  opacity: 1;
+  background-image: repeating-linear-gradient(45deg, hsl(var(--fg-2) / 0.1) 0 1px, transparent 1px 5px);
+}
+
+/* Black viewbox container for dithered SVG art */
+.dither-viewbox {
+  background: #000;
+  overflow: hidden;
+}
+
+/* Ramp fades — mask the grain layer */
 .dither--fade {
-  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
-  mask-image: linear-gradient(to bottom, #000, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 25%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 25%, transparent 100%);
 }
 .dither--fade-up {
-  -webkit-mask-image: linear-gradient(to top, #000, transparent);
-  mask-image: linear-gradient(to top, #000, transparent);
+  -webkit-mask-image: linear-gradient(to top, #000 25%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 25%, transparent 100%);
 }
 .dither--radial {
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
-  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 72%);
+  mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 72%);
 }
 
-/* Ordered 4x4 Bayer dither via a repeating inline SVG (crisp, retro). */
-.dither--bayer {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cg fill='%23808080'%3E%3Crect x='0' y='0' width='1' height='1'/%3E%3Crect x='2' y='2' width='1' height='1'/%3E%3Crect x='2' y='0' width='1' height='1' opacity='0.5'/%3E%3Crect x='0' y='2' width='1' height='1' opacity='0.5'/%3E%3C/g%3E%3C/svg%3E");
-  background-size: var(--dither-size) var(--dither-size);
-  opacity: 0.4;
-}
-
-/* Diagonal hatch texture. */
-.dither--hatch {
-  background-image: repeating-linear-gradient(45deg, var(--dither-dot) 0 1px, transparent 1px 6px);
-}
-
-/* Slow drift for "live" surfaces; disabled under reduced-motion. */
 @keyframes nw-dither-drift {
   from { background-position: 0 0; }
-  to { background-position: var(--dither-size, 4px) var(--dither-size, 4px); }
+  to { background-position: 3px 3px; }
 }
-.dither--animate { animation: nw-dither-drift 1.2s steps(2, end) infinite; }
+.dither--animate { animation: nw-dither-drift 1.4s steps(2, end) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .dither--animate { animation: none; }
 }

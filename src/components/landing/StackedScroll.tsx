@@ -26,8 +26,9 @@ export function StackedScroll() {
                 <div className="font-display font-bold text-3xl sm:text-4xl md:text-5xl tracking-tight leading-[1.05]">{c.title}</div>
                 <div className="text-sm sm:text-base md:text-lg text-ink-1 font-sans leading-relaxed max-w-md">{c.body}</div>
               </div>
-              <div className="dither dither--sparse relative bg-surface-0/60 border-t md:border-t-0 md:border-l border-border-subtle min-h-[200px] sm:min-h-[280px] flex items-center justify-center p-6 sm:p-8 font-mono text-xs text-ink-2 overflow-hidden">
-                <pre className="leading-tight text-[10px] sm:text-[11px] opacity-80">{`┌──────────── ${c.tag} ────────────┐
+              <div className="relative bg-surface-0 border-t md:border-t-0 md:border-l border-border-subtle min-h-[200px] sm:min-h-[280px] flex items-center justify-center p-6 sm:p-8 font-mono text-xs text-ink-2 overflow-hidden">
+                <div className="dither dither--grain absolute inset-0 opacity-50" aria-hidden />
+                <pre className="relative z-10 leading-tight text-[10px] sm:text-[11px] opacity-80">{`┌──────────── ${c.tag} ────────────┐
 │                                  │
 │   ▌ ${c.title.slice(0, 22).padEnd(22, " ")}      │
 │                                  │

@@ -12,7 +12,7 @@ const NotFound = () => {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background text-foreground overflow-hidden px-4">
-      <Dither variant="dot" fade="radial" density="normal" className="opacity-40" />
+      <Dither variant="grain" fade="radial" density="sparse" />
       <div className="relative text-center space-y-6">
         <Ascii size="text-[10px] sm:text-xs" className="text-ink-2 inline-block text-left">
 {`┌────────────────────┐

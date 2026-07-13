@@ -8,7 +8,7 @@ export function StarField() {
   const stars = Array.from({ length: 28 }, (_, i) => i);
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="dither dither--dense absolute inset-0 opacity-25" aria-hidden />
+      <div className="dither dither--grain dither--dense absolute inset-0 opacity-30" aria-hidden />
       {stars.map((i) => {
         const top = (i * 37) % 100;
         const left = (i * 53) % 100;

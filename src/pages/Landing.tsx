@@ -7,12 +7,12 @@ import { InfiniteMarquee } from "@/components/landing/InfiniteMarquee";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
 import { StackedScroll } from "@/components/landing/StackedScroll";
 import { Footer } from "@/components/landing/Footer";
-import { Dither } from "@/components/ui/Dither";
 import { Seo } from "@/components/Seo";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { motionEase } from "@/components/landing/constants";
+import { Dither } from "@/components/ui/Dither";
 
 export default function Landing() {
   const { user } = useAuth();
@@ -28,16 +28,16 @@ export default function Landing() {
   return (
     <>
       <Seo path="/" />
-      <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
+        <Dither variant="grain" fade="radial" density="sparse" className="opacity-100" />
         <NavBar ctaHref={ctaHref} ctaLabel={ctaLabel} />
         <Hero ctaHref={ctaHref} />
         <InfiniteMarquee items={["markdown", "latex", "excalidraw", "agentic ai", "block editor", "offline-first", "share & publish", "keyboard-first"]} />
         <FeatureGrid />
         <InfiniteMarquee reverse items={["⌘J summon", "/slash command", "$$ math $$", "≡ blocks", "✎ canvas", "↗ publish", "◉ private"]} />
         <StackedScroll />
-        <section className="relative py-24 sm:py-32 px-4 sm:px-6 overflow-hidden">
-          <Dither variant="dot" fade="radial" density="normal" className="opacity-40" />
-          <div className="relative max-w-3xl mx-auto text-center space-y-6">
+        <section className="relative py-24 sm:py-32 px-4 sm:px-6">
+          <div className="max-w-3xl mx-auto text-center space-y-6">
             <motion.h2
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}

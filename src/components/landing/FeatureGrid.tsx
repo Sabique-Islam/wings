@@ -1,26 +1,53 @@
 import { motion } from "framer-motion";
 import { fadeUp, motionEase } from "./constants";
-import { Dither } from "@/components/ui/Dither";
-import { AsciiSparkline } from "@/lib/ascii";
+import { DitherGraphic, DITHER_GRAPHIC_MAP } from "@/lib/dither/graphics";
 import { cn } from "@/lib/utils";
 
-type Feature = {
+type ShowcaseFeature = {
   t: string;
+  headline: string;
   d: string;
-  a: string;
-  span: string;
-  spark?: number[];
+  tag: string;
+  graphic: keyof typeof DITHER_GRAPHIC_MAP;
 };
 
-// Bento 3-2-3 rhythm across a 6-col grid.
-const FEATURES: Feature[] = [
-  { t: "block editor", d: "slash commands, markdown, latex, drawings — every line is a block you can drag and transform.", a: "/  →  table", span: "lg:col-span-3" },
-  { t: "agentic ai", d: "summon ⌘J. it reads your open page and drafts the next paragraph, inline.", a: "⌘J", span: "lg:col-span-3", spark: [3, 5, 4, 7, 6, 9, 8, 12, 10, 14] },
-  { t: "excalidraw inline", d: "sketch on any page. resize, persist, share.", a: "✎ canvas", span: "lg:col-span-2" },
-  { t: "live latex", d: "type $$…$$ — pmatrix, implies, all of it.", a: "Σ live", span: "lg:col-span-2" },
-  { t: "databases", d: "table, board, gallery — inline or full-page.", a: "▦ /table", span: "lg:col-span-2" },
-  { t: "share & publish", d: "role-based access. public read links.", a: "↗ /s/", span: "lg:col-span-3" },
-  { t: "offline first", d: "drafts cached locally. retries on reconnect.", a: "◉ local", span: "lg:col-span-3" },
+const SHOWCASE: ShowcaseFeature[] = [
+  {
+    t: "compose",
+    headline: "block editor",
+    d: "slash commands, markdown, latex, drawings — every line is a block you can drag and transform.",
+    tag: "/  →  table",
+    graphic: "block editor",
+  },
+  {
+    t: "summon",
+    headline: "agentic ai",
+    d: "summon ⌘J. it reads your open page and drafts the next paragraph, inline.",
+    tag: "⌘J",
+    graphic: "agentic ai",
+  },
+  {
+    t: "publish",
+    headline: "share & publish",
+    d: "role-based access. public read links. one click to the world.",
+    tag: "↗ /s/",
+    graphic: "share & publish",
+  },
+  {
+    t: "persist",
+    headline: "offline first",
+    d: "drafts cached locally. retries on reconnect. your words stay yours.",
+    tag: "◉ local",
+    graphic: "offline first",
+  },
+];
+
+type CompactFeature = { t: string; d: string; a: string };
+
+const MORE: CompactFeature[] = [
+  { t: "excalidraw inline", d: "sketch on any page. resize, persist, share.", a: "✎ canvas" },
+  { t: "live latex", d: "type $$…$$ — pmatrix, implies, all of it.", a: "Σ live" },
+  { t: "databases", d: "table, board, gallery — inline or full-page.", a: "▦ /table" },
 ];
 
 export function FeatureGrid() {
@@ -39,33 +66,60 @@ export function FeatureGrid() {
             built for the way you<br className="hidden sm:block" /> actually think.
           </motion.h2>
         </motion.div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-          {FEATURES.map((f, i) => (
-            <motion.div
+
+        {/* 2×2 reference-style cards with dithered black viewboxes */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 mb-4 sm:mb-5">
+          {SHOWCASE.map((f, i) => (
+            <motion.article
               key={f.t}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.05, ease: motionEase }}
+              transition={{ duration: 0.6, delay: i * 0.08, ease: motionEase }}
+              className="group relative flex flex-col rounded-xl border border-border-subtle bg-card p-6 sm:p-8 transition-colors hover:border-border-strong"
+            >
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <h3 className="font-display text-2xl sm:text-3xl tracking-tight capitalize">{f.t}</h3>
+                <span className="font-display text-4xl sm:text-5xl font-bold text-transparent [-webkit-text-stroke:1px_hsl(var(--fg-3))] tabular-nums leading-none">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+              </div>
+
+              <div className="dither-viewbox relative aspect-[8/3] w-full rounded-sm mb-6">
+                <DitherGraphic id={DITHER_GRAPHIC_MAP[f.graphic]} />
+              </div>
+
+              <div className="flex-1 space-y-3">
+                <h4 className="font-display text-lg sm:text-xl font-semibold tracking-tight">{f.headline}</h4>
+                <p className="text-sm text-ink-1 font-sans leading-relaxed">{f.d}</p>
+              </div>
+
+              <div className="mt-6 flex items-end justify-between gap-4">
+                <span className="inline-flex items-center gap-2 text-[10px] font-mono text-ink-2 border border-border-subtle rounded px-2 py-1">
+                  {f.tag}
+                </span>
+                <span className="text-[10px] font-mono text-ink-3 uppercase tracking-widest">wings</span>
+              </div>
+            </motion.article>
+          ))}
+        </div>
+
+        {/* Compact row for remaining features */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {MORE.map((f, i) => (
+            <motion.div
+              key={f.t}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: i * 0.06, ease: motionEase }}
               className={cn(
-                "group relative overflow-hidden rounded-xl border border-border-subtle bg-surface-1 p-6 sm:p-7 transition-colors hover:border-border-strong",
-                f.span,
+                "rounded-xl border border-border-subtle bg-surface-1 p-5 sm:p-6 transition-colors hover:border-border-strong",
               )}
             >
-              <Dither variant="dot" density="sparse" className="opacity-0 transition-opacity duration-slow group-hover:opacity-40" />
-              <div className="relative flex h-full flex-col">
-                <div className="font-mono text-[10px] text-ink-2 mb-5 sm:mb-6">0{i + 1} / 0{FEATURES.length}</div>
-                <div className="font-display text-2xl sm:text-3xl tracking-tight mb-2">{f.t}</div>
-                <div className="text-sm text-ink-1 font-sans leading-relaxed">{f.d}</div>
-                {f.spark && (
-                  <AsciiSparkline data={f.spark} accent className="mt-5 text-lg" />
-                )}
-                <div className="mt-auto pt-6 sm:pt-8">
-                  <span className="inline-flex items-center gap-2 text-[10px] font-mono text-ink-2 border border-border-subtle rounded px-2 py-1">
-                    {f.a}
-                  </span>
-                </div>
-              </div>
+              <div className="font-display text-lg tracking-tight mb-1.5">{f.t}</div>
+              <p className="text-sm text-ink-1 font-sans leading-relaxed mb-4">{f.d}</p>
+              <span className="text-[10px] font-mono text-ink-2 border border-border-subtle rounded px-2 py-1">{f.a}</span>
             </motion.div>
           ))}
         </div>
