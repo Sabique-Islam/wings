@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { fetchEntries, createEntry, updateEntry, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
 import { saveDraft, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
+import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
 import { JournalSidebar } from "@/components/JournalSidebar";
 import { JournalEditor } from "@/components/JournalEditor";
@@ -12,6 +14,27 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { AIAssistant } from "@/components/AIAssistant";
 import { useAuth } from "@/hooks/useAuth";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
+
+function resolveEntryOwnerId(
+  parentId: string | undefined,
+  userId: string,
+  entries: Entry[],
+  roleMap: Record<string, ShareRole>,
+): string {
+  if (!parentId) return userId;
+  const parent = entries.find((e) => e.id === parentId);
+  const role = roleMap[parentId];
+  if (parent && role && role !== "owner") return parent.user_id;
+  return userId;
+}
+
+function entryErrorMessage(err: unknown): string {
+  const msg = (err as { message?: string })?.message ?? "";
+  if (/jwt|session|auth/i.test(msg)) return "Session expired — sign in again.";
+  if (/row-level security|42501/i.test(msg)) return "Permission denied — you may not have access to create this page.";
+  if (/network|fetch/i.test(msg)) return "Network error — check your connection.";
+  return msg || "Something went wrong. Try again.";
+}
 
 export default function Index() {
   const { user } = useAuth();
@@ -28,18 +51,17 @@ export default function Index() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const savedFlashRef = useRef<ReturnType<typeof setTimeout>>();
+  const creatingRef = useRef(false);
 
   const setActiveId = useCallback((id: string | null) => {
     setActiveIdRaw(id);
     navigate(id ? `${basePath}/n/${id}` : basePath || "/app");
   }, [navigate, basePath]);
 
-  // Sync state from URL changes (back/forward, deep link)
   useEffect(() => {
     setActiveIdRaw(routeId ?? null);
   }, [routeId]);
 
-  // Flush pending writes on load (retry offline saves)
   useEffect(() => {
     if (!user) return;
     const pending = getPendingWrites();
@@ -61,45 +83,88 @@ export default function Index() {
         setEntries(data);
         setRoleMap(roles);
       })
-      .catch((err) => console.error("Failed to fetch entries:", err))
+      .catch((err) => {
+        console.error("Failed to fetch entries:", err);
+        toast.error("Couldn't load pages", { description: entryErrorMessage(err) });
+      })
       .finally(() => setLoading(false));
   }, [user]);
 
   const activeEntry = entries.find((e) => e.id === activeId) ?? null;
   const breadcrumbTrail = activeId ? getBreadcrumbTrail(entries, activeId) : [];
 
-  const handleNew = useCallback(async () => {
-    if (!user) return;
-    const entry = await createEntry(user.id, "");
-    setEntries((prev) => [entry, ...prev]);
-    setActiveId(entry.id);
-  }, [user]);
+  // Redirect when URL points to a missing/deleted page
+  useEffect(() => {
+    if (loading || !activeId) return;
+    if (activeEntry) return;
+    setActiveIdRaw(null);
+    navigate(basePath || "/app", { replace: true });
+  }, [loading, activeId, activeEntry, basePath, navigate]);
 
-  const handleNewSubpage = useCallback(async (parentId: string) => {
-    if (!user) return;
-    const entry = await createEntry(user.id, "", parentId);
+  const addCreatedEntry = useCallback((entry: Entry, ownerId: string) => {
     setEntries((prev) => [entry, ...prev]);
-    setActiveId(entry.id);
-  }, [user]);
-
-  const handleNewSubpageWithTitle = useCallback(async (parentId: string, title: string) => {
-    if (!user) return;
-    const entry = await createEntry(user.id, `# ${title}\n\n`, parentId);
-    setEntries((prev) => [entry, ...prev]);
-    // Insert a link to the new page at the cursor in the parent's editor
-    const editor = (window as any).__nw_editor;
-    if (editor) {
-      editor.chain().focus().insertContent(`<a href="#page:${entry.id}">${title}</a>`).run();
-    }
-  }, [user]);
-
-  const handleEntryCreated = useCallback((entry: Entry) => {
-    setEntries((prev) => [entry, ...prev]);
+    setRoleMap((prev) => ({
+      ...prev,
+      [entry.id]: entry.user_id === ownerId ? "owner" : (prev[entry.id] ?? "editor"),
+    }));
   }, []);
 
+  const handleNew = useCallback(async () => {
+    if (!user || creatingRef.current) return;
+    creatingRef.current = true;
+    try {
+      const entry = await createEntry(user.id, "");
+      addCreatedEntry(entry, user.id);
+      setActiveId(entry.id);
+    } catch (err) {
+      console.error("Failed to create page:", err);
+      toast.error("Couldn't create page", { description: entryErrorMessage(err) });
+    } finally {
+      creatingRef.current = false;
+    }
+  }, [user, setActiveId, addCreatedEntry]);
+
+  const handleNewSubpage = useCallback(async (parentId: string) => {
+    if (!user || creatingRef.current) return;
+    creatingRef.current = true;
+    try {
+      const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
+      const entry = await createEntry(ownerId, "", parentId);
+      addCreatedEntry(entry, user.id);
+      setActiveId(entry.id);
+    } catch (err) {
+      console.error("Failed to create sub-page:", err);
+      toast.error("Couldn't create sub-page", { description: entryErrorMessage(err) });
+    } finally {
+      creatingRef.current = false;
+    }
+  }, [user, entries, roleMap, setActiveId, addCreatedEntry]);
+
+  const handleNewSubpageWithTitle = useCallback(async (parentId: string, title: string) => {
+    if (!user || creatingRef.current) return;
+    creatingRef.current = true;
+    try {
+      const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
+      const entry = await createEntry(ownerId, `# ${title}\n\n`, parentId);
+      addCreatedEntry(entry, user.id);
+      const editor = (window as { __nw_editor?: { chain: () => { focus: () => { insertContent: (html: string) => { run: () => void } } } } }).__nw_editor;
+      if (editor) {
+        editor.chain().focus().insertContent(`<a href="#page:${entry.id}">${title}</a>`).run();
+      }
+    } catch (err) {
+      console.error("Failed to create sub-page:", err);
+      toast.error("Couldn't create sub-page", { description: entryErrorMessage(err) });
+    } finally {
+      creatingRef.current = false;
+    }
+  }, [user, entries, roleMap, addCreatedEntry]);
+
+  const handleEntryCreated = useCallback((entry: Entry) => {
+    if (!user) return;
+    addCreatedEntry(entry, user.id);
+  }, [user, addCreatedEntry]);
+
   const handleChange = useCallback((content: string) => {
-    // Local-first: persist to localStorage SYNCHRONOUSLY before anything else
-    // so a crash, reload, or network error can never lose a keystroke.
     if (activeId) {
       saveDraft(activeId, content);
     }
@@ -122,7 +187,6 @@ export default function Index() {
           if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
           savedFlashRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
         } catch {
-          // Network error — queue for retry; draft remains in localStorage.
           queuePendingWrite(activeId, content);
           setSaveStatus("error");
         }
@@ -130,9 +194,6 @@ export default function Index() {
     }, 500);
   }, [activeId]);
 
-  // When opening an entry, prefer the local draft if it diverges from the
-  // server copy — this restores anything the user typed while offline or
-  // before the page was reloaded.
   useEffect(() => {
     if (!activeId) return;
     const draft = getDraft(activeId);
@@ -145,24 +206,33 @@ export default function Index() {
     }));
   }, [activeId]);
 
-
   const handleDelete = useCallback(async (id: string) => {
-    await deleteEntry(id);
-    setEntries((prev) => {
-      const idsToRemove = new Set<string>();
-      const collect = (pid: string) => {
-        idsToRemove.add(pid);
-        prev.filter((e) => e.parent_id === pid).forEach((e) => collect(e.id));
-      };
-      collect(id);
-      return prev.filter((e) => !idsToRemove.has(e.id));
-    });
-    setActiveId(null);
-  }, []);
+    try {
+      await deleteEntry(id);
+      setEntries((prev) => {
+        const idsToRemove = new Set<string>();
+        const collect = (pid: string) => {
+          idsToRemove.add(pid);
+          prev.filter((e) => e.parent_id === pid).forEach((e) => collect(e.id));
+        };
+        collect(id);
+        return prev.filter((e) => !idsToRemove.has(e.id));
+      });
+      setActiveId(null);
+    } catch (err) {
+      console.error("Failed to delete page:", err);
+      toast.error("Couldn't delete page", { description: entryErrorMessage(err) });
+    }
+  }, [setActiveId]);
 
   const handleTogglePin = useCallback(async (id: string, pinned: boolean) => {
-    await togglePin(id, pinned);
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, pinned } : e)));
+    try {
+      await togglePin(id, pinned);
+      setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, pinned } : e)));
+    } catch (err) {
+      console.error("Failed to toggle pin:", err);
+      toast.error("Couldn't update pin", { description: entryErrorMessage(err) });
+    }
   }, []);
 
   const handleUpdateEntry = useCallback((updated: Entry) => {
@@ -173,6 +243,10 @@ export default function Index() {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
+      if (isTypingTarget(e.target) || isEditorFocused()) {
+        if (e.key === "n" || e.key === "N") return;
+        if (e.key === "b" || e.key === "B") return;
+      }
       if (e.key === "n" || e.key === "N") { e.preventDefault(); handleNew(); }
       if (e.key === "b" || e.key === "B") { e.preventDefault(); setSidebarOpen((s) => !s); }
       if (e.key === "/") { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent("nw:search")); }
@@ -227,7 +301,7 @@ export default function Index() {
         onNew={handleNew}
         sidebarOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onRefetch={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); })}
+        onRefetch={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); }).catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
       />
       <JournalEditor
         entry={activeEntry}
@@ -252,7 +326,7 @@ export default function Index() {
         onSelect={setActiveId}
         onLinkPage={(entry) => {
           const title = getEntryTitle(entry);
-          const editor = (window as any).__nw_editor;
+          const editor = (window as { __nw_editor?: { chain: () => { focus: () => { insertContent: (html: string) => { run: () => void } } } } }).__nw_editor;
           if (editor) {
             editor.chain().focus().insertContent(`<a href="#page:${entry.id}">${title}</a>`).run();
           }

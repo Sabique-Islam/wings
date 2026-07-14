@@ -4,6 +4,7 @@ import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut,
 } from "@/components/ui/command";
 import { Entry, getEntryTitle } from "@/lib/journal";
+import { isEditorFocused } from "@/lib/keyboard";
 
 interface Props {
   entries: Entry[];
@@ -18,6 +19,7 @@ export function CommandPalette({ entries, onSelect, onNew, onToggleSidebar }: Pr
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (isEditorFocused()) return;
         e.preventDefault();
         setOpen((o) => !o);
       }

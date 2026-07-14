@@ -94,25 +94,6 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     acceptedVersion.current = localVersion.current;
   }, [content, editor]);
 
-
-  // Keyboard shortcuts for formatting
-  useEffect(() => {
-    if (!editor) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-
-      if (e.shiftKey && e.key === "s") {
-        e.preventDefault();
-        editor.chain().focus().toggleStrike().run();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [editor]);
-
   const setLink = useCallback(() => {
     if (!editor) return;
     const previousUrl = editor.getAttributes("link").href;
@@ -125,7 +106,30 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
 
-  // Method to insert image at cursor
+  // Keyboard shortcuts for formatting + link (⌘K when editor focused)
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      if (e.key.toLowerCase() === "k" && editor.isFocused()) {
+        e.preventDefault();
+        setLink();
+        return;
+      }
+
+      if (e.shiftKey && e.key === "s") {
+        e.preventDefault();
+        editor.chain().focus().toggleStrike().run();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [editor, setLink]);
+
   const insertImage = useCallback((url: string) => {
     if (!editor) return;
     editor.chain().focus().setImage({ src: url }).run();

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sparkles, Wand2, Languages, Scissors, Maximize2, ListChecks, Loader2 } from "lucide-react";
 import { generateOnce, getApiKey } from "@/lib/aiClient";
+import { toast } from "sonner";
 
 interface Props {
   editor: any;
@@ -65,9 +66,9 @@ export function InlineAIMenu({ editor }: Props) {
         prompt: `${instruction}\n\nText:\n"""\n${selectedText}\n"""`,
       });
       editor.chain().focus().insertContentAt({ from, to }, result.trim()).run();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
-      alert(e?.message || "AI request failed");
+      toast.error((e as Error)?.message || "AI request failed");
     } finally {
       setBusy(false);
       setOpen(false);

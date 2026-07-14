@@ -16,26 +16,6 @@ export interface Entry {
 
 export type ShareRole = "owner" | "admin" | "editor" | "viewer";
 
-export async function getUserRoleForEntry(entryId: string, userId: string): Promise<ShareRole> {
-  // Check if owner
-  const { data: entry } = await supabase
-    .from("entries")
-    .select("user_id")
-    .eq("id", entryId)
-    .single();
-  if (entry?.user_id === userId) return "owner";
-
-  // Check shares
-  const { data: share } = await supabase
-    .from("entry_shares")
-    .select("role")
-    .eq("entry_id", entryId)
-    .or(`shared_with_user_id.eq.${userId}`)
-    .maybeSingle();
-
-  return (share?.role as ShareRole) || "viewer";
-}
-
 export interface MonthGroup {
   key: string;
   label: string;
@@ -100,7 +80,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
   const { data: ownData, error: ownError } = await query;
   if (ownError) {
     console.error("Failed to fetch own entries:", ownError);
-    return { entries: [], roleMap: {} };
+    throw ownError;
   }
 
   const roleMap: Record<string, ShareRole> = {};
@@ -168,14 +148,14 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
 }
 
 export async function createEntry(userId: string, content: string, parentId?: string): Promise<Entry> {
-  const insert: any = { user_id: userId, content };
-  if (parentId) insert.parent_id = parentId;
-  const { data, error } = await (supabase as any)
+  const insert = { user_id: userId, content, ...(parentId ? { parent_id: parentId } : {}) };
+  const { data, error } = await supabase
     .from("entries")
     .insert(insert)
     .select(ENTRY_COLS)
     .single();
   if (error) throw error;
+  if (!data) throw new Error("Failed to create page");
   return {
     ...data,
     parent_id: data.parent_id ?? null,

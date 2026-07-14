@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { Keyboard, X } from "lucide-react";
 
 const shortcuts = [
-  { keys: "⌘ K", desc: "Command palette" },
+  { keys: "⌘ K", desc: "Command palette (outside editor)" },
+  { keys: "⌘ K", desc: "Insert link (in editor)" },
   { keys: "⌘ N", desc: "New page" },
   { keys: "⌘ P", desc: "Quick switcher" },
   { keys: "⌘ /", desc: "Search sidebar" },
-  { keys: "⌘ B", desc: "Toggle sidebar" },
+  { keys: "⌘ B", desc: "Toggle sidebar (outside editor)" },
+  { keys: "⌘ B", desc: "Bold (in editor)" },
   { keys: "⌘ ?", desc: "Keyboard shortcuts" },
   { keys: "⌘ ⇧ S", desc: "Strikethrough" },
-  { keys: "⌘ B", desc: "Bold" },
   { keys: "⌘ I", desc: "Italic" },
   { keys: "⌘ E", desc: "Inline code" },
   { keys: "/", desc: "Slash commands" },
@@ -29,7 +30,6 @@ export function KeyboardPalette() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Listen for custom event from palette button
   useEffect(() => {
     const handler = () => setOpen((o) => !o);
     window.addEventListener("nw:shortcuts", handler);
@@ -56,7 +56,7 @@ export function KeyboardPalette() {
         </div>
         <ul className="py-2 max-h-80 overflow-y-auto">
           {shortcuts.map((s, i) => (
-            <li key={i} className="flex items-center justify-between px-4 py-1.5">
+            <li key={`${s.keys}-${s.desc}-${i}`} className="flex items-center justify-between px-4 py-1.5">
               <span className="text-xs text-muted-foreground font-mono">{s.desc}</span>
               <kbd className="text-[10px] bg-secondary text-secondary-foreground px-2 py-0.5 rounded font-mono">{s.keys}</kbd>
             </li>

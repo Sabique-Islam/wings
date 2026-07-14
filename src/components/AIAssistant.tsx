@@ -17,6 +17,7 @@ import {
 import { collectDrawingsFromContent, snapshotsAsAttachments } from "@/lib/ai/excalidrawContext";
 import { uploadImage } from "@/lib/imageUpload";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
@@ -132,10 +133,18 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
         const body = lines.slice(bodyStart).join("\n").trim();
         const content = title ? `# ${title}\n\n${body}` : body;
         try {
-          const entry = await createEntry(user.id, content, activeEntry?.id);
+          const parentId = activeEntry?.id;
+          const ownerId = activeEntry && activeEntry.user_id !== user.id
+            ? activeEntry.user_id
+            : user.id;
+          const entry = await createEntry(ownerId, content, parentId);
           onCreateEntry(entry);
-          actions.push({ label: `Open "${title || "new page"}"`, onClick: () => onNavigate(entry.id) });
-        } catch (e) { console.error("create page failed", e); }
+          onNavigate(entry.id);
+          actions.push({ label: `Opened "${title || "new page"}"`, onClick: () => onNavigate(entry.id) });
+        } catch (e) {
+          console.error("create page failed", e);
+          toast.error("Couldn't create page", { description: (e as Error).message });
+        }
       } else if (t.kind === "image" && editor && user) {
         try {
           const { base64, mimeType } = await generateImage(t.body);

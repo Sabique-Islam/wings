@@ -14,7 +14,9 @@ import {
 } from "@/lib/ai/storage";
 import { setUsername as saveUsername } from "@/lib/profile";
 import { SOCIAL } from "@/config/navigation";
+import { SITE } from "@/config/site";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 const PRESET_COLORS = [
   "#6366f1", "#8b5cf6", "#a855f7", "#ec4899",
@@ -90,40 +92,50 @@ export function SettingsPanel() {
   }, [provider]);
 
   const savePref = useCallback(async (patch: Record<string, unknown>) => {
-    if (!user) return;
+    if (!user) return false;
     const { data: existing } = await supabase
       .from("user_preferences")
       .select("id")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (existing) {
-      await supabase.from("user_preferences").update(patch as any).eq("user_id", user.id);
-    } else {
-      await supabase.from("user_preferences").insert({ user_id: user.id, ...patch } as any);
+    const { error } = existing
+      ? await supabase.from("user_preferences").update(patch as any).eq("user_id", user.id)
+      : await supabase.from("user_preferences").insert({ user_id: user.id, ...patch } as any);
+    if (error) {
+      toast.error("Couldn't save settings", { description: error.message });
+      return false;
     }
+    return true;
   }, [user]);
 
   const saveName = async () => {
     if (!user) return;
     setSaving(true);
-    await savePref({ display_name: displayName });
+    const ok = await savePref({ display_name: displayName });
+    if (ok) toast.success("Display name saved");
     setSaving(false);
   };
 
   const handleUsername = async () => {
     if (!user || !username.trim()) return;
     const res = await saveUsername(user.id, username);
-    setUsernameMsg(res.ok ? "saved" : res.error || "error");
+    if (res.ok) {
+      setUsernameMsg("saved");
+      toast.success("Username saved");
+    } else {
+      setUsernameMsg(res.error || "error");
+      toast.error(res.error || "Couldn't save username");
+    }
     setTimeout(() => setUsernameMsg(null), 2500);
   };
 
-  const pickTheme = (t: typeof theme) => {
+  const pickTheme = async (t: typeof theme) => {
     setTheme(t);
-    savePref({ theme: t });
+    await savePref({ theme: t });
   };
-  const pickAccent = (c: string) => {
+  const pickAccent = async (c: string) => {
     setAccentColor(c);
-    savePref({ accent_color: c });
+    await savePref({ accent_color: c });
   };
 
   const saveAI = () => {
@@ -310,18 +322,19 @@ export function SettingsPanel() {
 
             {tab === "notifications" && (
               <div className="space-y-4">
+                <p className="text-sm text-ink-2 font-sans">email notification preferences are coming soon.</p>
                 {[
                   { l: "product updates", d: "occasional emails about new features." },
                   { l: "mentions & comments", d: "when someone mentions you or replies." },
                   { l: "shared page activity", d: "changes to pages shared with you." },
-                ].map((n, i) => (
-                  <label key={n.l} className="flex items-start justify-between gap-4 cursor-pointer">
+                ].map((n) => (
+                  <div key={n.l} className="flex items-start justify-between gap-4 opacity-50">
                     <span>
                       <span className="block text-sm font-sans text-ink-0">{n.l}</span>
                       <span className="block text-xs text-ink-2 font-sans">{n.d}</span>
                     </span>
-                    <input type="checkbox" defaultChecked={i === 0} className="mt-1 h-4 w-4 accent-[hsl(var(--accent-strong))]" />
-                  </label>
+                    <span className="text-[10px] font-mono text-ink-3 mt-1">soon</span>
+                  </div>
                 ))}
               </div>
             )}
@@ -351,7 +364,12 @@ export function SettingsPanel() {
                 <div className="rounded-lg border border-destructive/40 p-4 space-y-3">
                   <div className="text-sm font-display font-semibold text-destructive">delete account</div>
                   <p className="text-xs text-ink-2 font-sans">permanently removes your account and all pages. this cannot be undone.</p>
-                  <button className="rounded-md border border-destructive/60 text-destructive text-xs font-mono px-3 py-1.5 hover:bg-destructive/10 transition-colors" onClick={() => window.dispatchEvent(new CustomEvent("wings:contact-support"))}>request deletion</button>
+                  <a
+                    href={`mailto:${SITE.email}?subject=${encodeURIComponent("Account deletion request")}`}
+                    className="inline-flex rounded-md border border-destructive/60 text-destructive text-xs font-mono px-3 py-1.5 hover:bg-destructive/10 transition-colors"
+                  >
+                    request deletion
+                  </a>
                 </div>
               </div>
             )}

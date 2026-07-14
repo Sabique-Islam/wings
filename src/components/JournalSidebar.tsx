@@ -11,6 +11,7 @@ import {
 } from "@/lib/journal";
 import { useResizable } from "@/hooks/useResizable";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Props {
   allEntries: Entry[];
@@ -81,14 +82,22 @@ export function JournalSidebar({
   };
 
   const handleRestore = async (id: string) => {
-    await restoreEntry(id);
-    setTrash((t) => t.filter((e) => e.id !== id));
-    onRefetch();
+    try {
+      await restoreEntry(id);
+      setTrash((t) => t.filter((e) => e.id !== id));
+      onRefetch();
+    } catch (err) {
+      toast.error("Couldn't restore page", { description: (err as Error).message });
+    }
   };
 
   const handlePurge = async (id: string) => {
-    await permanentlyDeleteEntry(id);
-    setTrash((t) => t.filter((e) => e.id !== id));
+    try {
+      await permanentlyDeleteEntry(id);
+      setTrash((t) => t.filter((e) => e.id !== id));
+    } catch (err) {
+      toast.error("Couldn't delete page", { description: (err as Error).message });
+    }
   };
 
   const toggleExpand = (id: string) => {

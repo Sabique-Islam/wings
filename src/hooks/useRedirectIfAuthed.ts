@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardPath } from "@/lib/auth/redirect";
 
@@ -7,9 +7,15 @@ import { getDashboardPath } from "@/lib/auth/redirect";
 export function useRedirectIfAuthed(enabled = true) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     if (!enabled || loading || !user) return;
+    const returnTo = searchParams.get("returnTo");
+    if (returnTo && returnTo.startsWith("/")) {
+      navigate(returnTo, { replace: true });
+      return;
+    }
     let cancelled = false;
     getDashboardPath(user.id).then((path) => {
       if (!cancelled) navigate(path, { replace: true });
@@ -17,5 +23,5 @@ export function useRedirectIfAuthed(enabled = true) {
     return () => {
       cancelled = true;
     };
-  }, [enabled, user, loading, navigate]);
+  }, [enabled, user, loading, navigate, searchParams]);
 }

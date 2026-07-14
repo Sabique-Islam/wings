@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useParams, useLocation } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -24,33 +24,54 @@ import { getMyUsername } from "@/lib/profile";
 
 const queryClient = new QueryClient();
 
+async function waitForUsername(userId: string, attempts = 8): Promise<string | null> {
+  for (let i = 0; i < attempts; i++) {
+    const username = await getMyUsername(userId);
+    if (username) return username;
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 250));
+  }
+  return null;
+}
+
 function UsernameGate() {
   const { username } = useParams<{ username: string }>();
-  const { user } = useAuth();
+  const location = useLocation();
+  const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<"loading" | "ok" | "deny">("loading");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!user || !username) { setState("deny"); return; }
-      const my = await getMyUsername(user.id);
+      if (authLoading) return;
+      if (!user) {
+        setState("deny");
+        return;
+      }
+      if (!username) {
+        setState("deny");
+        return;
+      }
+      const my = await waitForUsername(user.id);
       if (cancelled) return;
       if (my && my.toLowerCase() === username.toLowerCase()) {
         setState("ok");
       } else {
-        // verify the username exists at all? either way, deny if not yours
         setState("deny");
       }
     })();
     return () => { cancelled = true; };
-  }, [user, username]);
+  }, [user, username, authLoading]);
 
-  if (state === "loading") {
+  if (authLoading || state === "loading") {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <AsciiSpinner />
       </div>
     );
+  }
+  if (!user) {
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/auth?returnTo=${returnTo}`} replace />;
   }
   if (state === "deny") return <NotFound />;
   return <Index />;

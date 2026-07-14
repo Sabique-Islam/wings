@@ -4,6 +4,7 @@ import { Share2, Copy, Check, Globe, Lock, X, Link as LinkIcon, ChevronDown, Tra
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { sendShareInviteEmail } from "@/lib/email";
+import { toast } from "sonner";
 
 interface Props {
   entry: Entry;
@@ -58,16 +59,45 @@ export function ShareMenu({ entry, onUpdate }: Props) {
   const isShared = !!entry.share_token;
   const shareUrl = isShared ? `${window.location.origin}/s/${entry.share_token}` : null;
 
-  useEffect(() => {
-    if (!open) return;
+  const loadShares = useCallback(() => {
     supabase
       .from("entry_shares")
       .select("*")
       .eq("entry_id", entry.id)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Failed to load shares:", error);
+          return;
+        }
         if (data) setShares(data as ShareRecord[]);
       });
-  }, [open, entry.id]);
+  }, [entry.id]);
+
+  useEffect(() => {
+    loadShares();
+  }, [loadShares]);
+
+  useEffect(() => {
+    if (!open) return;
+    loadShares();
+  }, [open, loadShares]);
+
+  const ensurePublicShareUrl = useCallback(async (): Promise<string | null> => {
+    if (entry.share_token) {
+      return `${window.location.origin}/s/${entry.share_token}`;
+    }
+    const token = generateToken();
+    const { error } = await supabase
+      .from("entries")
+      .update({ share_token: token })
+      .eq("id", entry.id);
+    if (error) {
+      toast.error("Couldn't enable public link", { description: error.message });
+      return null;
+    }
+    onUpdate({ ...entry, share_token: token });
+    return `${window.location.origin}/s/${token}`;
+  }, [entry, onUpdate]);
 
   const togglePublicShare = useCallback(async () => {
     setLoading(true);
@@ -76,7 +106,9 @@ export function ShareMenu({ entry, onUpdate }: Props) {
       .from("entries")
       .update({ share_token: newToken })
       .eq("id", entry.id);
-    if (!error) {
+    if (error) {
+      toast.error("Couldn't update public link", { description: error.message });
+    } else {
       onUpdate({ ...entry, share_token: newToken });
     }
     setLoading(false);
@@ -123,32 +155,48 @@ export function ShareMenu({ entry, onUpdate }: Props) {
     } else if (data) {
       setShares((prev) => [...prev, data as ShareRecord]);
       const invitedEmail = email.trim().toLowerCase();
-      const inviteUrl = window.location.href;
+      const inviteUrl = await ensurePublicShareUrl();
+      if (!inviteUrl) {
+        setError("Enable a public link first, then try again");
+        setInviting(false);
+        return;
+      }
       setLastInvited({ email: invitedEmail, url: inviteUrl });
       setInviteLinkCopied(false);
       setEmail("");
-      void sendShareInviteEmail({
+      const { error: emailError } = await sendShareInviteEmail({
         to: invitedEmail,
         entryId: entry.id,
         entryTitle: entry.title || "Untitled",
         role: selectedRole,
         url: inviteUrl,
       });
+      if (emailError) {
+        toast.message("Invite saved", { description: "Share link copied — email could not be sent." });
+      }
     }
     setInviting(false);
-  }, [email, selectedRole, entry.id, entry.title, user]);
+  }, [email, selectedRole, entry.id, entry.title, user, ensurePublicShareUrl]);
 
   const updateRole = useCallback(async (shareId: string, newRole: Role) => {
-    await supabase
+    const { error } = await supabase
       .from("entry_shares")
       .update({ role: newRole } as any)
       .eq("id", shareId);
+    if (error) {
+      toast.error("Couldn't update role", { description: error.message });
+      return;
+    }
     setShares((prev) => prev.map((s) => (s.id === shareId ? { ...s, role: newRole } : s)));
     setRoleDropdownId(null);
   }, []);
 
   const removeShare = useCallback(async (shareId: string) => {
-    await supabase.from("entry_shares").delete().eq("id", shareId);
+    const { error } = await supabase.from("entry_shares").delete().eq("id", shareId);
+    if (error) {
+      toast.error("Couldn't remove access", { description: error.message });
+      return;
+    }
     setShares((prev) => prev.filter((s) => s.id !== shareId));
   }, []);
 
