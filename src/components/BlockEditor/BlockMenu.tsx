@@ -39,7 +39,6 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
       setAnchor({ x: detail.x ?? 80, y: detail.y ?? 120 });
       setOpen(true);
       setSubmenu(null);
-      // Select the block
       try {
         const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, detail.pos));
         editor.view.dispatch(tr);
@@ -56,10 +55,21 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
     const close = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false);
+        window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
       }
     };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   if (!open || !editor) return null;
@@ -69,6 +79,7 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
     if (!node) return;
     editor.chain().focus().insertContentAt(pos + node.nodeSize, node.toJSON()).run();
     setOpen(false);
+    window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
   };
 
   const deleteBlock = () => {
@@ -77,6 +88,7 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
     editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
     onDeleteBlock?.();
     setOpen(false);
+    window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
   };
 
   return (
@@ -103,6 +115,7 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
               onClick={() => {
                 turnInto(editor, t.type);
                 setOpen(false);
+                window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
               }}
             >
               {t.label}
@@ -133,6 +146,7 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
                   if (c.value) editor.chain().focus().setColor(c.value).run();
                   else editor.chain().focus().unsetColor().run();
                   setOpen(false);
+                  window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
                 }}
               />
             ))}
@@ -150,6 +164,7 @@ export function BlockMenu({ editor, onDeleteBlock }: Props) {
                   if (c.value) editor.chain().focus().toggleHighlight({ color: c.value }).run();
                   else editor.chain().focus().unsetHighlight().run();
                   setOpen(false);
+                  window.dispatchEvent(new CustomEvent("nw:blockMenu:close"));
                 }}
               />
             ))}

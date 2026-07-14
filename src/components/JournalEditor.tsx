@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Entry, ShareRole } from "@/lib/journal";
 import { Trash2, PanelLeft, Download, Pin, PinOff, FilePlus, Keyboard, Sparkles, PenTool, Hash, Upload, FileJson, FileText } from "lucide-react";
 import { EmptyStateAscii } from "@/components/AsciiAnimation";
+import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ShareMenu } from "@/components/ShareMenu";
@@ -21,6 +22,8 @@ import {
 
 interface Props {
   entry: Entry | null;
+  allEntries?: Entry[];
+  roleMap?: Record<string, ShareRole>;
   userId: string;
   onChange: (content: string) => void;
   onTitleChange?: (title: string) => void;
@@ -36,6 +39,7 @@ interface Props {
   onNewSubpageWithTitle: (parentId: string, title: string) => Promise<void>;
   onOpenAI: () => void;
   onImported?: () => void;
+  onNew?: () => void;
   saveStatus?: "idle" | "saving" | "saved" | "error";
 }
 
@@ -48,7 +52,7 @@ function readingTime(words: number): string {
   return mins < 1 ? "<1 min" : `${mins} min`;
 }
 
-export function JournalEditor({ entry, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, saveStatus = "idle" }: Props) {
+export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, onNew, saveStatus = "idle" }: Props) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,10 +274,20 @@ export function JournalEditor({ entry, userId, onChange, onTitleChange, onDelete
 
       <div className={`flex-1 overflow-y-auto relative w-full min-w-0 ${showLineNumbers ? "nw-line-numbers" : ""}`}>
         {!entry ? (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <EmptyStateAscii />
-            <p className="text-[10px] text-ink-3 font-mono">⌘K palette · ⌘N create · ⌘J for AI</p>
-          </div>
+          allEntries.length > 0 ? (
+            <DashboardHome
+              entries={allEntries}
+              roleMap={roleMap}
+              onSelect={(id) => onNavigate(id)}
+              onNew={onNew ?? (() => {})}
+              onOpenAI={onOpenAI}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-4 relative">
+              <EmptyStateAscii />
+              <p className="text-[10px] text-ink-3 font-mono">⌘K palette · ⌘N create · ⌘J for AI</p>
+            </div>
+          )
         ) : (
           <div className="page-editor-body w-full max-w-[708px] mx-auto px-6 md:px-10 py-6">
             <textarea

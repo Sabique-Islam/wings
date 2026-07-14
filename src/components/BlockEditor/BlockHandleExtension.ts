@@ -1,34 +1,45 @@
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
+import { NodeSelection, Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BlockHandle — Notion-style gutter affordance.
+// BlockHandle — Notion-style gutter (Domternal / Notion parity patterns).
 //
-// Renders two floating buttons (⋮⋮ drag/menu, + add-below) in the left margin
-// tracking the top-level block currently under the mouse. Fully implemented in
-// ProseMirror-land so hover state doesn't trigger React re-renders.
-//
-// The DOM is a single detached container reused across hovers — creating and
-// destroying nodes on every mousemove would be jank on long documents.
+// • Hover bridge: gutter zone + handle container keep handles visible while
+//   moving from block text → +/grip buttons (hideDelay 250ms).
+// • Grip: click → block menu, drag → reorder with drop line indicator.
+// • + : insert below and open slash menu (Alt+click inserts above).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const key = new PluginKey("blockHandle");
 
+const GUTTER_PX = 52;
+const HIDE_DELAY_MS = 250;
+const AUTO_SCROLL_EDGE = 48;
+const AUTO_SCROLL_MAX = 16;
+
+const GRIP_SVG = `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="currentColor"><circle cx="4" cy="3" r="1.25"/><circle cx="10" cy="3" r="1.25"/><circle cx="4" cy="7" r="1.25"/><circle cx="10" cy="7" r="1.25"/><circle cx="4" cy="11" r="1.25"/><circle cx="10" cy="11" r="1.25"/></svg>`;
+
 interface HandleState {
   container: HTMLDivElement;
-  addBtn: HTMLButtonElement;
-  dragBtn: HTMLButtonElement;
+  addBtn: HTMLSpanElement;
+  dragBtn: HTMLSpanElement;
+  dropLine: HTMLDivElement;
   target: HTMLElement | null;
   targetPos: number | null;
 }
 
-function findTopLevelBlockAt(view: EditorView, clientX: number, clientY: number) {
+interface BlockHit {
+  pos: number;
+  node: { nodeSize: number; textContent: string };
+  dom: HTMLElement;
+}
+
+function findTopLevelBlockAt(view: EditorView, clientX: number, clientY: number): BlockHit | null {
   const posInfo = view.posAtCoords({ left: clientX, top: clientY });
   if (!posInfo) return null;
 
   const $pos = view.state.doc.resolve(posInfo.pos);
-  // Ascend to the direct child of doc.
   let depth = $pos.depth;
   while (depth > 0 && $pos.node(depth - 1).type.name !== "doc") depth--;
   if (depth < 1) return null;
@@ -40,43 +51,68 @@ function findTopLevelBlockAt(view: EditorView, clientX: number, clientY: number)
   return { pos, node, dom };
 }
 
+function findDropPos(view: EditorView, clientY: number): number | null {
+  const editorRoot = view.dom.closest(".block-editor-wrapper") as HTMLElement | null;
+  const rootRect = editorRoot?.getBoundingClientRect();
+  const probeX = rootRect ? rootRect.left + GUTTER_PX + 16 : view.dom.getBoundingClientRect().left + 16;
+  const hit = findTopLevelBlockAt(view, probeX, clientY);
+  if (!hit) {
+    const end = view.state.doc.content.size;
+    return end;
+  }
+  const blockRect = hit.dom.getBoundingClientRect();
+  const mid = blockRect.top + blockRect.height / 2;
+  if (clientY < mid) return hit.pos;
+  return hit.pos + hit.node.nodeSize;
+}
+
 function createHandleDom(): HandleState {
   const container = document.createElement("div");
   container.className = "nw-block-handle";
   container.setAttribute("contenteditable", "false");
-  container.style.display = "none";
 
-  const dragBtn = document.createElement("button");
-  dragBtn.type = "button";
+  const addBtn = document.createElement("span");
+  addBtn.className = "nw-block-handle-btn nw-block-handle-add";
+  addBtn.setAttribute("role", "button");
+  addBtn.setAttribute("tabindex", "0");
+  addBtn.setAttribute("aria-label", "Insert block below");
+  addBtn.setAttribute("title", "Click to insert below · Alt-click to insert above");
+  addBtn.textContent = "+";
+
+  const dragBtn = document.createElement("span");
   dragBtn.className = "nw-block-handle-btn nw-block-handle-drag";
-  dragBtn.setAttribute("aria-label", "Drag or open block menu");
-  dragBtn.setAttribute("title", "Drag to move · click for menu");
-  dragBtn.innerHTML = "⋮⋮";
+  dragBtn.setAttribute("role", "button");
+  dragBtn.setAttribute("tabindex", "0");
+  dragBtn.setAttribute("aria-label", "Drag to move or click for menu");
+  dragBtn.setAttribute("title", "Drag to move · Click for menu");
+  dragBtn.innerHTML = GRIP_SVG;
   dragBtn.draggable = true;
 
-  const addBtn = document.createElement("button");
-  addBtn.type = "button";
-  addBtn.className = "nw-block-handle-btn nw-block-handle-add";
-  addBtn.setAttribute("aria-label", "Insert block below");
-  addBtn.setAttribute("title", "Insert block below (opens slash menu)");
-  addBtn.innerHTML = "+";
+  const dropLine = document.createElement("div");
+  dropLine.className = "nw-drop-indicator";
+  dropLine.style.display = "none";
 
   container.appendChild(addBtn);
   container.appendChild(dragBtn);
 
-  return { container, addBtn, dragBtn, target: null, targetPos: null };
+  return { container, addBtn, dragBtn, dropLine, target: null, targetPos: null };
 }
 
 function positionHandle(state: HandleState, editorRoot: HTMLElement) {
-  if (!state.target) {
-    state.container.style.display = "none";
-    return;
-  }
+  if (!state.target) return;
   const targetRect = state.target.getBoundingClientRect();
   const rootRect = editorRoot.getBoundingClientRect();
-  state.container.style.display = "flex";
-  state.container.style.top = `${targetRect.top - rootRect.top + 2}px`;
-  state.container.style.left = `${targetRect.left - rootRect.left - 44}px`;
+  const handleH = state.container.offsetHeight || 26;
+  const top = targetRect.top - rootRect.top + Math.max(2, (targetRect.height - handleH) / 2);
+  state.container.style.top = `${top}px`;
+}
+
+function setHoveredBlock(state: HandleState, dom: HTMLElement | null) {
+  if (state.target && state.target !== dom) {
+    state.target.classList.remove("nw-block-hovered");
+  }
+  state.target = dom;
+  dom?.classList.add("nw-block-hovered");
 }
 
 export const BlockHandle = Extension.create({
@@ -87,37 +123,87 @@ export const BlockHandle = Extension.create({
       new Plugin({
         key,
         view(view) {
-          const editorRoot = view.dom.parentElement as HTMLElement | null;
+          const editorRoot =
+            (view.dom.closest(".block-editor-wrapper") as HTMLElement | null) ??
+            (view.dom.parentElement as HTMLElement | null);
           if (!editorRoot) return { destroy: () => {} };
 
-          // Ensure the wrapper can position absolute children.
-          const priorPosition = editorRoot.style.position;
-          if (!priorPosition) editorRoot.style.position = "relative";
+          editorRoot.classList.add("nw-has-block-handle");
 
           const state = createHandleDom();
           editorRoot.appendChild(state.container);
+          editorRoot.appendChild(state.dropLine);
 
-          const onMouseMove = (e: MouseEvent) => {
-            if (!view.editable) return;
-            const hit = findTopLevelBlockAt(view, e.clientX, e.clientY);
-            if (!hit) return;
-            if (state.target === hit.dom) return;
-            state.target = hit.dom;
-            state.targetPos = hit.pos;
-            positionHandle(state, editorRoot);
+          let hideTimer: ReturnType<typeof setTimeout> | null = null;
+          let pinned = false;
+          let menuOpen = false;
+          let dragging = false;
+          let didDrag = false;
+          let autoScrollRaf = 0;
+
+          const clearHideTimer = () => {
+            if (hideTimer) {
+              clearTimeout(hideTimer);
+              hideTimer = null;
+            }
           };
 
-          const onMouseLeave = (e: MouseEvent) => {
-            // Ignore leaves into our own handle.
-            const to = e.relatedTarget as Node | null;
-            if (to && state.container.contains(to)) return;
-            state.target = null;
+          const show = () => {
+            clearHideTimer();
+            state.container.classList.add("is-visible");
+          };
+
+          const hide = () => {
+            if (pinned || menuOpen || dragging) return;
+            state.container.classList.remove("is-visible");
+            setHoveredBlock(state, null);
             state.targetPos = null;
-            state.container.style.display = "none";
+          };
+
+          const scheduleHide = () => {
+            if (pinned || menuOpen || dragging) return;
+            clearHideTimer();
+            hideTimer = setTimeout(hide, HIDE_DELAY_MS);
+          };
+
+          const resolveBlock = (clientX: number, clientY: number): BlockHit | null => {
+            const rootRect = editorRoot.getBoundingClientRect();
+            if (clientY < rootRect.top || clientY > rootRect.bottom) return null;
+            if (clientX < rootRect.left - 12 || clientX > rootRect.right + 8) return null;
+            const inGutter = clientX < rootRect.left + GUTTER_PX;
+            const probeX = inGutter ? rootRect.left + GUTTER_PX + 12 : clientX;
+            return findTopLevelBlockAt(view, probeX, clientY);
+          };
+
+          const activateBlock = (hit: BlockHit) => {
+            if (state.target === hit.dom && state.targetPos === hit.pos) return;
+            setHoveredBlock(state, hit.dom);
+            state.targetPos = hit.pos;
+            positionHandle(state, editorRoot);
+            show();
+          };
+
+          const onPointerMove = (e: MouseEvent) => {
+            if (!view.editable || dragging) return;
+            const hit = resolveBlock(e.clientX, e.clientY);
+            if (hit) {
+              activateBlock(hit);
+              clearHideTimer();
+            } else if (!pinned && !state.container.contains(e.target as Node)) {
+              scheduleHide();
+            }
+          };
+
+          const onEditorLeave = (e: MouseEvent) => {
+            const to = e.relatedTarget as Node | null;
+            if (to && (state.container.contains(to) || editorRoot.contains(to))) return;
+            scheduleHide();
           };
 
           const onScroll = () => {
-            if (state.target) positionHandle(state, editorRoot);
+            if (state.target && state.container.classList.contains("is-visible")) {
+              positionHandle(state, editorRoot);
+            }
           };
 
           const openSlashAfter = () => {
@@ -125,31 +211,23 @@ export const BlockHandle = Extension.create({
             const node = view.state.doc.nodeAt(state.targetPos);
             if (!node) return;
             const insertPos = state.targetPos + node.nodeSize;
-            const tr = view.state.tr.insert(
-              insertPos,
-              view.state.schema.nodes.paragraph.create(),
-            );
+            const tr = view.state.tr.insert(insertPos, view.state.schema.nodes.paragraph.create());
             const sel = TextSelection.near(tr.doc.resolve(insertPos + 1));
             tr.setSelection(sel).scrollIntoView();
             view.dispatch(tr);
             view.focus();
-            // Simulate a slash keypress so the SlashCommand suggestion opens.
-            setTimeout(() => {
-              const evt = new KeyboardEvent("keydown", { key: "/", bubbles: true });
-              view.dom.dispatchEvent(evt);
-              // Also actually insert the character since the synthetic
-              // keydown alone doesn't produce input on all browsers.
-              view.dispatch(view.state.tr.insertText("/"));
-            }, 0);
+            setTimeout(() => view.dispatch(view.state.tr.insertText("/")), 0);
           };
 
           const openBlockMenu = (e?: MouseEvent) => {
             if (state.targetPos == null) return;
-            const rect = state.target?.getBoundingClientRect();
+            menuOpen = true;
+            show();
+            const rect = state.container.getBoundingClientRect();
             const detail = {
               pos: state.targetPos,
-              x: e?.clientX ?? rect?.left ?? 80,
-              y: e?.clientY ?? rect?.top ?? 120,
+              x: rect.right + 4,
+              y: rect.top,
             };
             window.dispatchEvent(new CustomEvent("nw:blockMenu", { detail }));
           };
@@ -157,52 +235,150 @@ export const BlockHandle = Extension.create({
           const onAddClick = (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
+            pinned = true;
             if (e.altKey) {
-              // Insert above
               if (state.targetPos == null) return;
-              const tr = view.state.tr.insert(state.targetPos, view.state.schema.nodes.paragraph.create());
+              const tr = view.state.tr.insert(
+                state.targetPos,
+                view.state.schema.nodes.paragraph.create(),
+              );
               view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(state.targetPos + 1))));
               view.focus();
               setTimeout(() => view.dispatch(view.state.tr.insertText("/")), 0);
             } else {
               openSlashAfter();
             }
+            pinned = false;
           };
 
           const onDragClick = (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
+            if (didDrag) {
+              didDrag = false;
+              return;
+            }
             openBlockMenu(e);
+          };
+
+          const positionDropLine = (clientY: number) => {
+            const dropPos = findDropPos(view, clientY);
+            if (dropPos == null) return;
+            const coords = view.coordsAtPos(Math.min(dropPos, view.state.doc.content.size));
+            const rootRect = editorRoot.getBoundingClientRect();
+            state.dropLine.style.display = "block";
+            state.dropLine.style.top = `${coords.top - rootRect.top - 1}px`;
+            state.dropLine.style.left = `${GUTTER_PX}px`;
+            state.dropLine.style.right = "0";
+          };
+
+          const stopAutoScroll = () => {
+            if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
+            autoScrollRaf = 0;
+          };
+
+          const startAutoScroll = (clientY: number) => {
+            stopAutoScroll();
+            const scrollParent = editorRoot.closest(".overflow-y-auto") as HTMLElement | null;
+            if (!scrollParent) return;
+
+            const tick = () => {
+              const rect = scrollParent.getBoundingClientRect();
+              let delta = 0;
+              if (clientY < rect.top + AUTO_SCROLL_EDGE) {
+                delta = -Math.min(AUTO_SCROLL_MAX, AUTO_SCROLL_EDGE - (clientY - rect.top));
+              } else if (clientY > rect.bottom - AUTO_SCROLL_EDGE) {
+                delta = Math.min(AUTO_SCROLL_MAX, clientY - (rect.bottom - AUTO_SCROLL_EDGE));
+              }
+              if (delta !== 0) scrollParent.scrollTop += delta;
+              autoScrollRaf = requestAnimationFrame(tick);
+            };
+            autoScrollRaf = requestAnimationFrame(tick);
           };
 
           const onDragStart = (e: DragEvent) => {
             if (state.targetPos == null || !state.target) return;
             const node = view.state.doc.nodeAt(state.targetPos);
             if (!node) return;
-            const slice = view.state.doc.slice(
-              state.targetPos,
-              state.targetPos + node.nodeSize,
-            );
+            dragging = true;
+            didDrag = true;
+            show();
+            const slice = view.state.doc.slice(state.targetPos, state.targetPos + node.nodeSize);
+            const tr = view.state.tr.setSelection(NodeSelection.create(view.state.doc, state.targetPos));
+            view.dispatch(tr);
             (view as any).dragging = { slice, move: true };
+            e.dataTransfer?.setData("text/plain", node.textContent || " ");
             e.dataTransfer?.setData("text/html", state.target.outerHTML);
-            e.dataTransfer?.setDragImage(state.target, 0, 0);
-            if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+            if (e.dataTransfer) {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setDragImage(state.target, 0, 0);
+            }
+            window.dispatchEvent(new CustomEvent("nw:dismiss-overlays"));
           };
 
-          state.addBtn.addEventListener("mousedown", onAddClick);
+          const onDragEnd = () => {
+            dragging = false;
+            (view as any).dragging = null;
+            state.dropLine.style.display = "none";
+            stopAutoScroll();
+            setTimeout(() => {
+              didDrag = false;
+            }, 0);
+            scheduleHide();
+          };
+
+          const onDragOver = (e: DragEvent) => {
+            if (!(view as any).dragging) return;
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+            positionDropLine(e.clientY);
+            startAutoScroll(e.clientY);
+          };
+
+          const onHandleEnter = () => {
+            pinned = true;
+            clearHideTimer();
+            show();
+          };
+
+          const onHandleLeave = (e: MouseEvent) => {
+            pinned = false;
+            const to = e.relatedTarget as Node | null;
+            if (to && editorRoot.contains(to)) return;
+            scheduleHide();
+          };
+
+          const onMenuClose = () => {
+            menuOpen = false;
+            scheduleHide();
+          };
+
+          state.addBtn.addEventListener("click", onAddClick);
           state.dragBtn.addEventListener("click", onDragClick);
           state.dragBtn.addEventListener("dragstart", onDragStart);
-          view.dom.addEventListener("mousemove", onMouseMove);
-          editorRoot.addEventListener("mouseleave", onMouseLeave);
+          state.dragBtn.addEventListener("dragend", onDragEnd);
+          state.container.addEventListener("mouseenter", onHandleEnter);
+          state.container.addEventListener("mouseleave", onHandleLeave);
+
+          editorRoot.addEventListener("mousemove", onPointerMove);
+          editorRoot.addEventListener("mouseleave", onEditorLeave);
+          view.dom.addEventListener("dragover", onDragOver);
           window.addEventListener("scroll", onScroll, true);
+          window.addEventListener("nw:blockMenu:close", onMenuClose);
 
           return {
             destroy: () => {
-              view.dom.removeEventListener("mousemove", onMouseMove);
-              editorRoot.removeEventListener("mouseleave", onMouseLeave);
+              clearHideTimer();
+              stopAutoScroll();
+              editorRoot.removeEventListener("mousemove", onPointerMove);
+              editorRoot.removeEventListener("mouseleave", onEditorLeave);
+              view.dom.removeEventListener("dragover", onDragOver);
               window.removeEventListener("scroll", onScroll, true);
+              window.removeEventListener("nw:blockMenu:close", onMenuClose);
               state.container.remove();
-              if (!priorPosition) editorRoot.style.position = "";
+              state.dropLine.remove();
+              editorRoot.classList.remove("nw-has-block-handle");
+              setHoveredBlock(state, null);
             },
           };
         },

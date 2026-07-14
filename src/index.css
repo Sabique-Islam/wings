@@ -201,10 +201,20 @@
 /* Block Editor */
 .block-editor-wrapper {
   @apply min-h-full relative w-full min-w-0;
+  overflow: visible;
+  /* Gutter for block handles — text stays aligned with page title */
+  padding-left: 3.25rem;
+  margin-left: -3.25rem;
+}
+
+.block-editor-wrapper.nw-has-block-handle {
+  /* Reserve gutter without shifting text (negative margin pulls gutter into page padding) */
 }
 
 .block-editor-content {
-  @apply w-full min-w-0 text-base font-sans leading-normal tracking-normal text-foreground relative;
+  @apply w-full min-w-0 text-base font-sans text-foreground relative;
+  line-height: 1.65;
+  letter-spacing: -0.003em;
 }
 
 .block-editor-wrapper .ProseMirror {
@@ -231,19 +241,37 @@
 .block-editor-content > * {
   padding: 3px 2px;
   min-height: 1.5em;
+  border-radius: 4px;
+  transition: background-color 120ms ease;
+}
+
+.block-editor-content > .nw-block-hovered {
+  background: hsl(var(--foreground) / 0.04);
+}
+
+.block-editor-content > .ProseMirror-selectednode,
+.block-editor-content > [data-node-view-wrapper].ProseMirror-selectednode {
+  background: hsl(var(--accent-soft) / 0.35);
+  outline: none;
 }
 
 /* Headings — Notion scale */
 .block-editor-content h1 {
-  @apply text-[1.875rem] font-semibold text-foreground mt-8 mb-1;
+  @apply text-[1.875rem] font-semibold text-foreground mb-1;
   letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.block-editor-content h1:first-child {
+  margin-top: 0.15em;
 }
 .block-editor-content h2 {
   @apply text-2xl font-semibold text-foreground mt-6 mb-1;
   letter-spacing: -0.015em;
+  line-height: 1.3;
 }
 .block-editor-content h3 {
   @apply text-xl font-semibold text-foreground mt-4 mb-1;
+  line-height: 1.35;
 }
 
 /* Paragraphs */
@@ -262,12 +290,12 @@
   @apply text-muted-foreground/30 float-left h-0 pointer-events-none whitespace-nowrap;
 }
 
-/* Lists */
+/* Lists — match body size (Notion) */
 .block-editor-content ul {
-  @apply list-disc pl-5 text-sm;
+  @apply list-disc pl-6 text-base;
 }
 .block-editor-content ol {
-  @apply list-decimal pl-5 text-sm;
+  @apply list-decimal pl-6 text-base;
 }
 .block-editor-content li {
   @apply mb-0.5;
@@ -575,14 +603,22 @@
 
 /* ============ General editor aesthetic polish ============ */
 .block-editor-wrapper {
-  @apply max-w-[708px] mx-auto px-0 py-2 w-full min-w-0;
+  @apply max-w-[708px] mx-auto py-2 w-full min-w-0;
+  padding-right: 0;
 }
 @media (min-width: 1600px) {
   .block-editor-wrapper { max-width: 708px; }
 }
 .block-editor-content h1 {
-  @apply text-[1.875rem] font-semibold tracking-tight text-foreground mt-8 mb-1;
+  @apply text-[1.875rem] font-semibold tracking-tight text-foreground mb-1;
   letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.block-editor-content h1:first-child {
+  margin-top: 0.15em;
+}
+.block-editor-content h1:not(:first-child) {
+  margin-top: 2em;
 }
 .block-editor-content h2 {
   @apply text-2xl font-semibold text-foreground mt-6 mb-1;
@@ -795,6 +831,8 @@
 @media (max-width: 768px) {
   .block-editor-wrapper {
     padding: 1rem 0.875rem !important;
+    padding-left: 0.875rem !important;
+    margin-left: 0 !important;
     max-width: 100% !important;
   }
   .block-editor-content {
@@ -811,7 +849,11 @@
   .tableWrapper { -webkit-overflow-scrolling: touch; }
 }
 @media (max-width: 480px) {
-  .block-editor-wrapper { padding: 0.75rem 0.625rem !important; }
+  .block-editor-wrapper {
+    padding: 0.75rem 0.625rem !important;
+    padding-left: 0.625rem !important;
+    margin-left: 0 !important;
+  }
   .block-editor-content { font-size: 13.5px; }
 }
 
@@ -832,8 +874,8 @@
 }
 /* Tiptap "gap" / node selection (for atoms like math, drawings, images) */
 .ProseMirror-selectednode {
-  outline: 2px solid hsl(var(--ring) / 0.55);
-  outline-offset: 2px;
+  outline: 2px solid hsl(var(--accent-strong) / 0.45);
+  outline-offset: 3px;
   border-radius: 4px;
 }
 
@@ -851,40 +893,145 @@
 /* ============ Block hover handle (Notion-style gutter) ============ */
 .nw-block-handle {
   position: absolute;
-  display: none;
+  left: 0.125rem;
+  display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 2px;
-  z-index: 20;
-  pointer-events: auto;
+  gap: 1px;
+  z-index: 30;
   user-select: none;
-  transition: opacity 120ms ease;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 150ms ease, visibility 150ms ease;
+  /* Bridge into content so moving from text → handle doesn't drop hover */
+  padding-right: 10px;
+  margin-right: -10px;
+}
+.nw-block-handle.is-visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 .nw-block-handle-btn {
-  width: 18px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   background: transparent;
-  color: hsl(var(--muted-foreground) / 0.6);
-  font-size: 12px;
+  color: hsl(var(--muted-foreground) / 0.55);
+  font-size: 18px;
   line-height: 1;
   cursor: grab;
   border: none;
-  transition: background 120ms ease, color 120ms ease;
+  flex-shrink: 0;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 }
 .nw-block-handle-btn:hover {
-  background: hsl(var(--accent) / 0.7);
+  background: hsl(var(--accent-soft));
   color: hsl(var(--foreground));
 }
-.nw-block-handle-add { cursor: pointer; font-weight: 600; font-size: 14px; }
-.nw-block-handle-drag:active { cursor: grabbing; }
+.nw-block-handle-add {
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1;
+}
+.nw-block-handle-drag {
+  cursor: grab;
+}
+.nw-block-handle-drag:active {
+  cursor: grabbing;
+}
+.nw-block-handle-drag svg {
+  display: block;
+  opacity: 0.85;
+}
+
+/* Drop indicator while dragging blocks */
+.nw-drop-indicator {
+  position: absolute;
+  height: 2px;
+  background: hsl(var(--accent-strong));
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 25;
+  box-shadow: 0 0 0 1px hsl(var(--accent-strong) / 0.25);
+}
+
+.page-editor-body {
+  overflow: visible;
+}
+
+/* ============ Dashboard home (Laz Media–clean) ============ */
+.nw-dashboard-home {
+  background: hsl(var(--bg-0));
+}
+
+.nw-dash-metric {
+  @apply rounded-2xl p-5 border border-border-subtle;
+  box-shadow: var(--shadow-1);
+}
+.nw-dash-metric--a { background: hsl(var(--bg-1)); }
+.nw-dash-metric--b { background: hsl(var(--accent-soft) / 0.35); }
+.nw-dash-metric--c { background: hsl(var(--bg-2)); }
+.nw-dash-metric--d { background: hsl(var(--bg-1)); }
+
+.nw-dash-panel {
+  @apply rounded-2xl border border-border-subtle bg-surface-1;
+  box-shadow: var(--shadow-1);
+}
+
+.nw-dash-btn {
+  @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border border-border-subtle bg-surface-1 text-ink-0 hover:bg-surface-2 transition-colors;
+}
+.nw-dash-btn--primary {
+  @apply bg-accent-strong text-accent-strong-foreground border-transparent hover:opacity-90;
+}
+
+.nw-dash-table th {
+  @apply text-[10px] font-mono uppercase tracking-wider text-ink-2 pb-3 font-normal;
+}
+.nw-dash-table td {
+  @apply py-3 border-t border-border-subtle align-middle;
+}
+.nw-dash-table tbody tr:hover td {
+  background: hsl(var(--bg-2) / 0.5);
+}
+
+.nw-sidebar-search {
+  @apply rounded-full border border-border-subtle bg-surface-1;
+}
+.nw-sidebar-search:focus {
+  @apply ring-1 ring-accent-strong/40 border-border-strong outline-none;
+}
+
+.nw-pill {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono uppercase tracking-wider border border-border-subtle bg-surface-2 text-ink-1;
+}
+.nw-pill--sm {
+  @apply px-2 py-0.5 text-[9px] normal-case tracking-normal;
+}
+.nw-pill--accent {
+  @apply border-accent-strong/30 bg-accent-soft text-accent-strong;
+}
+
+@media (max-width: 768px) {
+  .nw-dash-metric {
+    @apply p-4;
+  }
+}
 
 @media (max-width: 768px) {
   /* Handles rely on hover; hide on touch for cleanliness. */
-  .nw-block-handle { display: none !important; }
+  .nw-block-handle,
+  .nw-block-handle.is-visible {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
 }
 
 

@@ -23,6 +23,7 @@ interface Props {
   sidebarOpen: boolean;
   onToggle: () => void;
   onRefetch: () => void;
+  onHome?: () => void;
 }
 
 function SectionHeader({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
@@ -35,7 +36,7 @@ function SectionHeader({ children, action }: { children: React.ReactNode; action
 }
 
 export function JournalSidebar({
-  allEntries, roleMap, userId, activeId, onSelect, onNew, sidebarOpen, onToggle, onRefetch,
+  allEntries, roleMap, userId, activeId, onSelect, onNew, sidebarOpen, onToggle, onRefetch, onHome,
 }: Props) {
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
@@ -61,7 +62,10 @@ export function JournalSidebar({
   }, [searching]);
 
   useEffect(() => {
-    const handler = () => setSearching(true);
+    const handler = () => {
+      setSearching(true);
+      searchRef.current?.focus();
+    };
     window.addEventListener("nw:search", handler);
     return () => window.removeEventListener("nw:search", handler);
   }, []);
@@ -152,10 +156,10 @@ export function JournalSidebar({
           <button
             onClick={() => onSelect(entry.id)}
             className={cn(
-              "flex-1 text-left px-1.5 py-1.5 rounded text-xs flex items-center gap-1.5 transition-colors",
+              "flex-1 text-left px-2 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors",
               isActive
-                ? "bg-accent-soft text-accent-strong"
-                : "text-ink-1 hover:bg-accent/50 hover:text-foreground",
+                ? "bg-accent-soft text-accent-strong font-medium"
+                : "text-ink-1 hover:bg-surface-2 hover:text-foreground",
             )}
           >
             {entry.pinned ? <Star className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
@@ -185,36 +189,50 @@ export function JournalSidebar({
           title="Drag to resize"
         />
 
-        <div className="p-3.5 flex items-center justify-between border-b border-border-subtle shrink-0">
-          <span className="text-xs font-display font-semibold tracking-wide text-foreground">wings</span>
-          <div className="flex items-center gap-1">
+        <div className="p-3 flex flex-col gap-2 border-b border-border-subtle shrink-0">
+          <div className="flex items-center justify-between">
             <button
-              onClick={() => setSearching(!searching)}
-              className="text-ink-2 hover:text-foreground transition-colors p-1"
-              title="Search (⌘/)"
+              type="button"
+              onClick={onHome}
+              className={cn(
+                "text-xs font-display font-semibold tracking-wide transition-colors",
+                activeId ? "text-ink-1 hover:text-foreground" : "text-foreground",
+              )}
             >
-              {searching ? <X className="h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
+              overview
             </button>
-            <button onClick={onNew} className="text-ink-2 hover:text-foreground transition-colors p-1" title="New page (⌘N)">
-              <Plus className="h-4 w-4" />
+            <button
+              onClick={onNew}
+              className="nw-pill nw-pill--sm nw-pill--accent"
+              title="New page (⌘N)"
+            >
+              <Plus className="h-3 w-3" /> new
             </button>
           </div>
-        </div>
-
-        {searching && (
-          <div className="px-3 py-2 border-b border-border-subtle shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-3 pointer-events-none" />
             <input
               ref={searchRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="search pages..."
-              className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+              onFocus={() => setSearching(true)}
+              placeholder="search pages…"
+              className="nw-sidebar-search w-full pl-8 pr-8 py-2 text-xs text-foreground placeholder:text-ink-3 focus:outline-none font-sans"
               onKeyDown={(e) => {
-                if (e.key === "Escape") { setSearching(false); setSearch(""); }
+                if (e.key === "Escape") { setSearch(""); setSearching(false); searchRef.current?.blur(); }
               }}
             />
+            {(search || searching) && (
+              <button
+                type="button"
+                onClick={() => { setSearch(""); setSearching(false); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-3 hover:text-foreground p-0.5"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
         <nav className="flex-1 min-h-0 overflow-y-auto p-2 space-y-5">
           {filteredPinned.length > 0 && (

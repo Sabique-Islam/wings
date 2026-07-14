@@ -313,9 +313,12 @@ export default function Index() {
         sidebarOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onRefetch={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); }).catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
+        onHome={() => setActiveId(null)}
       />
       <JournalEditor
         entry={activeEntry}
+        allEntries={entries}
+        roleMap={roleMap}
         userId={user?.id || ""}
         onChange={handleChange}
         onTitleChange={handleTitleChange}
@@ -330,6 +333,7 @@ export default function Index() {
         userRole={activeId ? (roleMap[activeId] || "owner") : "owner"}
         onNewSubpageWithTitle={handleNewSubpageWithTitle}
         onOpenAI={() => setAiOpen(true)}
+        onNew={handleNew}
         onImported={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); })}
         saveStatus={saveStatus}
       />
