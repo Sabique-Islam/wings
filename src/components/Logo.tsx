@@ -1,4 +1,4 @@
-import logoAsset from "@/assets/wings-logo.png.asset.json";
+import logoUrl from "@/assets/wings-logo.png";
 
 interface Props {
   size?: number;
@@ -15,7 +15,7 @@ export function Logo({ size = 28, className = "", withWordmark = false, wordmark
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <img
-        src={logoAsset.url}
+        src={logoUrl}
         width={size}
         height={size}
         alt="Wings"
