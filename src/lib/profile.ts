@@ -1,5 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { isUsernameAvailable } from "@/lib/username";
+
+type UserPreferencesUpdate = TablesUpdate<"user_preferences">;
+export type UserPreferencesPatch = UserPreferencesUpdate;
 function deriveBaseUsername(userId: string, email?: string | null): string {
   let base = "";
   if (email) {
@@ -101,7 +105,7 @@ export async function setUsername(
 
 export async function updateUserPreferences(
   userId: string,
-  patch: Record<string, unknown>,
+  patch: UserPreferencesUpdate,
   email?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   try {

@@ -12,7 +12,7 @@ import {
   getActiveProvider, setActiveProvider, getApiKeyFor, setApiKeyFor, clearApiKeyFor,
   getModelFor, setModelFor,
 } from "@/lib/ai/storage";
-import { setUsername as saveUsername, updateUserPreferences } from "@/lib/profile";
+import { setUsername as saveUsername, updateUserPreferences, type UserPreferencesPatch } from "@/lib/profile";
 import { SOCIAL } from "@/config/navigation";
 import { SITE } from "@/config/site";
 import { Link } from "react-router-dom";
@@ -91,7 +91,7 @@ export function SettingsPanel() {
     setModel(getModelFor(provider));
   }, [provider]);
 
-  const savePref = useCallback(async (patch: Record<string, unknown>) => {
+  const savePref = useCallback(async (patch: UserPreferencesPatch) => {
     if (!user) return false;
     const { ok, error } = await updateUserPreferences(user.id, patch, user.email);
     if (!ok) {
