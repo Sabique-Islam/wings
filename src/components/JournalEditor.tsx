@@ -23,6 +23,7 @@ interface Props {
   entry: Entry | null;
   userId: string;
   onChange: (content: string) => void;
+  onTitleChange?: (title: string) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   sidebarOpen: boolean;
@@ -47,7 +48,7 @@ function readingTime(words: number): string {
   return mins < 1 ? "<1 min" : `${mins} min`;
 }
 
-export function JournalEditor({ entry, userId, onChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, saveStatus = "idle" }: Props) {
+export function JournalEditor({ entry, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, saveStatus = "idle" }: Props) {
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,8 +73,9 @@ export function JournalEditor({ entry, userId, onChange, onDelete, onTogglePin, 
   const [drawingOpen, setDrawingOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [showLineNumbers, setShowLineNumbers] = useState<boolean>(() => {
-    return localStorage.getItem("nw:lineNumbers") !== "0";
+    return localStorage.getItem("nw:lineNumbers") === "1";
   });
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -132,7 +134,7 @@ export function JournalEditor({ entry, userId, onChange, onDelete, onTogglePin, 
   }, [handleImageFile]);
 
   return (
-    <div className="flex-1 flex flex-col h-screen">
+    <div className="flex-1 flex flex-col h-screen min-w-0 w-full">
       <header className="h-10 flex items-center px-2 sm:px-3 border-b border-border-subtle gap-1 sm:gap-2 shrink-0 overflow-x-auto">
         <button onClick={onToggleSidebar} className="text-muted-foreground hover:text-foreground transition-colors" title="Toggle sidebar (⌘B)">
           <PanelLeft className="h-4 w-4" />
@@ -266,14 +268,39 @@ export function JournalEditor({ entry, userId, onChange, onDelete, onTogglePin, 
         )}
       </header>
 
-      <div className={`flex-1 overflow-y-auto relative ${showLineNumbers ? "nw-line-numbers" : ""}`}>
+      <div className={`flex-1 overflow-y-auto relative w-full min-w-0 ${showLineNumbers ? "nw-line-numbers" : ""}`}>
         {!entry ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">
             <EmptyStateAscii />
             <p className="text-[10px] text-ink-3 font-mono">⌘K palette · ⌘N create · ⌘J for AI</p>
           </div>
         ) : (
-          <>
+          <div className="page-editor-body w-full max-w-[708px] mx-auto px-6 md:px-10 py-6">
+            <textarea
+              ref={titleRef}
+              key={`title-${entry.id}`}
+              className="page-title-input w-full resize-none overflow-hidden bg-transparent border-0 outline-none font-bold text-[2.5rem] leading-tight tracking-tight text-foreground placeholder:text-muted-foreground/40 mb-2"
+              placeholder="Untitled"
+              rows={1}
+              defaultValue={entry.title || ""}
+              readOnly={!canEdit}
+              onChange={(e) => {
+                onTitleChange?.(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "ArrowDown") {
+                  e.preventDefault();
+                  (window as any).__nw_editor?.commands.focus("start");
+                }
+              }}
+              onInput={(e) => {
+                const t = e.target as HTMLTextAreaElement;
+                t.style.height = "auto";
+                t.style.height = `${t.scrollHeight}px`;
+              }}
+            />
             <BlockEditor
               key={entry.id}
               content={entry.content}
@@ -292,7 +319,7 @@ export function JournalEditor({ entry, userId, onChange, onDelete, onTogglePin, 
               className="hidden"
               onChange={handleFileChange}
             />
-          </>
+          </div>
         )}
       </div>
       {entry && (

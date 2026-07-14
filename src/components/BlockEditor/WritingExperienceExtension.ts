@@ -1,5 +1,6 @@
 import { Extension } from "@tiptap/core";
-import { TextSelection } from "@tiptap/pm/state";
+import { TextSelection, NodeSelection } from "@tiptap/pm/state";
+import { turnInto, type TurnIntoType } from "./blockCommands";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WritingExperience — the "Notion-parity" keymap.
@@ -133,6 +134,34 @@ function duplicateBlock(editor: any): boolean {
   return true;
 }
 
+/** Select the top-level block containing the cursor. */
+function selectCurrentBlock(editor: any): boolean {
+  const { $from } = editor.state.selection;
+  let depth = $from.depth;
+  while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+  if (depth < 1) return false;
+  const pos = $from.before(depth);
+  try {
+    const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos));
+    editor.view.dispatch(tr);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const TURN_INTO_KEYS: Record<string, TurnIntoType> = {
+  "0": "paragraph",
+  "1": "heading1",
+  "2": "heading2",
+  "3": "heading3",
+  "4": "bulletList",
+  "5": "orderedList",
+  "6": "taskList",
+  "7": "toggle",
+  "8": "codeBlock",
+};
+
 export const WritingExperience = Extension.create({
   name: "writingExperience",
   // Above StarterKit (100), below Suggestion (500). This keeps the slash menu
@@ -177,10 +206,60 @@ export const WritingExperience = Extension.create({
 
       Backspace: () => backspaceAtStartOfDecoration(this.editor),
 
+      Tab: () => {
+        if (this.editor.can().sinkListItem("listItem")) {
+          return this.editor.chain().focus().sinkListItem("listItem").run();
+        }
+        if (this.editor.can().sinkListItem("taskItem")) {
+          return this.editor.chain().focus().sinkListItem("taskItem").run();
+        }
+        return false;
+      },
+      "Shift-Tab": () => {
+        if (this.editor.can().liftListItem("listItem")) {
+          return this.editor.chain().focus().liftListItem("listItem").run();
+        }
+        if (this.editor.can().liftListItem("taskItem")) {
+          return this.editor.chain().focus().liftListItem("taskItem").run();
+        }
+        return false;
+      },
+
+      Escape: () => selectCurrentBlock(this.editor),
+
+      "Mod-a": () => {
+        const { selection, doc } = this.editor.state;
+        if (selection instanceof NodeSelection) {
+          return this.editor.commands.selectAll();
+        }
+        const { $from } = selection;
+        let depth = $from.depth;
+        while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+        if (depth >= 1) {
+          const from = $from.before(depth);
+          const to = from + $from.node(depth).nodeSize;
+          if (selection.from !== from || selection.to !== to) {
+            const tr = this.editor.state.tr.setSelection(
+              TextSelection.create(doc, from, Math.min(to, doc.content.size)),
+            );
+            this.editor.view.dispatch(tr);
+            return true;
+          }
+        }
+        return this.editor.commands.selectAll();
+      },
+
       // Block movement / duplication — Notion parity keymap.
       "Mod-Shift-ArrowUp": () => moveBlock(this.editor, "up"),
       "Mod-Shift-ArrowDown": () => moveBlock(this.editor, "down"),
       "Mod-d": () => duplicateBlock(this.editor),
+
+      ...Object.fromEntries(
+        Object.entries(TURN_INTO_KEYS).map(([key, type]) => [
+          `Mod-Alt-${key}`,
+          () => turnInto(this.editor, type),
+        ]),
+      ),
     };
   },
 });

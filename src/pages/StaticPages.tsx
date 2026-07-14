@@ -139,8 +139,14 @@ export function Docs() {
           ["/", "slash commands (type at line start)"],
           ["⌘B", "bold"],
           ["⌘I", "italic"],
+          ["⌘U", "underline"],
           ["⌘E", "inline code"],
           ["⌘⇧S", "strikethrough"],
+          ["⌘D", "duplicate block"],
+          ["⌘⇧↑/↓", "move block"],
+          ["⌘⌥0–8", "turn into"],
+          ["Tab", "indent list"],
+          ["Esc", "select block"],
         ].map(([k, v]) => (
           <div key={k + v} className="flex items-center justify-between border border-border/60 rounded-md px-3 py-2">
             <span className="text-xs font-mono text-muted-foreground">{v}</span>

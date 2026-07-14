@@ -85,4 +85,23 @@ describe("markdown <-> html conversion", () => {
     const html = markdownToHtml("```\n<script>\n```");
     expect(html).toContain("&lt;script&gt;");
   });
+
+  it("preserves callout HTML round-trip", () => {
+    const blob = '<div data-type="callout" data-emoji="💡" class="callout-block"><p>note</p></div>';
+    const md = htmlToMarkdown(blob);
+    expect(md).toContain('data-type="callout"');
+    expect(markdownToHtml(md)).toContain("callout");
+  });
+
+  it("preserves toggle HTML round-trip", () => {
+    const blob = '<div data-type="toggle" data-summary="Fold" data-open="true"><p>hidden</p></div>';
+    const md = htmlToMarkdown(blob);
+    expect(md).toContain('data-type="toggle"');
+  });
+
+  it("preserves embed HTML round-trip", () => {
+    const blob = '<div data-type="embed" data-url="https://youtube.com" data-embed-url="https://youtube.com/embed/x"><iframe src="https://youtube.com/embed/x"></iframe></div>';
+    const md = htmlToMarkdown(blob);
+    expect(md).toContain('data-type="embed"');
+  });
 });

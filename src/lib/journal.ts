@@ -167,10 +167,17 @@ export async function createEntry(userId: string, content: string, parentId?: st
 }
 
 export async function updateEntry(id: string, content: string): Promise<void> {
-  const title = content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 100);
   const { error } = await supabase
     .from("entries")
-    .update({ content, title })
+    .update({ content })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateEntryTitle(id: string, title: string): Promise<void> {
+  const { error } = await supabase
+    .from("entries")
+    .update({ title: title.slice(0, 100) })
     .eq("id", id);
   if (error) throw error;
 }

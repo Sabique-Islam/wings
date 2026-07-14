@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, createEntry, updateEntry, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
+import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
 import { saveDraft, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
@@ -50,6 +50,7 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const savedFlashRef = useRef<ReturnType<typeof setTimeout>>();
   const creatingRef = useRef(false);
 
@@ -169,11 +170,7 @@ export default function Index() {
       saveDraft(activeId, content);
     }
 
-    setEntries((prev) => prev.map((e) => {
-      if (e.id !== activeId) return e;
-      const title = content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 100);
-      return { ...e, content, title };
-    }));
+    setEntries((prev) => prev.map((e) => (e.id === activeId ? { ...e, content } : e)));
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setSaveStatus("saving");
@@ -194,6 +191,21 @@ export default function Index() {
     }, 500);
   }, [activeId]);
 
+  const handleTitleChange = useCallback((title: string) => {
+    if (!activeId) return;
+    setEntries((prev) => prev.map((e) => (e.id === activeId ? { ...e, title } : e)));
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+    titleDebounceRef.current = setTimeout(async () => {
+      if (activeId) {
+        try {
+          await updateEntryTitle(activeId, title);
+        } catch {
+          toast.error("Couldn't save title");
+        }
+      }
+    }, 500);
+  }, [activeId]);
+
   useEffect(() => {
     if (!activeId) return;
     const draft = getDraft(activeId);
@@ -201,8 +213,7 @@ export default function Index() {
     setEntries((prev) => prev.map((e) => {
       if (e.id !== activeId) return e;
       if (e.content === draft) return e;
-      const title = draft.split("\n")[0].replace(/^#+\s*/, "").slice(0, 100);
-      return { ...e, content: draft, title };
+      return { ...e, content: draft };
     }));
   }, [activeId]);
 
@@ -291,7 +302,7 @@ export default function Index() {
   }
 
   return (
-    <div className="flex w-full h-screen overflow-hidden">
+    <div className="flex w-full h-screen overflow-hidden min-w-0">
       <JournalSidebar
         allEntries={entries}
         roleMap={roleMap}
@@ -307,6 +318,7 @@ export default function Index() {
         entry={activeEntry}
         userId={user?.id || ""}
         onChange={handleChange}
+        onTitleChange={handleTitleChange}
         onDelete={handleDelete}
         onTogglePin={handleTogglePin}
         sidebarOpen={sidebarOpen}

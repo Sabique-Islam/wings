@@ -1,4 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Geist+Mono:wght@300;400;500;600;700&display=swap');
+@import "highlight.js/styles/github.min.css";
+
+[data-theme="dark"] .hljs {
+  background: hsl(var(--secondary) / 0.6) !important;
+  color: hsl(var(--foreground)) !important;
+}
 
 @tailwind base;
 @tailwind components;
@@ -194,11 +200,15 @@
 
 /* Block Editor */
 .block-editor-wrapper {
-  @apply min-h-full relative;
+  @apply min-h-full relative w-full min-w-0;
 }
 
 .block-editor-content {
-  @apply text-sm font-mono leading-[1.8] tracking-wide text-foreground relative;
+  @apply w-full min-w-0 text-base font-sans leading-normal tracking-normal text-foreground relative;
+}
+
+.block-editor-wrapper .ProseMirror {
+  @apply w-full min-w-0;
 }
 
 /* Free-canvas floating block toolbar buttons */
@@ -215,34 +225,41 @@
 
 
 .block-editor-content > * + * {
-  margin-top: 0.5em;
+  margin-top: 0.125rem;
 }
 
-/* Headings */
+.block-editor-content > * {
+  padding: 3px 2px;
+  min-height: 1.5em;
+}
+
+/* Headings — Notion scale */
 .block-editor-content h1 {
-  @apply text-xl font-semibold text-primary mb-2 mt-4;
+  @apply text-[1.875rem] font-semibold text-foreground mt-8 mb-1;
+  letter-spacing: -0.02em;
 }
 .block-editor-content h2 {
-  @apply text-lg font-medium text-primary mb-2 mt-3;
+  @apply text-2xl font-semibold text-foreground mt-6 mb-1;
+  letter-spacing: -0.015em;
 }
 .block-editor-content h3 {
-  @apply text-base font-medium text-secondary-foreground mb-1 mt-2;
+  @apply text-xl font-semibold text-foreground mt-4 mb-1;
 }
 
 /* Paragraphs */
 .block-editor-content p {
-  @apply text-sm text-foreground;
+  @apply text-base text-foreground/90;
 }
 
 /* Placeholder */
 .block-editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  @apply text-muted-foreground/30 float-left h-0 pointer-events-none;
+  @apply text-muted-foreground/30 float-left h-0 pointer-events-none whitespace-nowrap;
 }
 
 .block-editor-content .is-empty::before {
   content: attr(data-placeholder);
-  @apply text-muted-foreground/30 float-left h-0 pointer-events-none;
+  @apply text-muted-foreground/30 float-left h-0 pointer-events-none whitespace-nowrap;
 }
 
 /* Lists */
@@ -270,7 +287,7 @@
   @apply mt-0.5;
 }
 .block-editor-content ul[data-type="taskList"] li > label input[type="checkbox"] {
-  @apply h-4 w-4 rounded border-muted-foreground/40 bg-transparent accent-foreground cursor-pointer;
+  @apply h-4 w-4 rounded-sm border-muted-foreground/40 bg-transparent accent-foreground cursor-pointer;
 }
 .block-editor-content ul[data-type="taskList"] li > div {
   @apply flex-1;
@@ -279,20 +296,39 @@
   @apply line-through text-muted-foreground/50;
 }
 
-/* Blockquote */
+/* Blockquote — Notion style */
 .block-editor-content blockquote {
-  @apply border-l-2 border-muted-foreground/30 pl-3 italic text-muted-foreground text-sm;
+  @apply border-l-[3px] border-current pl-4 text-foreground my-1;
+  border-color: currentColor;
+  opacity: 0.9;
 }
 
-/* Code */
+/* Code — Notion style */
 .block-editor-content code {
-  @apply bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded text-xs;
+  @apply text-[85%] px-1 py-0.5 rounded;
+  color: #eb5757;
+  background: rgba(135, 131, 120, 0.15);
 }
-.block-editor-content pre {
-  @apply bg-secondary p-4 rounded text-xs overflow-x-auto my-2;
+.block-editor-content pre,
+.code-block-wrapper pre {
+  @apply bg-secondary/60 rounded-md text-sm overflow-x-auto my-2 p-0;
 }
-.block-editor-content pre code {
-  @apply bg-transparent p-0 text-secondary-foreground;
+.block-editor-content pre code,
+.code-block-wrapper pre code {
+  @apply bg-transparent p-0 text-foreground;
+  color: inherit;
+}
+.code-block-wrapper {
+  @apply relative my-2 rounded-md overflow-hidden border border-border/40;
+}
+.code-block-toolbar {
+  @apply flex items-center justify-between px-3 py-1.5 bg-secondary/80 border-b border-border/40 text-xs;
+}
+.code-lang-select {
+  @apply bg-transparent border-0 text-xs text-muted-foreground outline-none cursor-pointer;
+}
+.code-copy-btn {
+  @apply p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground;
 }
 
 /* Horizontal rule */
@@ -330,26 +366,33 @@
   @apply line-through text-muted-foreground/60;
 }
 
-/* Callout */
+/* Callout — Notion soft */
 .callout-block {
-  @apply flex items-start gap-3 bg-secondary/50 border border-border rounded-md p-3 my-2 text-sm;
+  @apply flex items-start gap-3 rounded-md p-3 my-1 text-base;
+  background: rgba(135, 131, 120, 0.15);
 }
 .callout-emoji {
-  @apply text-base leading-none mt-0.5 select-none;
+  @apply text-xl leading-none mt-0.5 select-none shrink-0 bg-transparent border-0 cursor-pointer p-0;
 }
 .callout-content {
-  @apply flex-1;
+  @apply flex-1 min-w-0;
 }
 
-/* Toggle */
+/* Toggle — Notion */
 .toggle-block {
-  @apply border border-border rounded-md my-2;
+  @apply my-1;
 }
-.toggle-block summary {
-  @apply px-3 py-2 cursor-pointer text-sm text-foreground select-none hover:bg-accent/50 transition-colors;
+.toggle-header {
+  @apply flex items-start gap-1;
 }
-.toggle-block .toggle-content {
-  @apply px-3 pb-2;
+.toggle-chevron {
+  @apply p-0.5 mt-0.5 rounded hover:bg-accent/50 bg-transparent border-0 cursor-pointer text-muted-foreground shrink-0;
+}
+.toggle-summary {
+  @apply flex-1 text-base font-medium outline-none cursor-text;
+}
+.toggle-content {
+  @apply pl-6 pt-1;
 }
 
 /* Bubble menu */
@@ -436,13 +479,52 @@
   @apply inline-block w-auto min-w-[120px];
 }
 
-/* ============ Columns layout ============ */
-.block-editor-content .nw-columns {
-  @apply grid grid-cols-1 md:grid-cols-2 gap-4 my-3 p-3 rounded-md border border-dashed border-border/50;
+/* Columns */
+.nw-column-list {
+  @apply grid gap-4 my-2;
+}
+.nw-column-list.nw-cols-2 {
+  @apply grid-cols-1 md:grid-cols-2;
+}
+.nw-column-list.nw-cols-3 {
+  @apply grid-cols-1 md:grid-cols-3;
 }
 .block-editor-content .nw-col {
-  @apply min-h-[60px];
+  @apply min-h-[40px];
 }
+
+/* Bookmark */
+.bookmark-block { @apply my-2; }
+.bookmark-card {
+  @apply flex items-center gap-3 p-3 rounded-md border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors no-underline;
+}
+.bookmark-title { @apply text-sm font-medium text-foreground truncate; }
+.bookmark-desc { @apply text-xs text-muted-foreground truncate; }
+.bookmark-url { @apply text-[10px] text-muted-foreground/60 truncate; }
+.bookmark-icon { @apply text-muted-foreground; }
+
+/* Embed */
+.embed-block { @apply my-4 rounded-lg overflow-hidden; }
+.embed-iframe { @apply w-full rounded-lg; min-height: 300px; border: 0; }
+
+/* Block menu */
+.block-menu-item {
+  @apply px-3 py-1.5 text-left text-sm hover:bg-accent transition-colors;
+}
+.block-menu-submenu {
+  @apply absolute left-full top-0 ml-1 bg-card border border-border rounded-lg shadow-xl py-1 min-w-[160px] z-50;
+}
+.color-swatch {
+  @apply w-5 h-5 rounded-full cursor-pointer border-0 shrink-0;
+}
+
+/* Page title */
+.page-title-input {
+  font-family: Geist, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Slash menu */
+.slash-menu .slash-menu-row { @apply flex items-center gap-3 w-full px-3 py-2 text-left; }
 .block-editor-content .nw-col p {
   @apply mb-1;
 }
@@ -493,27 +575,27 @@
 
 /* ============ General editor aesthetic polish ============ */
 .block-editor-wrapper {
-  @apply max-w-[1100px] mx-auto px-6 md:px-10 lg:px-14 py-8;
+  @apply max-w-[708px] mx-auto px-0 py-2 w-full min-w-0;
 }
 @media (min-width: 1600px) {
-  .block-editor-wrapper { max-width: 1280px; }
+  .block-editor-wrapper { max-width: 708px; }
 }
 .block-editor-content h1 {
-  @apply text-2xl font-semibold tracking-tight text-foreground mt-6 mb-3;
+  @apply text-[1.875rem] font-semibold tracking-tight text-foreground mt-8 mb-1;
   letter-spacing: -0.02em;
 }
 .block-editor-content h2 {
-  @apply text-xl font-semibold text-foreground mt-5 mb-2;
+  @apply text-2xl font-semibold text-foreground mt-6 mb-1;
   letter-spacing: -0.015em;
 }
 .block-editor-content h3 {
-  @apply text-base font-semibold text-foreground mt-4 mb-2;
+  @apply text-xl font-semibold text-foreground mt-4 mb-1;
 }
 .block-editor-content p {
-  @apply text-foreground/90;
+  @apply text-foreground/90 text-base;
 }
 .block-editor-content blockquote {
-  @apply border-l-2 border-primary/40 pl-4 italic text-muted-foreground my-3;
+  @apply border-l-[3px] pl-4 my-1;
 }
 
 /* slash command popup animation */
@@ -763,6 +845,7 @@
   pointer-events: none;
   height: 0;
   float: left;
+  white-space: nowrap;
 }
 
 /* ============ Block hover handle (Notion-style gutter) ============ */

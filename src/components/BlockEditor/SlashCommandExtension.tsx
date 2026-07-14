@@ -16,12 +16,14 @@ import {
   Sparkles, FilePlus2, Layout,
 } from "lucide-react";
 import { TEMPLATES } from "@/lib/templates";
+import { fuzzyMatch, insertBookmark, insertEmbed, insertTemplateMarkdown } from "./blockCommands";
 
 export interface CommandItem {
   title: string;
   description: string;
   icon: React.ElementType;
   category: string;
+  aliases?: string[];
   command: (props: { editor: any; range: any }) => void;
 }
 
@@ -48,6 +50,7 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Plain text block",
     icon: Type,
     category: "Basic",
+    aliases: ["p", "paragraph", "plain"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setParagraph().run();
     },
@@ -57,6 +60,7 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Large heading",
     icon: Heading1,
     category: "Basic",
+    aliases: ["h1", "title", "#"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run();
     },
@@ -66,6 +70,7 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Medium heading",
     icon: Heading2,
     category: "Basic",
+    aliases: ["h2", "##"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run();
     },
@@ -75,6 +80,7 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Small heading",
     icon: Heading3,
     category: "Basic",
+    aliases: ["h3", "###"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run();
     },
@@ -101,7 +107,8 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     title: "To-do List",
     description: "Checklist with toggles",
     icon: CheckSquare,
-    category: "Lists",
+    category: "Basic",
+    aliases: ["todo", "task", "checkbox", "check"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).toggleTaskList().run();
     },
@@ -129,6 +136,7 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Code with syntax highlighting",
     icon: Code2,
     category: "Advanced",
+    aliases: ["code", "snippet", "```"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setCodeBlock().run();
     },
@@ -165,6 +173,7 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Upload or paste image",
     icon: Image,
     category: "Media",
+    aliases: ["img", "photo", "picture"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
       h.onImageUpload?.();
@@ -203,15 +212,19 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Side-by-side layout",
     icon: Layout,
     category: "Advanced",
+    aliases: ["columns", "col", "2col"],
     command: ({ editor, range }) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent(
-          `<div class="nw-columns"><div class="nw-col"><p>Left</p></div><div class="nw-col"><p>Right</p></div></div>`
-        )
-        .run();
+      editor.chain().focus().deleteRange(range).insertColumnList(2).run();
+    },
+  },
+  {
+    title: "Three columns",
+    description: "Three-column layout",
+    icon: Columns,
+    category: "Advanced",
+    aliases: ["3col", "three columns"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertColumnList(3).run();
     },
   },
   {
@@ -240,15 +253,12 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "Embed a link with preview",
     icon: ExternalLink,
     category: "Media",
+    aliases: ["bookmark", "link preview"],
     command: ({ editor, range }) => {
       const url = window.prompt("Paste URL");
       if (!url) return;
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent(`<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`)
-        .run();
+      editor.chain().focus().deleteRange(range).run();
+      insertBookmark(editor, url);
     },
   },
   {
@@ -256,22 +266,12 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     description: "YouTube, Figma, or any iframe",
     icon: Columns,
     category: "Media",
+    aliases: ["iframe", "youtube", "video"],
     command: ({ editor, range }) => {
       const url = window.prompt("Paste embed URL (YouTube, Figma, etc.)");
       if (!url) return;
-      let embedUrl = url;
-      const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-      if (ytMatch) {
-        embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
-      }
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .insertContent(
-          `<div data-type="embed"><iframe src="${embedUrl}" frameborder="0" allowfullscreen style="width:100%;height:400px;border-radius:8px;"></iframe></div>`
-        )
-        .run();
+      editor.chain().focus().deleteRange(range).run();
+      insertEmbed(editor, url);
     },
   },
   // Templates
@@ -281,7 +281,8 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     icon: FileText,
     category: "Templates",
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertContent(tpl.content).run();
+      editor.chain().focus().deleteRange(range).run();
+      insertTemplateMarkdown(editor, tpl.content);
     },
   })),
 ];
@@ -343,7 +344,7 @@ export const CommandList = forwardRef<any, CommandListProps>(
     catMap.forEach((catItems, label) => categories.push({ label, items: catItems }));
 
     return (
-      <div className="bg-card border border-border rounded-md shadow-lg overflow-hidden max-h-[360px] overflow-y-auto min-w-[240px]">
+      <div className="slash-menu bg-card border border-border rounded-lg shadow-xl overflow-hidden max-h-[380px] overflow-y-auto min-w-[320px]">
         {categories.map((cat) => (
           <div key={cat.label}>
             <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 px-3 pt-2 pb-1">{cat.label}</p>
@@ -388,10 +389,19 @@ export function createSlashCommandExtension(handlers: SlashHandlers = {}) {
             props.command({ editor, range });
           },
           items: ({ query }: { query: string }) => {
-            return getSuggestionItems(handlers).filter((item) =>
-              item.title.toLowerCase().includes(query.toLowerCase()) ||
-              item.description.toLowerCase().includes(query.toLowerCase())
-            );
+            const q = query.trim();
+            if (!q) return getSuggestionItems(handlers);
+            return getSuggestionItems(handlers)
+              .map((item) => ({
+                item,
+                score: Math.max(
+                  fuzzyMatch(q, item.title, item.aliases),
+                  fuzzyMatch(q, item.description, item.aliases),
+                ),
+              }))
+              .filter(({ score }) => score > 0)
+              .sort((a, b) => b.score - a.score)
+              .map(({ item }) => item);
           },
           render: () => {
             let component: ReactRenderer | null = null;

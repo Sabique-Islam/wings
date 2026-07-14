@@ -22,6 +22,10 @@ import { BlockMath, InlineMath } from "./MathExtension";
 import { ExcalidrawNode } from "./ExcalidrawExtension";
 import { WritingExperience } from "./WritingExperienceExtension";
 import { BlockHandle } from "./BlockHandleExtension";
+import { CodeBlockExtension } from "./CodeBlockExtension";
+import { Column, ColumnList } from "./ColumnExtension";
+import { Bookmark } from "./BookmarkExtension";
+import { Embed } from "./EmbedExtension";
 
 interface BlockEditorExtensionHandlers {
   onImageUpload?: (file?: File) => void;
@@ -30,9 +34,6 @@ interface BlockEditorExtensionHandlers {
   onAskAI?: () => void;
 }
 
-// Notion-style per-block placeholder.
-// Only show a hint on nodes where the user needs one; empty paragraphs stay
-// silent unless they're the very first block of an empty document.
 const PLACEHOLDER_BY_NODE: Record<string, string> = {
   heading: "Heading",
   blockquote: "Empty quote",
@@ -49,22 +50,16 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionHandle
     BlockHandle,
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
-      codeBlock: {
-        HTMLAttributes: { class: "code-block" },
-      },
+      codeBlock: false,
       dropcursor: false,
       horizontalRule: {
         HTMLAttributes: { class: "editor-hr" },
       },
-      // StarterKit v3 bundles Link by default. Keep one Link extension only;
-      // duplicates register competing keymaps/input rules and can swallow Enter.
       link: false,
     }),
-
+    CodeBlockExtension,
     Placeholder.configure({
       placeholder: ({ node, editor, pos }) => {
-        // Empty paragraph: show hint ONLY on the first top-level paragraph of
-        // an empty document. Every other empty paragraph stays silent (Notion).
         if (node.type.name === "paragraph") {
           const doc = editor.state.doc;
           const isFirstTopLevel = pos === 0;
@@ -76,7 +71,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionHandle
           return "";
         }
         if (node.type.name === "heading") {
-          const level = (node.attrs as any).level ?? 1;
+          const level = (node.attrs as { level?: number }).level ?? 1;
           return `Heading ${level}`;
         }
         return PLACEHOLDER_BY_NODE[node.type.name] ?? "";
@@ -97,7 +92,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionHandle
       linkOnPaste: true,
       HTMLAttributes: { class: "editor-link" },
     }),
-    Dropcursor.configure({ color: "hsl(0 0% 40%)", width: 2 }),
+    Dropcursor.configure({ color: "hsl(var(--muted-foreground) / 0.4)", width: 2 }),
     Typography,
     Table.configure({
       resizable: true,
@@ -106,8 +101,12 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionHandle
     TableRow,
     TableCell,
     TableHeader,
+    Column,
+    ColumnList,
     Callout,
     ToggleBlock,
+    Bookmark,
+    Embed,
     BlockMath,
     InlineMath,
     ExcalidrawNode,

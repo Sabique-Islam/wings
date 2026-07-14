@@ -1,9 +1,12 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { markdownToHtml, htmlToMarkdown } from "@/lib/markdown";
+import { looksLikeMarkdown } from "./blockCommands";
 import { useCallback, useEffect, useRef } from "react";
-import { Bold, Italic, Strikethrough, Code, Link as LinkIcon, Sparkles, AlignLeft, AlignCenter, AlignRight, Highlighter, Palette } from "lucide-react";
+import { Bold, Italic, Strikethrough, Underline, Code, Link as LinkIcon, Sparkles } from "lucide-react";
 import { createBlockEditorExtensions } from "./editorExtensions";
+import { BlockMenu } from "./BlockMenu";
+import { TurnIntoDropdown, ColorDropdown } from "./ColorMenu";
 
 interface Props {
   content: string;
@@ -15,18 +18,7 @@ interface Props {
   editable?: boolean;
 }
 
-// Markdown <-> HTML conversion lives in @/lib/markdown.
-
 export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNewPage, onAskAI, editable = true }: Props) {
-  // Snapshot initial content ONCE per mount. Parent passes `key={entry.id}`
-  // so switching entries remounts the editor with fresh content. While the
-  // user is typing we must NOT call `editor.setContent()` in response to
-  // prop changes — that wipes cursor/selection/undo and reads to the user
-  // as "text disappearing / undoing itself". Local-first: every keystroke
-  // flows through onChange, the editor is the on-screen source of truth,
-  // and the parent's content prop is only accepted when the editor's own
-  // version has NOT advanced since the last emit (i.e. the change came from
-  // outside this component).
   const initialContent = useRef(markdownToHtml(content));
   const lastEmittedMarkdown = useRef(content);
   const localVersion = useRef(0);
@@ -63,6 +55,13 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
           }
           return true;
         }
+        const text = event.clipboardData?.getData("text/plain") || "";
+        if (text && looksLikeMarkdown(text) && !event.clipboardData?.getData("text/html")?.trim()) {
+          event.preventDefault();
+          const html = markdownToHtml(text);
+          view.pasteHTML(html);
+          return true;
+        }
         return false;
       },
     },
@@ -75,15 +74,10 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     },
   });
 
-  // Reflect editable changes (e.g. share-role transitions) without remounting.
   useEffect(() => {
     if (editor && editor.isEditable !== editable) editor.setEditable(editable);
   }, [editable, editor]);
 
-  // Accept external content updates ONLY if the editor hasn't advanced since
-  // the last sync. If localVersion is ahead, our doc is fresher than the
-  // prop — silently ignore (this prevents the debounced parent state from
-  // clobbering in-flight typing, which was the "text disappears" race).
   useEffect(() => {
     if (!editor) return;
     if (editor.isFocused) return;
@@ -106,26 +100,25 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
 
-  // Keyboard shortcuts for formatting + link (⌘K when editor focused)
   useEffect(() => {
     if (!editor) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
-
       if (e.key.toLowerCase() === "k" && editor.isFocused()) {
         e.preventDefault();
         setLink();
         return;
       }
-
       if (e.shiftKey && e.key === "s") {
         e.preventDefault();
         editor.chain().focus().toggleStrike().run();
       }
+      if (e.key.toLowerCase() === "u") {
+        e.preventDefault();
+        editor.chain().focus().toggleUnderline().run();
+      }
     };
-
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [editor, setLink]);
@@ -135,7 +128,6 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     editor.chain().focus().setImage({ src: url }).run();
   }, [editor]);
 
-  // Expose insertImage on the DOM for parent to call
   useEffect(() => {
     if (!editor) return;
     (window as any).__nw_insertImage = insertImage;
@@ -154,7 +146,7 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
 
   return (
     <div
-      className="block-editor-wrapper"
+      className="block-editor-wrapper w-full min-w-0"
       onClick={(e) => {
         const target = e.target as HTMLElement;
         if (target.tagName === "A") {
@@ -170,11 +162,19 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
         }
       }}
     >
+      <BlockMenu editor={editor} />
       {editor && editable && (
-        <BubbleMenu
-          editor={editor}
-          className="bubble-menu"
-        >
+        <BubbleMenu editor={editor} className="bubble-menu">
+          <TurnIntoDropdown editor={editor} />
+          <div className="w-px h-4 bg-border mx-0.5" />
+          <button
+            onClick={() => (window as any).__nw_openInlineAI?.()}
+            className="bubble-btn bubble-btn-ai"
+            title="Ask AI"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </button>
+          <div className="w-px h-4 bg-border mx-0.5" />
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
             className={`bubble-btn ${editor.isActive("bold") ? "is-active" : ""}`}
@@ -188,6 +188,13 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
             title="Italic (⌘I)"
           >
             <Italic className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            className={`bubble-btn ${editor.isActive("underline") ? "is-active" : ""}`}
+            title="Underline (⌘U)"
+          >
+            <Underline className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => editor.chain().focus().toggleStrike().run()}
@@ -211,53 +218,10 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
           >
             <LinkIcon className="h-3.5 w-3.5" />
           </button>
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <button onClick={() => editor.chain().focus().setTextAlign("left").run()} className={`bubble-btn ${editor.isActive({ textAlign: "left" }) ? "is-active" : ""}`} title="Align left"><AlignLeft className="h-3.5 w-3.5" /></button>
-          <button onClick={() => editor.chain().focus().setTextAlign("center").run()} className={`bubble-btn ${editor.isActive({ textAlign: "center" }) ? "is-active" : ""}`} title="Align center"><AlignCenter className="h-3.5 w-3.5" /></button>
-          <button onClick={() => editor.chain().focus().setTextAlign("right").run()} className={`bubble-btn ${editor.isActive({ textAlign: "right" }) ? "is-active" : ""}`} title="Align right"><AlignRight className="h-3.5 w-3.5" /></button>
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <label className="bubble-btn cursor-pointer" title="Text color">
-            <Palette className="h-3.5 w-3.5" />
-            <input
-              type="color"
-              onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()}
-              className="sr-only"
-            />
-          </label>
-          <label className="bubble-btn cursor-pointer" title="Highlight">
-            <Highlighter className="h-3.5 w-3.5" />
-            <input
-              type="color"
-              onInput={(e) => editor.chain().focus().toggleHighlight({ color: (e.target as HTMLInputElement).value }).run()}
-              className="sr-only"
-            />
-          </label>
-          <select
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) editor.chain().focus().unsetFontFamily().run();
-              else editor.chain().focus().setFontFamily(v).run();
-            }}
-            defaultValue=""
-            className="bubble-btn bg-transparent text-[10px] font-mono outline-none cursor-pointer"
-            title="Font family"
-          >
-            <option value="">font</option>
-            <option value="ui-monospace, JetBrains Mono, monospace">mono</option>
-            <option value="ui-sans-serif, Inter, system-ui, sans-serif">sans</option>
-            <option value="ui-serif, Georgia, serif">serif</option>
-          </select>
-          <button
-            onClick={() => (window as any).__nw_openInlineAI?.()}
-            className="bubble-btn bubble-btn-ai"
-            title="Ask AI"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span className="ml-1 text-[10px]">AI</span>
-          </button>
+          <ColorDropdown editor={editor} />
         </BubbleMenu>
       )}
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="w-full min-w-0" />
     </div>
   );
 }

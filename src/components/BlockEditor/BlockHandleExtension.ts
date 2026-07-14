@@ -143,22 +143,36 @@ export const BlockHandle = Extension.create({
             }, 0);
           };
 
-          const openBlockMenu = () => {
+          const openBlockMenu = (e?: MouseEvent) => {
             if (state.targetPos == null) return;
-            const detail = { pos: state.targetPos };
+            const rect = state.target?.getBoundingClientRect();
+            const detail = {
+              pos: state.targetPos,
+              x: e?.clientX ?? rect?.left ?? 80,
+              y: e?.clientY ?? rect?.top ?? 120,
+            };
             window.dispatchEvent(new CustomEvent("nw:blockMenu", { detail }));
           };
 
           const onAddClick = (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
-            openSlashAfter();
+            if (e.altKey) {
+              // Insert above
+              if (state.targetPos == null) return;
+              const tr = view.state.tr.insert(state.targetPos, view.state.schema.nodes.paragraph.create());
+              view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(state.targetPos + 1))));
+              view.focus();
+              setTimeout(() => view.dispatch(view.state.tr.insertText("/")), 0);
+            } else {
+              openSlashAfter();
+            }
           };
 
           const onDragClick = (e: MouseEvent) => {
             e.preventDefault();
             e.stopPropagation();
-            openBlockMenu();
+            openBlockMenu(e);
           };
 
           const onDragStart = (e: DragEvent) => {

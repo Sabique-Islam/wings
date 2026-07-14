@@ -7,12 +7,18 @@ const shortcuts = [
   { keys: "⌘ N", desc: "New page" },
   { keys: "⌘ P", desc: "Quick switcher" },
   { keys: "⌘ /", desc: "Search sidebar" },
-  { keys: "⌘ B", desc: "Toggle sidebar (outside editor)" },
-  { keys: "⌘ B", desc: "Bold (in editor)" },
+  { keys: "⌘ J", desc: "Toggle AI assistant" },
+  { keys: "⌘ B", desc: "Toggle sidebar / Bold in editor" },
   { keys: "⌘ ?", desc: "Keyboard shortcuts" },
+  { keys: "⌘ D", desc: "Duplicate block" },
+  { keys: "⌘ ⇧ ↑/↓", desc: "Move block up/down" },
+  { keys: "⌘ U", desc: "Underline" },
   { keys: "⌘ ⇧ S", desc: "Strikethrough" },
   { keys: "⌘ I", desc: "Italic" },
   { keys: "⌘ E", desc: "Inline code" },
+  { keys: "⌘ ⌥ 0–8", desc: "Turn into (text, h1–h3, lists, toggle, code)" },
+  { keys: "Tab / ⇧Tab", desc: "Indent / outdent list" },
+  { keys: "Esc", desc: "Select block" },
   { keys: "/", desc: "Slash commands" },
 ];
 
@@ -42,7 +48,7 @@ export function KeyboardPalette() {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setOpen(false)}>
       <div className="fixed inset-0 bg-background/60" />
       <div
-        className="relative bg-card border border-border rounded-lg shadow-2xl w-80 overflow-hidden"
+        className="relative bg-card border border-border rounded-lg shadow-2xl w-96 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -54,10 +60,10 @@ export function KeyboardPalette() {
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        <ul className="py-2 max-h-80 overflow-y-auto">
+        <ul className="py-2 max-h-96 overflow-y-auto">
           {shortcuts.map((s, i) => (
             <li key={`${s.keys}-${s.desc}-${i}`} className="flex items-center justify-between px-4 py-1.5">
-              <span className="text-xs text-muted-foreground font-mono">{s.desc}</span>
+              <span className="text-xs text-muted-foreground">{s.desc}</span>
               <kbd className="text-[10px] bg-secondary text-secondary-foreground px-2 py-0.5 rounded font-mono">{s.keys}</kbd>
             </li>
           ))}

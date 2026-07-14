@@ -1,15 +1,8 @@
 // Markdown <-> HTML conversion used by the block editor.
-// We deliberately do NOT use the `tiptap-markdown` extension because at the
-// time of writing it overrides node behavior in ways that break basic editing
-// (e.g. Enter creating new paragraphs, inline input rules). Instead we keep
-// a clean separation: markdown is converted to HTML at load time with
-// `marked`, and HTML is converted back to markdown at save time with
-// `turndown`, with a few custom rules for our atom nodes.
 
 import { marked } from "marked";
 import TurndownService from "turndown";
 
-// -- HTML -> Markdown (save) -------------------------------------------------
 const turndown = new TurndownService({
   headingStyle: "atx",
   codeBlockStyle: "fenced",
@@ -17,7 +10,13 @@ const turndown = new TurndownService({
   emDelimiter: "_",
 });
 
-// Task lists
+const CUSTOM_BLOCK_TYPES = new Set(["callout", "toggle", "column-list", "bookmark", "embed", "excalidraw"]);
+turndown.keep((node) => {
+  if (node.nodeType !== 1) return false;
+  const type = (node as HTMLElement).getAttribute("data-type");
+  return !!type && CUSTOM_BLOCK_TYPES.has(type);
+});
+
 turndown.addRule("taskList", {
   filter: (node) =>
     node.nodeName === "LI" &&
@@ -29,21 +28,31 @@ turndown.addRule("taskList", {
   },
 });
 
-// Highlight / mark
 turndown.addRule("highlight", {
   filter: ["mark"],
   replacement: (content) => `==${content}==`,
 });
 
-// Excalidraw atom — preserve the HTML so parseHTML can recover it on load.
-turndown.addRule("excalidraw", {
-  filter: (node) =>
-    node.nodeName === "DIV" &&
-    (node as HTMLElement).getAttribute("data-type") === "excalidraw",
-  replacement: (_content, node) => `\n\n${(node as HTMLElement).outerHTML}\n\n`,
+turndown.addRule("underline", {
+  filter: ["u"],
+  replacement: (content) => `<u>${content}</u>`,
 });
 
-// Inline / block math nodes rendered by MathExtension
+// Passthrough custom blocks as HTML blobs
+function passthroughRule(name: string, test: (el: HTMLElement) => boolean) {
+  turndown.addRule(name, {
+    filter: (node) => node.nodeType === 1 && test(node as HTMLElement),
+    replacement: (_c, node) => `\n\n${(node as HTMLElement).outerHTML}\n\n`,
+  });
+}
+
+passthroughRule("excalidraw", (el) => el.getAttribute("data-type") === "excalidraw");
+passthroughRule("callout", (el) => el.getAttribute("data-type") === "callout");
+passthroughRule("toggle", (el) => el.getAttribute("data-type") === "toggle");
+passthroughRule("columnList", (el) => el.getAttribute("data-type") === "column-list");
+passthroughRule("bookmark", (el) => el.getAttribute("data-type") === "bookmark");
+passthroughRule("embed", (el) => el.getAttribute("data-type") === "embed");
+
 turndown.addRule("inlineMath", {
   filter: (node) =>
     node.nodeName === "SPAN" &&
@@ -53,6 +62,7 @@ turndown.addRule("inlineMath", {
     return `$${latex}$`;
   },
 });
+
 turndown.addRule("blockMath", {
   filter: (node) =>
     node.nodeName === "DIV" &&
@@ -63,15 +73,24 @@ turndown.addRule("blockMath", {
   },
 });
 
+// Preserve inline styles for color/align
+turndown.addRule("styledSpan", {
+  filter: (node) => {
+    if (node.nodeName !== "SPAN") return false;
+    const el = node as HTMLElement;
+    return !!(el.getAttribute("style") || el.style.color);
+  },
+  replacement: (content, node) => (node as HTMLElement).outerHTML.replace(content, content),
+});
+
 export function htmlToMarkdown(html: string): string {
-  return turndown.turndown(html || "").trim();
+  if (!html) return "";
+  const input = html.trim().startsWith("<") ? `<div data-root="1">${html}</div>` : html;
+  return turndown.turndown(input).trim();
 }
 
-// -- Markdown -> HTML (load) -------------------------------------------------
 marked.setOptions({ gfm: true, breaks: false });
 
-/** Convert $$...$$ and $...$ in markdown into the math extension's HTML
- *  so the editor's parser can pick them up. Skips fenced code blocks. */
 function preprocessMath(md: string): string {
   if (!md) return md;
   const fenceRe = /(^|\n)```[\s\S]*?\n```/g;
@@ -85,19 +104,22 @@ function preprocessMath(md: string): string {
   }
   if (last < md.length) segs.push({ text: md.slice(last), isCode: false });
 
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-  return segs.map((seg) => {
-    if (seg.isCode) return seg.text;
-    let text = seg.text;
-    text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_f, latex) =>
-      `\n\n<div data-type="block-math" data-latex="${esc(String(latex).trim())}"></div>\n\n`
-    );
-    text = text.replace(/(^|[^\\$])\$([^\n$]+?)\$(?!\d)/g, (_f, pre, latex) =>
-      `${pre}<span data-type="inline-math" data-latex="${esc(String(latex).trim())}"></span>`
-    );
-    return text;
-  }).join("");
+  return segs
+    .map((seg) => {
+      if (seg.isCode) return seg.text;
+      let text = seg.text;
+      text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_f, latex) =>
+        `\n\n<div data-type="block-math" data-latex="${esc(String(latex).trim())}"></div>\n\n`,
+      );
+      text = text.replace(/(^|[^\\$])\$([^\n$]+?)\$(?!\d)/g, (_f, pre, latex) =>
+        `${pre}<span data-type="inline-math" data-latex="${esc(String(latex).trim())}"></span>`,
+      );
+      return text;
+    })
+    .join("");
 }
 
 export function markdownToHtml(md: string): string {
