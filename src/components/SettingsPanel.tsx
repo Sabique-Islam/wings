@@ -12,7 +12,7 @@ import {
   getActiveProvider, setActiveProvider, getApiKeyFor, setApiKeyFor, clearApiKeyFor,
   getModelFor, setModelFor,
 } from "@/lib/ai/storage";
-import { setUsername as saveUsername } from "@/lib/profile";
+import { setUsername as saveUsername, updateUserPreferences } from "@/lib/profile";
 import { SOCIAL } from "@/config/navigation";
 import { SITE } from "@/config/site";
 import { Link } from "react-router-dom";
@@ -93,16 +93,9 @@ export function SettingsPanel() {
 
   const savePref = useCallback(async (patch: Record<string, unknown>) => {
     if (!user) return false;
-    const { data: existing } = await supabase
-      .from("user_preferences")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    const { error } = existing
-      ? await supabase.from("user_preferences").update(patch as any).eq("user_id", user.id)
-      : await supabase.from("user_preferences").insert({ user_id: user.id, ...patch } as any);
-    if (error) {
-      toast.error("Couldn't save settings", { description: error.message });
+    const { ok, error } = await updateUserPreferences(user.id, patch, user.email);
+    if (!ok) {
+      toast.error("Couldn't save settings", { description: error });
       return false;
     }
     return true;
@@ -118,7 +111,7 @@ export function SettingsPanel() {
 
   const handleUsername = async () => {
     if (!user || !username.trim()) return;
-    const res = await saveUsername(user.id, username);
+    const res = await saveUsername(user.id, username, user.email);
     if (res.ok) {
       setUsernameMsg("saved");
       toast.success("Username saved");
