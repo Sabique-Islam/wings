@@ -27,6 +27,7 @@ export function Seo({
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={url} />
+      <link rel="icon" href="/favicon.ico" type="image/x-icon" />
       {noIndex && <meta name="robots" content="noindex, nofollow" />}
 
       {/* OpenGraph */}
