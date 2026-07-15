@@ -77,7 +77,6 @@ export async function sendMagicLinkMail(opts: {
   to: string;
   action: string;
   verifyUrl: string;
-  token: string;
   userId: string;
   tokenHash: string;
 }) {
@@ -86,7 +85,6 @@ export async function sendMagicLinkMail(opts: {
     heading: copy.heading,
     lead: copy.lead,
     verifyUrl: opts.verifyUrl,
-    token: opts.token,
   });
 
   return assertSent(await sendMail({

@@ -22,27 +22,20 @@ function btn(href: string, label: string): string {
   return `<a href="${href}" style="display:inline-block;margin:20px 0 8px;padding:12px 22px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:999px;font-family:${mono};font-size:11px;letter-spacing:0.16em;text-transform:uppercase;">${label}</a>`;
 }
 
-function codeBlock(value: string): string {
-  return `<div style="margin:16px 0;padding:14px 16px;background:#f4f2ef;border:1px solid #e4e0da;border-radius:8px;font-family:${mono};font-size:22px;letter-spacing:0.35em;text-align:center;">${value}</div>`;
-}
-
 export function magicLinkTemplate(opts: {
   heading: string;
   lead: string;
   verifyUrl: string;
-  token: string;
 }): { subject: string; html: string; text: string } {
   const body = `
 <h1 style="margin:0 0 12px;font-size:24px;line-height:1.15;letter-spacing:-0.03em;font-weight:700;">${opts.heading}</h1>
 <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#4a4540;">${opts.lead}</p>
 ${btn(opts.verifyUrl, "open wings")}
-<p style="margin:18px 0 6px;font-size:13px;color:#6b6560;">or paste this one-time code:</p>
-${codeBlock(opts.token)}
-<p style="margin:16px 0 0;font-size:12px;color:#9a948c;">if you didn't request this, ignore this email.</p>`;
+<p style="margin:16px 0 0;font-size:12px;color:#9a948c;">this link expires soon and works once. if you didn't request it, ignore this email.</p>`;
   return {
     subject: opts.heading,
     html: shell(opts.lead, body),
-    text: `${opts.heading}\n\n${opts.lead}\n\n${opts.verifyUrl}\n\nCode: ${opts.token}\n`,
+    text: `${opts.heading}\n\n${opts.lead}\n\n${opts.verifyUrl}\n`,
   };
 }
 
@@ -85,7 +78,7 @@ export function authCopy(action: string): { heading: string; lead: string; subje
     case "signup":
       return { heading: "welcome to wings", lead: "confirm your email to start writing.", subject: "welcome to wings" };
     case "recovery":
-      return { heading: "reset your sign-in", lead: "use this link or code to get back into wings.", subject: "reset your wings sign-in" };
+      return { heading: "reset your sign-in", lead: "use this link to get back into wings.", subject: "reset your wings sign-in" };
     case "email_change":
       return { heading: "confirm your new email", lead: "approve this change to update your wings account.", subject: "confirm your new email" };
     case "invite":

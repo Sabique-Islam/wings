@@ -1,5 +1,5 @@
 // Supabase Auth "Send Email" hook — Resend SDK (html/text).
-// Docs: https://resend.com/docs/send-with-nodejs
+// Docs: https://supabase.com/docs/guides/auth/auth-hooks/send-email-hook
 
 import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import {
@@ -21,8 +21,39 @@ interface HookPayload {
   };
 }
 
+const JSON_HEADERS = { "Content-Type": "application/json" };
+
+/** Supabase only reads error bodies when the hook returns HTTP 200/202. */
+function hookOk(): Response {
+  return new Response(JSON.stringify({}), { status: 200, headers: JSON_HEADERS });
+}
+
+function hookError(message: string, httpCode = 500): Response {
+  return new Response(
+    JSON.stringify({ error: { message, http_code: httpCode } }),
+    { status: 200, headers: JSON_HEADERS },
+  );
+}
+
+function webhookHeaders(req: Request): Record<string, string> {
+  const get = (name: string) => req.headers.get(name) ?? req.headers.get(name.toLowerCase()) ?? "";
+  return {
+    "webhook-id": get("webhook-id"),
+    "webhook-timestamp": get("webhook-timestamp"),
+    "webhook-signature": get("webhook-signature"),
+  };
+}
+
+/** Accepts `v1,whsec_<b64>`, `whsec_<b64>`, or raw base64 — normalizes to what standardwebhooks expects. */
+function hookSecret(): string | null {
+  const raw = Deno.env.get("SEND_EMAIL_HOOK_SECRET")?.trim().replace(/^["']|["']$/g, "");
+  if (!raw) return null;
+  return raw.replace(/^v1,/, "").replace(/^whsec_/, "");
+}
+
 function verifyUrl(tokenHash: string, actionType: string, redirectTo: string): string {
   const base = supabaseUrl();
+  if (!base) throw new Error("SUPABASE_URL not configured for auth-send-email");
   const params = new URLSearchParams({
     token: tokenHash,
     type: actionType,
@@ -33,20 +64,20 @@ function verifyUrl(tokenHash: string, actionType: string, redirectTo: string): s
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "method not allowed" }), { status: 405 });
+    return hookError("method not allowed", 405);
   }
 
-  const secret = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
+  const secret = hookSecret();
   if (!secret) {
-    return new Response(JSON.stringify({ error: "SEND_EMAIL_HOOK_SECRET not configured" }), { status: 503 });
+    console.error("auth-send-email: SEND_EMAIL_HOOK_SECRET missing");
+    return hookError("SEND_EMAIL_HOOK_SECRET not configured", 500);
   }
 
   const payload = await req.text();
-  const headers = Object.fromEntries(req.headers);
-  const hookSecret = secret.replace("v1,whsec_", "");
-  const wh = new Webhook(hookSecret);
+  const headers = webhookHeaders(req);
 
   try {
+    const wh = new Webhook(secret);
     const { user, email_data } = wh.verify(payload, headers) as HookPayload;
     const action = email_data.email_action_type;
 
@@ -55,54 +86,45 @@ Deno.serve(async (req) => {
       action,
       userId: user.id,
     });
-    if (notification) {
-      return new Response(JSON.stringify({}), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    if (notification) return hookOk();
 
     const redirectTo = email_data.redirect_to || siteUrl();
 
-    if (action === "email_change" && user.new_email && email_data.token_new && email_data.token_hash_new) {
-      await sendMagicLinkMail({
-        to: user.email,
-        action,
-        verifyUrl: verifyUrl(email_data.token_hash_new, action, redirectTo),
-        token: email_data.token,
-        userId: user.id,
-        tokenHash: email_data.token_hash_new,
-      });
-      await sendMagicLinkMail({
-        to: user.new_email,
-        action,
-        verifyUrl: verifyUrl(email_data.token_hash, action, redirectTo),
-        token: email_data.token_new,
-        userId: user.id,
-        tokenHash: email_data.token_hash,
-      });
+    if (action === "email_change" && user.new_email && email_data.token_hash_new) {
+      // Secure email change: confirm on both addresses. Note the reversed hash
+      // mapping (token_hash_new → current email) — Supabase quirk, documented.
+      // Parallel send: the hook has a 5s total budget including retries.
+      await Promise.all([
+        sendMagicLinkMail({
+          to: user.email,
+          action,
+          verifyUrl: verifyUrl(email_data.token_hash_new, action, redirectTo),
+          userId: user.id,
+          tokenHash: email_data.token_hash_new,
+        }),
+        sendMagicLinkMail({
+          to: user.new_email,
+          action,
+          verifyUrl: verifyUrl(email_data.token_hash, action, redirectTo),
+          userId: user.id,
+          tokenHash: email_data.token_hash,
+        }),
+      ]);
     } else {
       const recipient = action === "email_change" && user.new_email ? user.new_email : user.email;
       await sendMagicLinkMail({
         to: recipient,
         action,
         verifyUrl: verifyUrl(email_data.token_hash, action, redirectTo),
-        token: email_data.token_new || email_data.token,
         userId: user.id,
         tokenHash: email_data.token_hash,
       });
     }
 
-    return new Response(JSON.stringify({}), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return hookOk();
   } catch (e) {
     console.error("auth-send-email:", e);
-    const err = e as { message?: string };
-    return new Response(
-      JSON.stringify({ error: { http_code: 500, message: err.message ?? "send failed" } }),
-      { status: 401, headers: { "Content-Type": "application/json" } },
-    );
+    const message = e instanceof Error ? e.message : "send failed";
+    return hookError(message, 500);
   }
 });

@@ -50,3 +50,15 @@ declare module "npm:@supabase/supabase-js@2.49.1" {
     };
   };
 }
+
+/** Deno https: specifiers — resolved at runtime by Supabase Edge Functions. */
+declare module "https://esm.sh/standardwebhooks@1.0.0" {
+  export class Webhook {
+    constructor(secret: string);
+    verify(payload: string, headers: Record<string, string>): unknown;
+  }
+}
+
+declare module "https://esm.sh/@supabase/supabase-js@2.49.1" {
+  export { createClient } from "npm:@supabase/supabase-js@2.49.1";
+}
