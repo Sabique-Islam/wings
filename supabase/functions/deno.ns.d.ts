@@ -37,18 +37,28 @@ declare module "npm:resend@^6" {
 }
 
 declare module "npm:@supabase/supabase-js@2.49.1" {
+  interface SupabaseUser {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, unknown>;
+  }
+
+  interface SupabaseClient {
+    auth: {
+      getUser(): Promise<{
+        data: { user: SupabaseUser | null };
+        error: { message: string } | null;
+      }>;
+    };
+    // Query builder is only stubbed for edge-function typecheck.
+    from(table: string): any;
+  }
+
   export function createClient(
     url: string,
     key: string,
     options?: { global?: { headers?: Record<string, string> } },
-  ): {
-    auth: {
-      getUser(): Promise<{
-        data: { user: { id: string; email?: string } | null };
-        error: { message: string } | null;
-      }>;
-    };
-  };
+  ): SupabaseClient;
 }
 
 /** Deno https: specifiers — resolved at runtime by Supabase Edge Functions. */

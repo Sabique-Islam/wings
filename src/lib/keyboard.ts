@@ -9,6 +9,6 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 
 /** True when the TipTap block editor has focus. */
 export function isEditorFocused(): boolean {
-  const editor = (window as { __nw_editor?: { isFocused: () => boolean } }).__nw_editor;
-  return !!editor?.isFocused?.();
+  const editor = (window as { __nw_editor?: { isFocused: boolean } }).__nw_editor;
+  return !!editor?.isFocused;
 }

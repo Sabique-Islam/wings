@@ -91,6 +91,21 @@ export function htmlToMarkdown(html: string): string {
 
 marked.setOptions({ gfm: true, breaks: false });
 
+// Defense-in-depth: treat raw HTML in markdown as plain text so <script> and
+// event-handler attributes never pass through marked into the editor pipeline.
+marked.use({
+  walkTokens(token) {
+    if (token.type === "html") {
+      const raw = (token as { raw?: string }).raw ?? "";
+      (token as { type: string }).type = "text";
+      (token as { text: string }).text = raw
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+  },
+});
+
 function preprocessMath(md: string): string {
   if (!md) return md;
   const fenceRe = /(^|\n)```[\s\S]*?\n```/g;

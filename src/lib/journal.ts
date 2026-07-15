@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { EntryLayoutMap, normalizeLayout } from "./layout";
+import { logError } from "./logger";
 
 export interface Entry {
   id: string;
@@ -79,7 +80,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
   if (!opts.includeTrash) query = query.is("deleted_at", null);
   const { data: ownData, error: ownError } = await query;
   if (ownError) {
-    console.error("Failed to fetch own entries:", ownError);
+    logError("Failed to fetch own entries", ownError);
     throw ownError;
   }
 
@@ -106,7 +107,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
       if (entries) sharedEntries = entries as any[];
     }
   } catch (err) {
-    console.error("Failed to fetch shared entries:", err);
+    logError("Failed to fetch shared entries", err);
   }
 
   const all = [...(ownData ?? []), ...sharedEntries];
@@ -136,7 +137,7 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
     .eq("user_id", userId)
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false });
-  if (error) { console.error("Failed to fetch trash:", error); return []; }
+  if (error) { logError("Failed to fetch trash", error); return []; }
   return (data ?? []).map((d: any) => ({
     ...d,
     parent_id: d.parent_id ?? null,
@@ -226,7 +227,7 @@ export async function searchEntries(userId: string, q: string, limit = 20): Prom
     .is("deleted_at", null)
     .textSearch("search_tsv", query, { type: "websearch", config: "english" })
     .limit(limit);
-  if (error) { console.error("Search failed:", error); return []; }
+  if (error) { logError("Search failed", error); return []; }
   return (data ?? []).map((d: any) => ({
     ...d,
     parent_id: d.parent_id ?? null,

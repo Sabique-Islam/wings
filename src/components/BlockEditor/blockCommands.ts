@@ -1,5 +1,6 @@
 import type { Editor } from "@tiptap/core";
 import { markdownToHtml } from "@/lib/markdown";
+import { isAllowedEmbedUrl, isSafeHttpUrl } from "@/lib/safeUrl";
 
 export const TEXT_COLORS = [
   { label: "Default", value: "" },
@@ -78,21 +79,25 @@ export function insertColumns(editor: Editor, count: 2 | 3): void {
   editor.chain().focus().insertContent({ type: "columnList", content: cols }).run();
 }
 
-export function insertBookmark(editor: Editor, url: string): void {
+export function insertBookmark(editor: Editor, url: string): boolean {
+  if (!isSafeHttpUrl(url)) return false;
   let title = url;
   try {
     title = new URL(url).hostname;
   } catch {
     /* keep url */
   }
-  editor.chain().focus().insertBookmark({ url, title }).run();
+  return editor.chain().focus().insertBookmark({ url, title }).run();
 }
 
-export function insertEmbed(editor: Editor, url: string): void {
+export function insertEmbed(editor: Editor, url: string): boolean {
   let embedUrl = url;
   const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
   if (ytMatch) embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}`;
-  editor.chain().focus().insertEmbed({ url, embedUrl }).run();
+  // Reject anything not on the https embed allowlist so unsupported/hostile
+  // URLs never reach the iframe node.
+  if (!isAllowedEmbedUrl(embedUrl)) return false;
+  return editor.chain().focus().insertEmbed({ url, embedUrl }).run();
 }
 
 export function insertTemplateMarkdown(editor: Editor, markdown: string): void {

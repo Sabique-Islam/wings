@@ -32,6 +32,12 @@ export default function AuthCallback() {
           if (exchangeError) throw exchangeError;
         }
 
+        // Scrub the auth code / implicit token hash from the URL + history so it
+        // never lands in bookmarks, referrers, or shared links.
+        if (window.location.search || window.location.hash) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
         // PKCE code exchange, or implicit tokens in the URL hash (detectSessionInUrl).
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;

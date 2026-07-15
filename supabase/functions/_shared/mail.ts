@@ -10,8 +10,26 @@ import {
 } from "./templates.ts";
 
 let client: Resend | null = null;
+let configChecked = false;
+
+/** Fail closed in production when required mail env vars are missing. */
+function assertMailConfig(): void {
+  if (configChecked) return;
+  configChecked = true;
+  const isProd = !!Deno.env.get("DENO_DEPLOYMENT_ID");
+  if (!isProd) return;
+  const missing: string[] = [];
+  if (!Deno.env.get("SITE_URL")) missing.push("SITE_URL");
+  if (!Deno.env.get("MAIL_FROM_AUTH")) missing.push("MAIL_FROM_AUTH");
+  if (!Deno.env.get("MAIL_FROM_APP")) missing.push("MAIL_FROM_APP");
+  if (!Deno.env.get("RESEND_API_KEY")) missing.push("RESEND_API_KEY");
+  if (missing.length > 0) {
+    throw new Error(`mail configuration incomplete: ${missing.join(", ")}`);
+  }
+}
 
 function getResend(): Resend {
+  assertMailConfig();
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) throw new Error("RESEND_API_KEY not configured");
   if (!client) client = new Resend(key);

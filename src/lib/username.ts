@@ -29,9 +29,12 @@ export function validateUsername(raw: string): UsernameCheckResult {
 
 export async function isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
   const u = username.trim().toLowerCase();
-  let query = supabase.from("user_preferences").select("user_id, username").ilike("username", u).limit(1);
-  const { data } = await query;
-  if (!data || data.length === 0) return true;
-  if (excludeUserId && data[0].user_id === excludeUserId) return true;
-  return false;
+  const { data, error } = await supabase.rpc("is_username_available", {
+    _username: u,
+    _exclude_user_id: excludeUserId ?? undefined,
+  });
+  // Fail closed: treat lookup errors as "not available" so we never hand out a
+  // name we couldn't verify.
+  if (error) return false;
+  return data === true;
 }

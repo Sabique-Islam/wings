@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Sparkles, Wand2, Languages, Scissors, Maximize2, ListChecks, Loader2 } from "lucide-react";
 import { generateOnce, getApiKey } from "@/lib/aiClient";
 import { toast } from "sonner";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
+import { markdownToHtml } from "@/lib/markdown";
 
 interface Props {
   editor: any;
@@ -65,7 +67,8 @@ export function InlineAIMenu({ editor }: Props) {
       const result = await generateOnce({
         prompt: `${instruction}\n\nText:\n"""\n${selectedText}\n"""`,
       });
-      editor.chain().focus().insertContentAt({ from, to }, result.trim()).run();
+      const html = sanitizeHtml(markdownToHtml(result.trim()));
+      editor.chain().focus().insertContentAt({ from, to }, html).run();
     } catch (e: unknown) {
       console.error(e);
       toast.error((e as Error)?.message || "AI request failed");

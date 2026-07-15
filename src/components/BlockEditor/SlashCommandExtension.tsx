@@ -16,6 +16,7 @@ import {
   Sparkles, FilePlus2, Layout,
 } from "lucide-react";
 import { TEMPLATES } from "@/lib/templates";
+import { toast } from "sonner";
 import { fuzzyMatch, insertBookmark, insertEmbed, insertTemplateMarkdown } from "./blockCommands";
 
 export interface CommandItem {
@@ -258,7 +259,9 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
       const url = window.prompt("Paste URL");
       if (!url) return;
       editor.chain().focus().deleteRange(range).run();
-      insertBookmark(editor, url);
+      if (!insertBookmark(editor, url)) {
+        toast.error("Only http(s) links can be bookmarked");
+      }
     },
   },
   {
@@ -271,7 +274,9 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
       const url = window.prompt("Paste embed URL (YouTube, Figma, etc.)");
       if (!url) return;
       editor.chain().focus().deleteRange(range).run();
-      insertEmbed(editor, url);
+      if (!insertEmbed(editor, url)) {
+        toast.error("Embeds are only allowed from trusted https sources (YouTube, Vimeo, Figma, etc.)");
+      }
     },
   },
   // Templates

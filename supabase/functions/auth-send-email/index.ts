@@ -51,13 +51,29 @@ function hookSecret(): string | null {
   return raw.replace(/^v1,/, "").replace(/^whsec_/, "");
 }
 
+const MAX_BODY_BYTES = 64 * 1024;
+
+/** Only honor redirect targets on our own site; otherwise fall back to SITE_URL. */
+function safeRedirect(redirectTo: string): string {
+  const site = siteUrl().replace(/\/+$/, "");
+  if (!redirectTo) return site;
+  try {
+    const u = new URL(redirectTo);
+    const allowed = [site, "http://localhost:8080", "http://localhost:5173"];
+    if (allowed.some((a) => u.origin === new URL(a).origin)) return redirectTo;
+  } catch {
+    /* not an absolute URL */
+  }
+  return site;
+}
+
 function verifyUrl(tokenHash: string, actionType: string, redirectTo: string): string {
   const base = supabaseUrl();
   if (!base) throw new Error("SUPABASE_URL not configured for auth-send-email");
   const params = new URLSearchParams({
     token: tokenHash,
     type: actionType,
-    redirect_to: redirectTo || siteUrl(),
+    redirect_to: safeRedirect(redirectTo),
   });
   return `${base}/auth/v1/verify?${params.toString()}`;
 }
@@ -74,6 +90,9 @@ Deno.serve(async (req) => {
   }
 
   const payload = await req.text();
+  if (payload.length > MAX_BODY_BYTES) {
+    return hookError("payload too large", 413);
+  }
   const headers = webhookHeaders(req);
 
   try {
@@ -88,7 +107,7 @@ Deno.serve(async (req) => {
     });
     if (notification) return hookOk();
 
-    const redirectTo = email_data.redirect_to || siteUrl();
+    const redirectTo = safeRedirect(email_data.redirect_to || siteUrl());
 
     if (action === "email_change" && user.new_email && email_data.token_hash_new) {
       // Secure email change: confirm on both addresses. Note the reversed hash
@@ -123,8 +142,8 @@ Deno.serve(async (req) => {
 
     return hookOk();
   } catch (e) {
+    // Log detail server-side, return a generic message to the caller.
     console.error("auth-send-email:", e);
-    const message = e instanceof Error ? e.message : "send failed";
-    return hookError(message, 500);
+    return hookError("email delivery failed", 500);
   }
 });

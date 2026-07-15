@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
-import { isUsernameAvailable } from "@/lib/username";
+import { isUsernameAvailable, validateUsername } from "@/lib/username";
 
 type UserPreferencesUpdate = TablesUpdate<"user_preferences">;
 export type UserPreferencesPatch = UserPreferencesUpdate;
@@ -71,12 +71,11 @@ export async function getMyUsername(userId: string): Promise<string | null> {
 }
 
 export async function getUserIdByUsername(username: string): Promise<string | null> {
-  const { data } = await supabase
-    .from("user_preferences")
-    .select("user_id, username")
-    .ilike("username", username)
-    .maybeSingle();
-  return data?.user_id ?? null;
+  const { data, error } = await supabase.rpc("get_user_id_by_username", {
+    _username: username.trim().toLowerCase(),
+  });
+  if (error) return null;
+  return (data as string | null) ?? null;
 }
 
 export async function setUsername(
@@ -85,6 +84,9 @@ export async function setUsername(
   email?: string | null,
 ): Promise<{ ok: boolean; error?: string }> {
   const u = username.trim().toLowerCase();
+  const check = validateUsername(u);
+  if (!check.ok) return { ok: false, error: check.message || "invalid username" };
+
   try {
     await ensureUserPreferencesRow(userId, email);
   } catch (e) {

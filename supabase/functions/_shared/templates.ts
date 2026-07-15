@@ -1,12 +1,33 @@
 const mono = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 const sans = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
+/** Escape untrusted text before interpolating into email HTML. */
+function esc(s: string): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Only allow http(s) URLs in hrefs; otherwise fall back to '#'. */
+function safeUrl(raw: string): string {
+  const u = String(raw ?? "").trim();
+  return /^https?:\/\//i.test(u) ? u : "#";
+}
+
+/** Strip CR/LF so a value can't inject extra email headers/subject lines. */
+function oneLine(s: string): string {
+  return String(s ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+
 function shell(preheader: string, body: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
 <body style="margin:0;padding:0;background:#f4f2ef;color:#1a1a1a;font-family:${sans};">
-<span style="display:none;max-height:0;overflow:hidden;">${preheader}</span>
+<span style="display:none;max-height:0;overflow:hidden;">${esc(preheader)}</span>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ef;padding:32px 16px;">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border:1px solid #e4e0da;border-radius:12px;">
@@ -19,7 +40,7 @@ function shell(preheader: string, body: string): string {
 }
 
 function btn(href: string, label: string): string {
-  return `<a href="${href}" style="display:inline-block;margin:20px 0 8px;padding:12px 22px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:999px;font-family:${mono};font-size:11px;letter-spacing:0.16em;text-transform:uppercase;">${label}</a>`;
+  return `<a href="${esc(safeUrl(href))}" style="display:inline-block;margin:20px 0 8px;padding:12px 22px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:999px;font-family:${mono};font-size:11px;letter-spacing:0.16em;text-transform:uppercase;">${esc(label)}</a>`;
 }
 
 export function magicLinkTemplate(opts: {
@@ -28,8 +49,8 @@ export function magicLinkTemplate(opts: {
   verifyUrl: string;
 }): { subject: string; html: string; text: string } {
   const body = `
-<h1 style="margin:0 0 12px;font-size:24px;line-height:1.15;letter-spacing:-0.03em;font-weight:700;">${opts.heading}</h1>
-<p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#4a4540;">${opts.lead}</p>
+<h1 style="margin:0 0 12px;font-size:24px;line-height:1.15;letter-spacing:-0.03em;font-weight:700;">${esc(opts.heading)}</h1>
+<p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#4a4540;">${esc(opts.lead)}</p>
 ${btn(opts.verifyUrl, "open wings")}
 <p style="margin:16px 0 0;font-size:12px;color:#9a948c;">this link expires soon and works once. if you didn't request it, ignore this email.</p>`;
   return {
@@ -45,8 +66,8 @@ export function notificationTemplate(opts: {
   subject: string;
 }): { subject: string; html: string; text: string } {
   const htmlBody = `
-<h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">${opts.heading}</h1>
-<p style="margin:0;font-size:15px;line-height:1.6;color:#4a4540;">${opts.body}</p>`;
+<h1 style="margin:0 0 12px;font-size:22px;font-weight:700;">${esc(opts.heading)}</h1>
+<p style="margin:0;font-size:15px;line-height:1.6;color:#4a4540;">${esc(opts.body)}</p>`;
   return {
     subject: opts.subject,
     html: shell(opts.body, htmlBody),
@@ -61,15 +82,18 @@ export function shareInviteTemplate(opts: {
   url: string;
 }): { subject: string; html: string; text: string } {
   const title = opts.entryTitle.trim() || "a note";
+  const inviter = oneLine(opts.inviterLabel);
+  const role = oneLine(opts.role);
+  const url = safeUrl(opts.url);
   const body = `
 <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;">you've been invited</h1>
-<p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#4a4540;">${opts.inviterLabel} shared <strong>${title}</strong> with you as <strong>${opts.role}</strong>.</p>
-${btn(opts.url, "open note")}
-<p style="margin:16px 0 0;font-size:12px;color:#9a948c;word-break:break-all;">${opts.url}</p>`;
+<p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#4a4540;">${esc(inviter)} shared <strong>${esc(title)}</strong> with you as <strong>${esc(role)}</strong>.</p>
+${btn(url, "open note")}
+<p style="margin:16px 0 0;font-size:12px;color:#9a948c;word-break:break-all;">${esc(url)}</p>`;
   return {
-    subject: `${opts.inviterLabel} shared a note with you`,
+    subject: oneLine(`${inviter} shared a note with you`),
     html: shell(`Open ${title} on Wings`, body),
-    text: `You've been invited to ${title} (${opts.role}) by ${opts.inviterLabel}.\n\n${opts.url}\n`,
+    text: `You've been invited to ${title} (${role}) by ${inviter}.\n\n${url}\n`,
   };
 }
 

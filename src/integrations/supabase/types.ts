@@ -283,6 +283,21 @@ export type Database = {
         Returns: boolean
       }
       is_entry_owner: { Args: { _entry_id: string }; Returns: boolean }
+      get_shared_entry: {
+        Args: { _token: string }
+        Returns: {
+          id: string
+          title: string
+          content: string
+          created_at: string
+        }[]
+      }
+      lookup_username: { Args: { _user_id: string }; Returns: string }
+      get_user_id_by_username: { Args: { _username: string }; Returns: string }
+      is_username_available: {
+        Args: { _username: string; _exclude_user_id?: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

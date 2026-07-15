@@ -3,6 +3,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { getDashboardPath } from "@/lib/auth/redirect";
 
+/** True only for a safe same-origin in-app path. */
+function isSafeReturnTo(path: string): boolean {
+  return /^\/[A-Za-z0-9/_-]/.test(path) && !path.startsWith("//") && !path.startsWith("/\\");
+}
+
 /** Send authenticated users to their dashboard (e.g. on /auth or /). */
 export function useRedirectIfAuthed(enabled = true) {
   const { user, loading } = useAuth();
@@ -12,7 +17,9 @@ export function useRedirectIfAuthed(enabled = true) {
   useEffect(() => {
     if (!enabled || loading || !user) return;
     const returnTo = searchParams.get("returnTo");
-    if (returnTo && returnTo.startsWith("/")) {
+    // Same-origin only: must be an absolute in-app path, never protocol-relative
+    // (//evil.com) or backslash-tricked (/\evil.com) — those escape our origin.
+    if (returnTo && isSafeReturnTo(returnTo)) {
       navigate(returnTo, { replace: true });
       return;
     }

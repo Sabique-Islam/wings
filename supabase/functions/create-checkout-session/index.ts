@@ -1,44 +1,102 @@
-// Edge function: create a Dodo Payments checkout session.
-// Env needed: DODO_PAYMENTS_API_KEY (set in Supabase project secrets).
+/// <reference path="../deno.ns.d.ts" />
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// Edge function: create a Dodo Payments checkout session.
+// Env: DODO_PAYMENTS_API_KEY, DODO_PAYMENTS_MODE, DODO_ALLOWED_PRODUCT_IDS
+// (comma-separated), SITE_URL. verify_jwt is enforced in config.toml.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { corsHeadersFor } from "../_shared/cors.ts";
+
+const MAX_BODY_BYTES = 4 * 1024;
 
 interface Body {
   product_id: string;
-  customer_email?: string;
-  customer_name?: string;
   return_url?: string;
 }
 
+function allowedReturnOrigins(): string[] {
+  const site = Deno.env.get("SITE_URL");
+  const extra = (Deno.env.get("CORS_EXTRA_ORIGINS") || "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  return [
+    ...(site ? [site] : ["https://wings.nopejs.me"]),
+    "http://localhost:8080",
+    "http://localhost:5173",
+    ...extra,
+  ];
+}
+
+function isAllowedReturnUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+    return allowedReturnOrigins().includes(u.origin);
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const cors = corsHeadersFor(req);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  const contentType = req.headers.get("Content-Type") || "";
+  if (!contentType.includes("application/json")) return json({ error: "invalid request" }, 415);
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "unauthorized" }, 401);
+
+  // Identify the caller (verify_jwt=true also enforces this at the gateway).
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error: userError } = await userClient.auth.getUser();
+  if (userError || !user?.email) return json({ error: "unauthorized" }, 401);
+
+  const apiKey = Deno.env.get("DODO_PAYMENTS_API_KEY");
+  if (!apiKey) return json({ error: "service unavailable" }, 503);
+
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_BYTES) return json({ error: "payload too large" }, 413);
+
+  let body: Body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return json({ error: "invalid request" }, 400);
+  }
+
+  const productId = body?.product_id;
+  if (!productId) return json({ error: "invalid request" }, 400);
+
+  // Allowlist product ids so a client can't check out arbitrary products.
+  const allowedProducts = (Deno.env.get("DODO_ALLOWED_PRODUCT_IDS") || "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  if (allowedProducts.length === 0 || !allowedProducts.includes(productId)) {
+    return json({ error: "invalid product" }, 400);
+  }
+
+  // Validate the return_url origin; fall back to SITE_URL on anything unexpected.
+  const site = (Deno.env.get("SITE_URL") || "https://wings.nopejs.me").replace(/\/+$/, "");
+  const returnUrl = body.return_url && isAllowedReturnUrl(body.return_url)
+    ? body.return_url
+    : `${site}/checkout/success`;
+
+  const mode = (Deno.env.get("DODO_PAYMENTS_MODE") || "test").toLowerCase();
+  const baseUrl = mode === "live"
+    ? "https://live.dodopayments.com"
+    : "https://test.dodopayments.com";
 
   try {
-    const apiKey = Deno.env.get("DODO_PAYMENTS_API_KEY");
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "DODO_PAYMENTS_API_KEY not configured yet" }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const mode = (Deno.env.get("DODO_PAYMENTS_MODE") || "test").toLowerCase();
-    const baseUrl = mode === "live"
-      ? "https://live.dodopayments.com"
-      : "https://test.dodopayments.com";
-
-    const body = (await req.json()) as Body;
-    if (!body?.product_id) {
-      return new Response(JSON.stringify({ error: "product_id required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const dodoRes = await fetch(`${baseUrl}/checkouts`, {
       method: "POST",
       headers: {
@@ -46,31 +104,26 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        product_cart: [{ product_id: body.product_id, quantity: 1 }],
-        customer: body.customer_email
-          ? { email: body.customer_email, name: body.customer_name || "" }
-          : undefined,
-        return_url: body.return_url,
+        product_cart: [{ product_id: productId, quantity: 1 }],
+        // Trust the authenticated identity, not client-supplied contact info.
+        customer: { email: user.email, name: user.user_metadata?.name || "" },
+        return_url: returnUrl,
       }),
     });
 
-    const json = await dodoRes.json().catch(() => ({}));
+    const upstream = await dodoRes.json().catch(() => ({}));
     if (!dodoRes.ok) {
-      return new Response(JSON.stringify({ error: json?.error || "dodo error", detail: json }), {
-        status: dodoRes.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error("dodo checkout error", dodoRes.status);
+      return json({ error: "checkout failed" }, 502);
     }
 
-    // The Dodo response shape is checkout_url for hosted/overlay/inline flows.
-    const checkout_url = json.checkout_url || json.payment_link || json.url;
-    return new Response(JSON.stringify({ checkout_url, session: json }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const checkout_url = upstream.checkout_url || upstream.payment_link || upstream.url;
+    if (!checkout_url) return json({ error: "checkout failed" }, 502);
+
+    // Return only the URL — never the upstream session/error body.
+    return json({ checkout_url });
+  } catch {
+    console.error("create-checkout-session failed");
+    return json({ error: "checkout failed" }, 500);
   }
 });

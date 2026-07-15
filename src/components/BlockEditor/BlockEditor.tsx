@@ -7,6 +7,7 @@ import { Bold, Italic, Strikethrough, Underline, Code, Link as LinkIcon, Sparkle
 import { createBlockEditorExtensions } from "./editorExtensions";
 import { BlockMenu } from "./BlockMenu";
 import { TurnIntoDropdown, ColorDropdown } from "./ColorMenu";
+import { isSafeHttpUrl } from "@/lib/safeUrl";
 
 interface Props {
   content: string;
@@ -105,7 +106,7 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
-      if (e.key.toLowerCase() === "k" && editor.isFocused()) {
+      if (e.key.toLowerCase() === "k" && editor.isFocused) {
         e.preventDefault();
         setLink();
         return;
@@ -157,7 +158,10 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
             window.dispatchEvent(new CustomEvent("nw:navigate", { detail: pageId }));
           } else if (href && !editable) {
             e.preventDefault();
-            window.open(href, "_blank", "noopener,noreferrer");
+            // Only follow http(s) links — block javascript:/data:/blob: etc.
+            if (isSafeHttpUrl(href)) {
+              window.open(href, "_blank", "noopener,noreferrer");
+            }
           }
         }
       }}

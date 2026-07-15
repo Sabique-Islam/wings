@@ -5,6 +5,8 @@ import {
 } from "lucide-react";
 import { useResizable } from "@/hooks/useResizable";
 import { marked } from "marked";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
+import { markdownToHtml } from "@/lib/markdown";
 import { Entry, getEntryTitle, createEntry } from "@/lib/journal";
 import { ChatMessage } from "@/lib/ai/types";
 import { streamChat, generateImage } from "@/lib/ai/client";
@@ -116,10 +118,12 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
 
     for (const t of tools) {
       if (t.kind === "write" && editor) {
-        editor.chain().focus("end").insertContent("\n\n" + t.body).run();
+        // Convert model markdown to HTML and sanitize before it enters the doc.
+        const html = sanitizeHtml(markdownToHtml(t.body));
+        editor.chain().focus("end").insertContent(html).run();
         actions.push({ label: "Wrote to page", onClick: () => {} });
       } else if (t.kind === "replace" && editor) {
-        editor.commands.setContent(t.body);
+        editor.commands.setContent(sanitizeHtml(markdownToHtml(t.body)));
         actions.push({ label: "Replaced page", onClick: () => {} });
       } else if (t.kind === "newpage" && user) {
         const lines = t.body.split("\n");
@@ -402,7 +406,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
                 <div
                   className="ai-msg-prose"
                   dangerouslySetInnerHTML={{
-                    __html: (marked.parse(m.content || "", { async: false }) as string) +
+                    __html: sanitizeHtml(marked.parse(m.content || "", { async: false }) as string) +
                       (m.pending ? '<span class="nw-caret"></span>' : ""),
                   }}
                 />

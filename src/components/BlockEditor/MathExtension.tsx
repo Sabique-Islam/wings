@@ -25,7 +25,9 @@ function MathView({ node, updateAttributes, editor, inline }: any) {
           throwOnError: false,
           displayMode: !inline,
           strict: false,
-          trust: true,
+          // trust:false blocks \href/\url/\includegraphics — prevents javascript:
+          // URLs and raw HTML injection from stored latex on shared pages.
+          trust: false,
           macros: {
             "\\R": "\\mathbb{R}",
             "\\N": "\\mathbb{N}",

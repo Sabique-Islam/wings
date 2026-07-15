@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { sendShareInviteEmail } from "@/lib/email";
 import { toast } from "sonner";
+import { logError } from "@/lib/logger";
 
 interface Props {
   entry: Entry;
@@ -66,7 +67,7 @@ export function ShareMenu({ entry, onUpdate }: Props) {
       .eq("entry_id", entry.id)
       .then(({ data, error }) => {
         if (error) {
-          console.error("Failed to load shares:", error);
+          logError("Failed to load shares", error);
           return;
         }
         if (data) setShares(data as ShareRecord[]);
@@ -81,23 +82,6 @@ export function ShareMenu({ entry, onUpdate }: Props) {
     if (!open) return;
     loadShares();
   }, [open, loadShares]);
-
-  const ensurePublicShareUrl = useCallback(async (): Promise<string | null> => {
-    if (entry.share_token) {
-      return `${window.location.origin}/s/${entry.share_token}`;
-    }
-    const token = generateToken();
-    const { error } = await supabase
-      .from("entries")
-      .update({ share_token: token })
-      .eq("id", entry.id);
-    if (error) {
-      toast.error("Couldn't enable public link", { description: error.message });
-      return null;
-    }
-    onUpdate({ ...entry, share_token: token });
-    return `${window.location.origin}/s/${token}`;
-  }, [entry, onUpdate]);
 
   const togglePublicShare = useCallback(async () => {
     setLoading(true);
@@ -155,28 +139,22 @@ export function ShareMenu({ entry, onUpdate }: Props) {
     } else if (data) {
       setShares((prev) => [...prev, data as ShareRecord]);
       const invitedEmail = email.trim().toLowerCase();
-      const inviteUrl = await ensurePublicShareUrl();
-      if (!inviteUrl) {
-        setError("Enable a public link first, then try again");
-        setInviting(false);
-        return;
-      }
+      // Invites deep-link to the authenticated note — no public token is minted.
+      // Recipients get access through their share row after signing in.
+      const inviteUrl = `${window.location.origin}/n/${entry.id}`;
       setLastInvited({ email: invitedEmail, url: inviteUrl });
       setInviteLinkCopied(false);
       setEmail("");
       const { error: emailError } = await sendShareInviteEmail({
         to: invitedEmail,
         entryId: entry.id,
-        entryTitle: entry.title || "Untitled",
-        role: selectedRole,
-        url: inviteUrl,
       });
       if (emailError) {
-        toast.message("Invite saved", { description: "Share link copied — email could not be sent." });
+        toast.message("Invite saved", { description: "Link copied — email could not be sent." });
       }
     }
     setInviting(false);
-  }, [email, selectedRole, entry.id, entry.title, user, ensurePublicShareUrl]);
+  }, [email, selectedRole, entry.id, user]);
 
   const updateRole = useCallback(async (shareId: string, newRole: Role) => {
     const { error } = await supabase

@@ -19,9 +19,13 @@ const CALLOUT_COLORS = [
   { label: "Red", value: "rgba(253,235,236,0.6)" },
 ];
 
+const ALLOWED_BG_COLORS = new Set(CALLOUT_COLORS.map((c) => c.value).filter(Boolean));
+
 function CalloutView({ node, updateAttributes }: NodeViewProps) {
   const emoji = (node.attrs.emoji as string) || "💡";
-  const bgColor = (node.attrs.bgColor as string) || "";
+  const rawBg = (node.attrs.bgColor as string) || "";
+  // Only honor colors from our known palette — reject arbitrary stored values.
+  const bgColor = ALLOWED_BG_COLORS.has(rawBg) ? rawBg : "";
 
   const pickEmoji = () => {
     const next = window.prompt("Emoji", emoji);

@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { Seo } from "@/components/Seo";
 
 export default function SharedEntry() {
   const { token } = useParams<{ token: string }>();
@@ -14,20 +15,20 @@ export default function SharedEntry() {
 
   useEffect(() => {
     if (!token) return;
+    // Share tokens are 32 hex chars. Reject anything else before hitting the DB.
+    if (!/^[a-f0-9]{32}$/.test(token)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
     const fetchShared = async () => {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/shared_entries_view?share_token=eq.${token}&select=content,created_at,title&limit=1`;
       try {
-        const res = await fetch(url, {
-          headers: {
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            "x-share-token": token,
-          },
-        });
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setContent(data[0].content);
-          setTitle(data[0].title || "");
-          setDate(new Date(data[0].created_at).toLocaleDateString("default", { day: "numeric", month: "long", year: "numeric" }));
+        const { data, error } = await supabase.rpc("get_shared_entry", { _token: token });
+        const row = Array.isArray(data) ? data[0] : data;
+        if (!error && row) {
+          setContent(row.content);
+          setTitle(row.title || "");
+          setDate(new Date(row.created_at).toLocaleDateString("default", { day: "numeric", month: "long", year: "numeric" }));
         } else {
           setNotFound(true);
         }
@@ -67,6 +68,7 @@ export default function SharedEntry() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Seo title={title || "shared note"} path={`/s/${token ?? ""}`} noIndex />
       <header className="h-12 flex items-center px-4 sm:px-6 border-b border-border justify-between gap-4">
         <a href="/" className="text-[10px] text-muted-foreground/50 hover:text-foreground font-mono transition-colors uppercase tracking-wider shrink-0">
           wings

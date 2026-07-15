@@ -22,8 +22,23 @@ import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { Analytics } from "@vercel/analytics/react";
 import { useEffect, useState } from "react";
 import { getMyUsername } from "@/lib/profile";
+import { getCookieConsent, type CookieConsent } from "@/components/CookieBanner";
 
 const queryClient = new QueryClient();
+
+/** Only load Vercel Analytics after the user opts in to analytics cookies. */
+function ConsentedAnalytics() {
+  const [enabled, setEnabled] = useState(() => getCookieConsent()?.analytics === true);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<CookieConsent | null>).detail;
+      setEnabled(detail?.analytics === true);
+    };
+    window.addEventListener("wings:cookie-consent", handler);
+    return () => window.removeEventListener("wings:cookie-consent", handler);
+  }, []);
+  return enabled ? <Analytics /> : null;
+}
 
 async function waitForUsername(userId: string, attempts = 8): Promise<string | null> {
   for (let i = 0; i < attempts; i++) {
@@ -146,7 +161,7 @@ const App = () => (
               <AppRoutes />
             </ErrorBoundary>
             <CookieBanner />
-            <Analytics />
+            <ConsentedAnalytics />
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>

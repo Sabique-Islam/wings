@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewProps } from "@tiptap/react";
 import { ExternalLink } from "lucide-react";
+import { isSafeHttpUrl } from "@/lib/safeUrl";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -16,6 +17,7 @@ function BookmarkView({ node }: NodeViewProps) {
     title: string;
     description: string;
   };
+  const safe = isSafeHttpUrl(url);
   const host = (() => {
     try {
       return new URL(url).hostname;
@@ -26,7 +28,13 @@ function BookmarkView({ node }: NodeViewProps) {
 
   return (
     <NodeViewWrapper className="bookmark-block" data-type="bookmark">
-      <a href={url} target="_blank" rel="noopener noreferrer" className="bookmark-card" contentEditable={false}>
+      <a
+        href={safe ? url : undefined}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        className="bookmark-card"
+        contentEditable={false}
+      >
         <div className="bookmark-body">
           <p className="bookmark-title">{title || host}</p>
           {description ? <p className="bookmark-desc">{description}</p> : null}
