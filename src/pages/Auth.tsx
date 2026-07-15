@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { sendMagicLink } from "@/lib/auth";
 import { signInWithGoogle } from "@/lib/auth/oauth";
 import { Logo } from "@/components/Logo";
+import { GoogleLogo } from "@/components/GoogleLogo";
 import { Dither } from "@/components/ui/Dither";
-import { Ascii, WINGS_TAGLINE } from "@/lib/ascii";
 import { Link } from "react-router-dom";
 import { useRedirectIfAuthed } from "@/hooks/useRedirectIfAuthed";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
@@ -51,110 +51,87 @@ export default function Auth() {
   return (
     <>
       <Seo title="sign in" path="/auth" noIndex />
-      <div className="min-h-screen bg-background text-foreground grid lg:grid-cols-2">
-        {/* Left — dither illustration + wordmark */}
-        <div className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-border-subtle p-10">
-          <Dither variant="grain" fade="radial" density="sparse" />
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] rounded-full bg-accent-strong/[0.06] blur-3xl" />
-          <Link to="/" className="relative z-10"><Logo size={30} withWordmark wordmarkClassName="text-sm font-display font-semibold" /></Link>
-          <div className="relative z-10 space-y-4">
-            <Ascii size="text-[9px] xl:text-[11px]" className="text-ink-1">
-{` ██╗    ██╗██╗███╗   ██╗ ██████╗ ███████╗
- ██║    ██║██║████╗  ██║██╔════╝ ██╔════╝
- ██║ █╗ ██║██║██╔██╗ ██║██║  ███╗███████╗
- ██║███╗██║██║██║╚██╗██║██║   ██║╚════██║
- ╚███╔███╔╝██║██║ ╚████║╚██████╔╝███████║
-  ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝`}
-            </Ascii>
-            <p className="font-display text-2xl tracking-tight max-w-sm">{WINGS_TAGLINE}.</p>
-          </div>
-          <div className="relative z-10 text-[10px] font-mono text-ink-2">pages · math · drawings · ai</div>
+      <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
+        <Dither variant="grain" fade="radial" density="sparse" className="opacity-100" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[42vh]" aria-hidden>
+          <Dither variant="bayer" fade="up" density="sparse" accent className="opacity-60" />
         </div>
 
-        {/* Right — form */}
-        <div className="relative flex items-center justify-center p-4 sm:p-8">
-          <div className="w-full max-w-sm space-y-8">
-            <div className="lg:hidden flex justify-center"><Logo size={40} withWordmark wordmarkClassName="text-base font-display font-semibold" /></div>
+        <Link
+          to="/"
+          className="absolute top-6 left-6 z-10 text-ink-2 hover:text-foreground transition-colors"
+        >
+          <Logo size={24} withWordmark wordmarkClassName="text-xs font-display font-medium" />
+        </Link>
 
-            <div className="space-y-1 text-center lg:text-left">
-              <h1 className="font-display font-bold text-2xl tracking-tight">welcome back</h1>
-              <p className="text-sm text-ink-2 font-sans">sign in to create and edit pages.</p>
+        <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-20">
+          <div className="w-full max-w-[340px] space-y-10">
+            <div className="space-y-2 text-center">
+              <h1 className="font-display text-2xl font-semibold tracking-tight">sign in</h1>
+              <p className="text-sm text-ink-2">your pages, math, and drawings — in one place.</p>
             </div>
 
-            <div className="border border-border-subtle rounded-xl bg-surface-1 p-6 space-y-5">
-              {stage === "sent" ? (
-                <div className="text-center space-y-3">
-                  <Ascii className="text-ink-2 mx-auto inline-block">
-{`  ┌─────────────┐
-  │  ✉ check    │
-  │  your inbox │
-  └─────────────┘`}
-                  </Ascii>
-                  <p className="text-xs text-ink-1">
-                    magic link sent to <span className="text-foreground">{email}</span>
-                  </p>
-                  <button
-                    onClick={() => setStage("request")}
-                    className="text-[10px] text-ink-2 hover:text-foreground transition-colors underline underline-offset-2"
-                  >
-                    try another email
-                  </button>
+            {stage === "sent" ? (
+              <div className="space-y-5 text-center">
+                <div className="relative mx-auto h-px w-24 overflow-hidden rounded-full bg-border-subtle">
+                  <div className="dither dither--bayer dither--accent absolute inset-0 opacity-80" />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <button
-                    type="button"
-                    onClick={handleGoogle}
-                    disabled={oauthLoading}
-                    className="w-full inline-flex items-center justify-center gap-2 border border-border-strong rounded-md px-3 py-2.5 text-xs hover:bg-accent/40 transition-colors disabled:opacity-50 font-mono"
-                  >
-                    <GoogleGlyph />
-                    {oauthLoading ? "redirecting..." : "continue with google"}
-                  </button>
+                <p className="text-sm text-ink-1">
+                  check <span className="text-foreground font-medium">{email}</span> for your link
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStage("request")}
+                  className="text-xs text-ink-2 hover:text-foreground transition-colors underline underline-offset-4"
+                >
+                  use a different email
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <button
+                  type="button"
+                  onClick={handleGoogle}
+                  disabled={oauthLoading}
+                  className="w-full inline-flex items-center justify-center gap-3 rounded-lg border border-border-subtle bg-surface-1 px-4 py-3 text-sm font-medium hover:bg-surface-2 transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <GoogleLogo size={20} />
+                  {oauthLoading ? "redirecting…" : "Continue with Google"}
+                </button>
 
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-ink-3">
-                    <span className="h-px flex-1 bg-border-subtle" />
-                    or
-                    <span className="h-px flex-1 bg-border-subtle" />
-                  </div>
-
-                  <form onSubmit={handleRequest} className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase tracking-widest text-ink-2 font-mono">email</label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@email.com"
-                        className="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-                        required
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-accent-strong text-accent-strong-foreground rounded-md px-3 py-2 text-xs font-medium hover:bg-accent-strong-hover transition-colors disabled:opacity-50 font-mono uppercase tracking-wider"
-                    >
-                      {loading ? "sending..." : "send magic link"}
-                    </button>
-                    <p className="text-[10px] text-ink-2 text-center">no password — just your email</p>
-                  </form>
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-border-subtle" />
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-ink-3 font-mono">or</span>
+                  <span className="h-px flex-1 bg-border-subtle" />
                 </div>
-              )}
-            </div>
 
-            <p className="text-center text-[10px] text-ink-3 font-mono">block editor · magic link or Google</p>
+                <form onSubmit={handleRequest} className="space-y-3">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@email.com"
+                    autoComplete="email"
+                    className="w-full rounded-lg border border-border-subtle bg-background/80 px-4 py-3 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-ring backdrop-blur-sm"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-lg bg-accent-strong px-4 py-3 text-sm font-medium text-accent-strong-foreground hover:bg-accent-strong-hover transition-colors disabled:opacity-50"
+                  >
+                    {loading ? "sending…" : "email me a magic link"}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            <p className="text-center text-[11px] text-ink-3 leading-relaxed">
+              no password · magic link or Google
+            </p>
           </div>
         </div>
       </div>
     </>
-  );
-}
-
-function GoogleGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#EA4335" d="M12 11v3.2h8.94c-.36 2.1-2.66 6.18-8.94 6.18-5.38 0-9.78-4.46-9.78-9.96S6.62 .46 12 .46c3.06 0 5.12 1.3 6.3 2.42l2.16-2.08C18.66-1.06 15.62-2 12-2 5.36-2-.06 3.42-.06 10.42S5.36 22.84 12 22.84c6.92 0 11.5-4.86 11.5-11.7 0-.78-.08-1.38-.18-1.96H12z"/>
-    </svg>
   );
 }

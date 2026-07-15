@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getDashboardPath } from "@/lib/auth/redirect";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { Seo } from "@/components/Seo";
+import { Dither } from "@/components/ui/Dither";
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -54,7 +55,9 @@ export default function AuthCallback() {
   return (
     <>
       <Seo title="signing in" path="/auth/callback" noIndex />
-      <div className="flex flex-col items-center justify-center h-screen bg-background gap-3 px-6 text-center">
+      <div className="relative flex flex-col items-center justify-center h-screen bg-background gap-3 px-6 text-center overflow-hidden">
+        <Dither variant="grain" fade="radial" density="sparse" className="opacity-100" />
+        <div className="relative z-10 flex flex-col items-center gap-3">
         {error ? (
           <>
             <p className="text-sm text-destructive font-mono">{error}</p>
@@ -66,6 +69,7 @@ export default function AuthCallback() {
             <p className="text-xs text-ink-2 font-mono">finishing sign-in…</p>
           </>
         )}
+        </div>
       </div>
     </>
   );
