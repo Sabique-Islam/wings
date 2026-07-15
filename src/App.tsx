@@ -19,6 +19,7 @@ import { CookieBanner } from "@/components/CookieBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DitherFilterDefs } from "@/lib/dither/filters";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { Analytics } from "@vercel/analytics/react";
 import { useEffect, useState } from "react";
 import { getMyUsername } from "@/lib/profile";
 
@@ -145,6 +146,7 @@ const App = () => (
               <AppRoutes />
             </ErrorBoundary>
             <CookieBanner />
+            <Analytics />
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>
