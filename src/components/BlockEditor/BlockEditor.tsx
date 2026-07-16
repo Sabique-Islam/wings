@@ -13,6 +13,7 @@ import { EditorPopoverInput, promptEditorInput } from "./EditorPopoverInput";
 import { isSafeHttpUrl } from "@/lib/safeUrl";
 import { fetchLinkPreview } from "@/lib/linkPreview";
 import type { EditorChangePayload } from "@/lib/editorPayload";
+import { resolveInitialEditorContent } from "@/lib/editorContent";
 import { createCollabExtensions } from "@/lib/collab/collabExtensions";
 import type { CollabSession } from "@/lib/collab/useCollabProvider";
 import type { PageOption } from "./PageMentionExtension";
@@ -36,10 +37,7 @@ interface Props {
 }
 
 function resolveInitialContent(content: string, contentJson?: JSONContent | null): string | JSONContent {
-  if (contentJson && typeof contentJson === "object" && contentJson.type === "doc") {
-    return contentJson;
-  }
-  return markdownToHtml(content);
+  return resolveInitialEditorContent(content, contentJson);
 }
 
 function pastePlainParagraphs(view: import("@tiptap/pm/view").EditorView, text: string): boolean {

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
 import type { EditorChangePayload } from "@/lib/editorPayload";
+import { shouldApplyDraft, shouldBlockEmptySave } from "@/lib/editorContent";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
 import { JournalSidebar } from "@/components/JournalSidebar";
@@ -185,6 +186,11 @@ export default function Index() {
     debounceRef.current = setTimeout(async () => {
       const toSave = pendingPayloadRef.current;
       if (!activeId || !toSave) return;
+      const existing = entries.find((e) => e.id === activeId);
+      if (existing && shouldBlockEmptySave(existing.content, toSave.markdown)) {
+        console.warn("[wings] blocked empty autosave over existing content");
+        return;
+      }
       setSaveStatus("saving");
       try {
         await updateEntry(activeId, toSave);
@@ -205,7 +211,7 @@ export default function Index() {
         setSaveStatus("error");
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [activeId, entryShared]);
+  }, [activeId, entryShared, entries]);
 
   const handleTitleChange = useCallback((title: string) => {
     if (!activeId) return;
@@ -228,6 +234,7 @@ export default function Index() {
     if (draft == null) return;
     setEntries((prev) => prev.map((e) => {
       if (e.id !== activeId) return e;
+      if (!shouldApplyDraft(e.content, draft.markdown)) return e;
       if (e.content === draft.markdown && e.content_json === draft.json) return e;
       return { ...e, content: draft.markdown, content_json: draft.json ?? e.content_json };
     }));

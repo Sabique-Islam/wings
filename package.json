@@ -13,7 +13,9 @@
     "test:editor": "vitest run src/lib/markdown.test.ts src/components/BlockEditor/BlockEditor.test.ts",
     "test:e2e": "playwright test tests/editor-enter.spec.ts tests/editor-notion-parity.spec.ts",
     "test:ci": "bun run test:editor && bun run test:e2e",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "recover:entries": "bun run scripts/recover-entries.ts",
+    "recover:entries:apply": "bun run scripts/recover-entries.ts --apply"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
