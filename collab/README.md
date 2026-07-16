@@ -23,3 +23,13 @@ Clients connect with their Supabase JWT. The server verifies the user owns the e
 ## Persistence
 
 Yjs state is stored as binary in `entries.content_yjs`. Solo saves still write `content` + `content_json` when not in a live collab session.
+
+### First collab session seed (`collab/server.ts` + `seedDocument.ts`)
+
+When `content_yjs` is null on fetch:
+
+1. Prefer non-empty `content_json` → `TiptapTransformer.toYdoc` via `getSeedExtensions()`
+2. Else non-empty `content` markdown → minimal doc (paragraphs/headings)
+3. Persist encoded state to `content_yjs` immediately (one-time) so later fetches use binary history
+
+Client still creates bare `Y.Doc` in `useCollabProvider.ts:47`; server fetch supplies initial state via Hocuspocus sync.

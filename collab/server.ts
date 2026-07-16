@@ -12,6 +12,7 @@
 import { Server } from "@hocuspocus/server";
 import { Database } from "@hocuspocus/extension-database";
 import { createClient } from "@supabase/supabase-js";
+import { seedStateFromEntry } from "./seedDocument.ts";
 
 const supabaseUrl = process.env.SUPABASE_URL ?? "";
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -52,6 +53,20 @@ async function canEditEntry(entryId: string, userId: string, email: string): Pro
   return !!share;
 }
 
+function parseBytea(raw: unknown): Uint8Array | null {
+  if (!raw) return null;
+  if (raw instanceof Uint8Array) return raw;
+  if (typeof raw === "string") {
+    const hex = raw.startsWith("\\x") ? raw.slice(2) : raw;
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return bytes;
+  }
+  return new Uint8Array(raw as ArrayBuffer);
+}
+
 const server = new Server({
   port: Number(process.env.COLLAB_PORT ?? 1234),
   debounce: 2000,
@@ -82,22 +97,23 @@ const server = new Server({
         if (!entryId) return null;
         const { data } = await admin
           .from("entries")
-          .select("content_yjs")
+          .select("content_yjs, content, content_json")
           .eq("id", entryId)
           .maybeSingle();
-        const raw = data?.content_yjs;
-        if (!raw) return null;
-        if (raw instanceof Uint8Array) return raw;
-        if (typeof raw === "string") {
-          // Postgres bytea may arrive as hex "\\x..." from some drivers
-          const hex = raw.startsWith("\\x") ? raw.slice(2) : raw;
-          const bytes = new Uint8Array(hex.length / 2);
-          for (let i = 0; i < bytes.length; i++) {
-            bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-          }
-          return bytes;
-        }
-        return new Uint8Array(raw as ArrayBuffer);
+
+        const existing = parseBytea(data?.content_yjs);
+        if (existing?.length) return existing;
+
+        const seeded = seedStateFromEntry(data?.content ?? "", data?.content_json);
+        if (!seeded?.length) return null;
+
+        // Persist once so later fetches use binary history, not re-seed from JSON.
+        await admin
+          .from("entries")
+          .update({ content_yjs: Buffer.from(seeded) })
+          .eq("id", entryId);
+
+        return seeded;
       },
       store: async ({ documentName, state }) => {
         const entryId = parseEntryId(documentName);
