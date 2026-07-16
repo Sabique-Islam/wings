@@ -145,6 +145,7 @@ export function ShareMenu({ entry, onUpdate }: Props) {
       setLastInvited({ email: invitedEmail, url: inviteUrl });
       setInviteLinkCopied(false);
       setEmail("");
+      window.dispatchEvent(new CustomEvent("nw:shares-changed", { detail: entry.id }));
       const { error: emailError } = await sendShareInviteEmail({
         to: invitedEmail,
         entryId: entry.id,

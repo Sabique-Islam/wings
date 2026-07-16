@@ -1,0 +1,15 @@
+{
+  "name": "wings-collab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types server.ts",
+    "dev": "node --watch --experimental-strip-types server.ts"
+  },
+  "dependencies": {
+    "@hocuspocus/extension-database": "^2.15.2",
+    "@hocuspocus/server": "^2.15.2",
+    "@supabase/supabase-js": "^2.100.1",
+    "yjs": "^13.6.27"
+  }
+}

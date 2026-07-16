@@ -78,6 +78,36 @@ function backspaceAtStartOfDecoration(editor: any): boolean {
   return editor.chain().setParagraph().run();
 }
 
+/** Nest the current top-level block into the previous sibling when it's a container. */
+function nestIntoPreviousSibling(editor: any): boolean {
+  const { state, view } = editor;
+  const { $from } = state.selection;
+  let depth = $from.depth;
+  while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+  if (depth < 1) return false;
+
+  const indexInParent = $from.index(depth - 1);
+  if (indexInParent === 0) return false;
+
+  const parent = $from.node(depth - 1);
+  const prev = parent.child(indexInParent - 1);
+  const nestable = new Set(["blockquote", "callout", "toggle"]);
+  if (!nestable.has(prev.type.name)) return false;
+
+  const blockPos = $from.before(depth);
+  const block = $from.node(depth);
+  const insertPos = blockPos - prev.nodeSize + prev.nodeSize - 1;
+
+  const tr = state.tr;
+  tr.delete(blockPos, blockPos + block.nodeSize);
+  const mappedInsert = tr.mapping.map(insertPos);
+  tr.insert(mappedInsert, block);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(mappedInsert + 1)));
+  tr.scrollIntoView();
+  view.dispatch(tr);
+  return true;
+}
+
 /** Move the current block up or down by one sibling. */
 function moveBlock(editor: any, direction: "up" | "down"): boolean {
   const { state, view } = editor;
@@ -213,7 +243,7 @@ export const WritingExperience = Extension.create({
         if (this.editor.can().sinkListItem("taskItem")) {
           return this.editor.chain().focus().sinkListItem("taskItem").run();
         }
-        return false;
+        return nestIntoPreviousSibling(this.editor);
       },
       "Shift-Tab": () => {
         if (this.editor.can().liftListItem("listItem")) {

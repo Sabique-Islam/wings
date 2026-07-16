@@ -1,10 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { JSONContent } from "@tiptap/core";
 import { EntryLayoutMap, normalizeLayout } from "./layout";
 import { logError } from "./logger";
+import type { EditorChangePayload } from "./editorPayload";
 
 export interface Entry {
   id: string;
   content: string;
+  content_json: JSONContent | null;
   created_at: string;
   user_id: string;
   pinned: boolean;
@@ -68,7 +71,7 @@ export function getEntryTitle(entry: Entry): string {
   return entry.title || entry.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 40) || "Untitled";
 }
 
-const ENTRY_COLS = "id, content, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
+const ENTRY_COLS = "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
 
 export async function fetchEntries(userId: string, opts: { includeTrash?: boolean } = {}): Promise<{ entries: Entry[]; roleMap: Record<string, ShareRole> }> {
   // Fetch own entries
@@ -120,6 +123,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
 
   const mapped: Entry[] = unique.map((d: any) => ({
     ...d,
+    content_json: (d.content_json as JSONContent | null) ?? null,
     parent_id: d.parent_id ?? null,
     title: d.title ?? "",
     share_token: d.share_token ?? null,
@@ -140,6 +144,7 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
   if (error) { logError("Failed to fetch trash", error); return []; }
   return (data ?? []).map((d: any) => ({
     ...d,
+    content_json: (d.content_json as JSONContent | null) ?? null,
     parent_id: d.parent_id ?? null,
     title: d.title ?? "",
     share_token: d.share_token ?? null,
@@ -159,6 +164,7 @@ export async function createEntry(userId: string, content: string, parentId?: st
   if (!data) throw new Error("Failed to create page");
   return {
     ...data,
+    content_json: (data.content_json as JSONContent | null) ?? null,
     parent_id: data.parent_id ?? null,
     title: data.title ?? "",
     share_token: data.share_token ?? null,
@@ -167,12 +173,22 @@ export async function createEntry(userId: string, content: string, parentId?: st
   };
 }
 
-export async function updateEntry(id: string, content: string): Promise<void> {
+export async function updateEntry(id: string, payload: EditorChangePayload): Promise<void> {
   const { error } = await supabase
     .from("entries")
-    .update({ content })
+    .update({ content: payload.markdown, content_json: payload.json })
     .eq("id", id);
   if (error) throw error;
+}
+
+/** True when an entry has at least one share row (enables realtime collab). */
+export async function entryHasShares(entryId: string): Promise<boolean> {
+  const { count, error } = await supabase
+    .from("entry_shares")
+    .select("id", { count: "exact", head: true })
+    .eq("entry_id", entryId);
+  if (error) return false;
+  return (count ?? 0) > 0;
 }
 
 export async function updateEntryTitle(id: string, title: string): Promise<void> {
@@ -230,6 +246,7 @@ export async function searchEntries(userId: string, q: string, limit = 20): Prom
   if (error) { logError("Search failed", error); return []; }
   return (data ?? []).map((d: any) => ({
     ...d,
+    content_json: (d.content_json as JSONContent | null) ?? null,
     parent_id: d.parent_id ?? null,
     title: d.title ?? "",
     share_token: d.share_token ?? null,

@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
-import { saveDraft, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
+import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
+import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
+import type { EditorChangePayload } from "@/lib/editorPayload";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
 import { JournalSidebar } from "@/components/JournalSidebar";
@@ -53,6 +54,9 @@ export default function Index() {
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const savedFlashRef = useRef<ReturnType<typeof setTimeout>>();
   const creatingRef = useRef(false);
+  const pendingPayloadRef = useRef<EditorChangePayload | null>(null);
+  const [entryShared, setEntryShared] = useState(false);
+  const SAVE_DEBOUNCE_MS = 1500;
 
   const setActiveId = useCallback((id: string | null) => {
     setActiveIdRaw(id);
@@ -68,7 +72,10 @@ export default function Index() {
     const pending = getPendingWrites();
     pending.forEach(async (pw) => {
       try {
-        await updateEntry(pw.entryId, pw.content);
+        await updateEntry(pw.entryId, {
+          markdown: pw.content,
+          json: pw.contentJson ?? { type: "doc", content: [] },
+        });
         clearPendingWrite(pw.entryId);
         clearDraft(pw.entryId);
       } catch {
@@ -165,31 +172,40 @@ export default function Index() {
     addCreatedEntry(entry, user.id);
   }, [user, addCreatedEntry]);
 
-  const handleChange = useCallback((content: string) => {
+  const handleChange = useCallback((payload: EditorChangePayload) => {
+    pendingPayloadRef.current = payload;
     if (activeId) {
-      saveDraft(activeId, content);
+      saveDraftThrottled(activeId, { markdown: payload.markdown, json: payload.json });
     }
 
-    setEntries((prev) => prev.map((e) => (e.id === activeId ? { ...e, content } : e)));
+    // While Yjs collab is live, Hocuspocus owns persistence — skip full-doc UPDATE.
+    if (entryShared && import.meta.env.VITE_COLLAB_URL) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    setSaveStatus("saving");
     debounceRef.current = setTimeout(async () => {
-      if (activeId) {
-        try {
-          await updateEntry(activeId, content);
-          clearDraft(activeId);
-          clearPendingWrite(activeId);
-          setSaveStatus("saved");
-          if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
-          savedFlashRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
-        } catch {
-          queuePendingWrite(activeId, content);
-          setSaveStatus("error");
-        }
+      const toSave = pendingPayloadRef.current;
+      if (!activeId || !toSave) return;
+      setSaveStatus("saving");
+      try {
+        await updateEntry(activeId, toSave);
+        setEntries((prev) =>
+          prev.map((e) =>
+            e.id === activeId
+              ? { ...e, content: toSave.markdown, content_json: toSave.json }
+              : e,
+          ),
+        );
+        clearDraft(activeId);
+        clearPendingWrite(activeId);
+        setSaveStatus("saved");
+        if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
+        savedFlashRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
+      } catch {
+        queuePendingWrite(activeId, { markdown: toSave.markdown, json: toSave.json });
+        setSaveStatus("error");
       }
-    }, 500);
-  }, [activeId]);
+    }, SAVE_DEBOUNCE_MS);
+  }, [activeId, entryShared]);
 
   const handleTitleChange = useCallback((title: string) => {
     if (!activeId) return;
@@ -212,10 +228,62 @@ export default function Index() {
     if (draft == null) return;
     setEntries((prev) => prev.map((e) => {
       if (e.id !== activeId) return e;
-      if (e.content === draft) return e;
-      return { ...e, content: draft };
+      if (e.content === draft.markdown && e.content_json === draft.json) return e;
+      return { ...e, content: draft.markdown, content_json: draft.json ?? e.content_json };
     }));
   }, [activeId]);
+
+  useEffect(() => {
+    if (!activeId) {
+      setEntryShared(false);
+      return;
+    }
+    entryHasShares(activeId).then(setEntryShared);
+    const onSharesChanged = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id === activeId) entryHasShares(activeId).then(setEntryShared);
+    };
+    window.addEventListener("nw:shares-changed", onSharesChanged);
+    return () => window.removeEventListener("nw:shares-changed", onSharesChanged);
+  }, [activeId]);
+
+  const flushEditor = useCallback(() => {
+    (window as { __nw_flushEditor?: () => void }).__nw_flushEditor?.();
+    const payload = pendingPayloadRef.current;
+    if (activeId && payload) {
+      saveDraft(activeId, { markdown: payload.markdown, json: payload.json });
+    }
+  }, [activeId]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushEditor();
+    };
+    window.addEventListener("visibilitychange", onHide);
+    window.addEventListener("beforeunload", flushEditor);
+    return () => {
+      window.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("beforeunload", flushEditor);
+    };
+  }, [flushEditor]);
+
+  useEffect(() => () => flushEditor(), [activeId, flushEditor]);
+
+  useEffect(() => {
+    const onCollabFlush = async () => {
+      flushEditor();
+      const toSave = pendingPayloadRef.current;
+      if (!activeId || !toSave) return;
+      try {
+        await updateEntry(activeId, toSave);
+        clearDraft(activeId);
+      } catch {
+        queuePendingWrite(activeId, { markdown: toSave.markdown, json: toSave.json });
+      }
+    };
+    window.addEventListener("nw:collab-flush", onCollabFlush);
+    return () => window.removeEventListener("nw:collab-flush", onCollabFlush);
+  }, [activeId, flushEditor]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -336,6 +404,7 @@ export default function Index() {
         onNew={handleNew}
         onImported={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); })}
         saveStatus={saveStatus}
+        collabEnabled={entryShared}
       />
       <QuickSwitcher
         entries={entries}

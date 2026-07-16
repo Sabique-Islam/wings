@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import {
   Plus, FileText, Search, X, LogOut, Download, Star, ChevronRight, Settings,
   Users, Trash2, RotateCcw, Loader2,
@@ -35,7 +35,7 @@ function SectionHeader({ children, action }: { children: React.ReactNode; action
   );
 }
 
-export function JournalSidebar({
+export const JournalSidebar = memo(function JournalSidebar({
   allEntries, roleMap, userId, activeId, onSelect, onNew, sidebarOpen, onToggle, onRefetch, onHome,
 }: Props) {
   const [search, setSearch] = useState("");
@@ -319,4 +319,4 @@ export function JournalSidebar({
       </aside>
     </>
   );
-}
+});

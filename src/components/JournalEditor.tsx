@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Entry, ShareRole } from "@/lib/journal";
+import type { Entry, ShareRole } from "@/lib/journal";
+import type { EditorChangePayload } from "@/lib/editorPayload";
+import { useCollabProvider } from "@/lib/collab/useCollabProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { Trash2, PanelLeft, Download, Pin, PinOff, FilePlus, Keyboard, Sparkles, PenTool, Hash, Upload, FileJson, FileText } from "lucide-react";
 import { EmptyStateAscii } from "@/components/AsciiAnimation";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
@@ -25,7 +28,7 @@ interface Props {
   allEntries?: Entry[];
   roleMap?: Record<string, ShareRole>;
   userId: string;
-  onChange: (content: string) => void;
+  onChange: (payload: EditorChangePayload) => void;
   onTitleChange?: (title: string) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
@@ -41,6 +44,7 @@ interface Props {
   onImported?: () => void;
   onNew?: () => void;
   saveStatus?: "idle" | "saving" | "saved" | "error";
+  collabEnabled?: boolean;
 }
 
 function wordCount(text: string): number {
@@ -52,7 +56,12 @@ function readingTime(words: number): string {
   return mins < 1 ? "<1 min" : `${mins} min`;
 }
 
-export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, onNew, saveStatus = "idle" }: Props) {
+function canEditRole(role: ShareRole): boolean {
+  return role === "owner" || role === "admin" || role === "editor";
+}
+
+export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
+  const { user } = useAuth();
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,7 +112,13 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
 
 
   const words = entry ? wordCount(entry.content) : 0;
-  const canEdit = userRole === "owner" || userRole === "admin" || userRole === "editor";
+  const canEdit = canEditRole(userRole);
+  const collabSession = useCollabProvider(
+    entry?.id ?? null,
+    collabEnabled && canEdit,
+    userId,
+    user?.email ?? "",
+  );
   const canDelete = userRole === "owner" || userRole === "admin";
   const canManage = userRole === "owner" || userRole === "admin";
 
@@ -115,7 +130,10 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
       if ((window as any).__nw_insertImage) {
         (window as any).__nw_insertImage(url);
       } else {
-        onChange(entry.content + `\n![image](${url})\n`);
+        onChange({
+          markdown: entry.content + `\n![image](${url})\n`,
+          json: entry.content_json ?? { type: "doc", content: [] },
+        });
       }
     }
     setUploading(false);
@@ -155,7 +173,13 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
             {uploading && (
               <span className="text-[10px] text-muted-foreground/50 ml-2 animate-pulse">uploading…</span>
             )}
-            {saveStatus === "saving" && (
+            {collabSession && (
+              <span className="text-[10px] text-emerald-600/80 ml-2 font-mono flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                live
+              </span>
+            )}
+            {saveStatus === "saving" && !collabSession && (
               <span className="text-[10px] text-muted-foreground/60 ml-2 font-mono flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-foreground/40 animate-pulse" />
                 saving…
@@ -318,12 +342,14 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
             <BlockEditor
               key={entry.id}
               content={entry.content}
+              contentJson={entry.content_json}
               onChange={onChange}
               onImageUpload={canEdit ? handleImageUpload : undefined}
               onLinkPage={canEdit ? () => window.dispatchEvent(new CustomEvent("nw:linkpage")) : undefined}
               onNewPage={canEdit ? (title: string) => onNewSubpageWithTitle(entry.id, title) : undefined}
               onAskAI={canEdit ? onOpenAI : undefined}
               editable={canEdit}
+              collabSession={collabSession}
             />
             <InlineAIMenu editor={(window as any).__nw_editor} />
             <input
@@ -350,7 +376,10 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               if (editor && editor.commands.insertDrawing) {
                 editor.chain().focus("end").insertDrawing({ sceneId, imageUrl }).run();
               } else if (imageUrl) {
-                onChange(entry.content + `\n\n![drawing](${imageUrl})\n`);
+                onChange({
+                  markdown: entry.content + `\n\n![drawing](${imageUrl})\n`,
+                  json: entry.content_json ?? { type: "doc", content: [] },
+                });
               }
             } else {
               // broadcast so existing node views can refresh their imageUrl

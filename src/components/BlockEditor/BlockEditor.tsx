@@ -1,34 +1,96 @@
 import { useEditor, EditorContent } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/react/menus";
+import type { JSONContent } from "@tiptap/core";
 import { markdownToHtml, htmlToMarkdown } from "@/lib/markdown";
 import { looksLikeMarkdown } from "./blockCommands";
-import { useCallback, useEffect, useRef } from "react";
-import { Bold, Italic, Strikethrough, Underline, Code, Link as LinkIcon, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { createBlockEditorExtensions } from "./editorExtensions";
 import { BlockMenu } from "./BlockMenu";
-import { TurnIntoDropdown, ColorDropdown } from "./ColorMenu";
+import { BlockContextMenu } from "./BlockContextMenu";
+import { BubbleMenuToolbar } from "./BubbleMenuToolbar";
 import { isSafeHttpUrl } from "@/lib/safeUrl";
+import type { EditorChangePayload } from "@/lib/editorPayload";
+import { createCollabExtensions } from "@/lib/collab/collabExtensions";
+import type { CollabSession } from "@/lib/collab/useCollabProvider";
+
+const SERIALIZE_DEBOUNCE_MS = 200;
 
 interface Props {
   content: string;
-  onChange: (markdown: string) => void;
+  contentJson?: JSONContent | null;
+  onChange: (payload: EditorChangePayload) => void;
   onImageUpload?: (file?: File) => void;
   onLinkPage?: () => void;
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
   editable?: boolean;
+  collabSession?: CollabSession | null;
 }
 
-export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNewPage, onAskAI, editable = true }: Props) {
-  const initialContent = useRef(markdownToHtml(content));
+function resolveInitialContent(content: string, contentJson?: JSONContent | null): string | JSONContent {
+  if (contentJson && typeof contentJson === "object" && contentJson.type === "doc") {
+    return contentJson;
+  }
+  return markdownToHtml(content);
+}
+
+export function BlockEditor({
+  content,
+  contentJson,
+  onChange,
+  onImageUpload,
+  onLinkPage,
+  onNewPage,
+  onAskAI,
+  editable = true,
+  collabSession = null,
+}: Props) {
+  const initialContent = useRef(resolveInitialContent(content, contentJson));
   const lastEmittedMarkdown = useRef(content);
+  const lastEmittedJson = useRef<JSONContent | null>(contentJson ?? null);
   const localVersion = useRef(0);
   const acceptedVersion = useRef(0);
+  const serializeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const extraExtensions = useMemo(
+    () =>
+      collabSession
+        ? createCollabExtensions(collabSession.ydoc, collabSession.provider, collabSession.user)
+        : [],
+    [collabSession],
+  );
+
+  const serialize = useCallback((editor: NonNullable<ReturnType<typeof useEditor>>, immediate = false) => {
+    const run = () => {
+      const md = htmlToMarkdown(editor.getHTML());
+      const json = editor.getJSON();
+      lastEmittedMarkdown.current = md;
+      lastEmittedJson.current = json;
+      (window as any).__nw_currentMarkdown = md;
+      onChangeRef.current({ markdown: md, json });
+    };
+    if (immediate) {
+      if (serializeTimer.current) clearTimeout(serializeTimer.current);
+      run();
+      return;
+    }
+    if (serializeTimer.current) clearTimeout(serializeTimer.current);
+    serializeTimer.current = setTimeout(run, SERIALIZE_DEBOUNCE_MS);
+  }, []);
 
   const editor = useEditor({
-    extensions: createBlockEditorExtensions({ onImageUpload, onLinkPage, onNewPage, onAskAI }),
+    extensions: createBlockEditorExtensions({
+      onImageUpload,
+      onLinkPage,
+      onNewPage,
+      onAskAI,
+      collab: !!collabSession,
+      extraExtensions,
+    }),
     content: initialContent.current,
     editable,
+    shouldRerenderOnTransaction: false,
     editorProps: {
       attributes: {
         class: "block-editor-content focus:outline-none",
@@ -66,14 +128,14 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
         return false;
       },
     },
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor: ed }) => {
       localVersion.current += 1;
-      const md = htmlToMarkdown(editor.getHTML());
-      lastEmittedMarkdown.current = md;
-      (window as any).__nw_currentMarkdown = md;
-      onChange(md);
+      serialize(ed);
     },
-  });
+    onBlur: ({ editor: ed }) => {
+      serialize(ed, true);
+    },
+  }, [collabSession]);
 
   useEffect(() => {
     if (editor && editor.isEditable !== editable) editor.setEditable(editable);
@@ -84,10 +146,12 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     if (editor.isFocused) return;
     if (content === lastEmittedMarkdown.current) return;
     if (localVersion.current !== acceptedVersion.current) return;
-    editor.commands.setContent(markdownToHtml(content), { emitUpdate: false });
+    const next = resolveInitialContent(content, contentJson);
+    editor.commands.setContent(next, { emitUpdate: false });
     lastEmittedMarkdown.current = content;
+    lastEmittedJson.current = contentJson ?? null;
     acceptedVersion.current = localVersion.current;
-  }, [content, editor]);
+  }, [content, contentJson, editor]);
 
   const setLink = useCallback(() => {
     if (!editor) return;
@@ -134,14 +198,17 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
     (window as any).__nw_insertImage = insertImage;
     (window as any).__nw_editor = editor;
     (window as any).__nw_getMarkdown = () => htmlToMarkdown(editor.getHTML());
+    (window as any).__nw_flushEditor = () => serialize(editor, true);
     (window as any).__nw_currentMarkdown = htmlToMarkdown(editor.getHTML());
     return () => {
       delete (window as any).__nw_insertImage;
       delete (window as any).__nw_editor;
       delete (window as any).__nw_getMarkdown;
+      delete (window as any).__nw_flushEditor;
       delete (window as any).__nw_currentMarkdown;
+      if (serializeTimer.current) clearTimeout(serializeTimer.current);
     };
-  }, [insertImage, editor]);
+  }, [insertImage, editor, serialize]);
 
   if (!editor) return null;
 
@@ -158,7 +225,6 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
             window.dispatchEvent(new CustomEvent("nw:navigate", { detail: pageId }));
           } else if (href && !editable) {
             e.preventDefault();
-            // Only follow http(s) links — block javascript:/data:/blob: etc.
             if (isSafeHttpUrl(href)) {
               window.open(href, "_blank", "noopener,noreferrer");
             }
@@ -167,63 +233,9 @@ export function BlockEditor({ content, onChange, onImageUpload, onLinkPage, onNe
       }}
     >
       <BlockMenu editor={editor} />
+      {editable && <BlockContextMenu editor={editor} />}
       {editor && editable && (
-        <BubbleMenu editor={editor} className="bubble-menu">
-          <TurnIntoDropdown editor={editor} />
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <button
-            onClick={() => (window as any).__nw_openInlineAI?.()}
-            className="bubble-btn bubble-btn-ai"
-            title="Ask AI"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-          </button>
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <button
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={`bubble-btn ${editor.isActive("bold") ? "is-active" : ""}`}
-            title="Bold (⌘B)"
-          >
-            <Bold className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={`bubble-btn ${editor.isActive("italic") ? "is-active" : ""}`}
-            title="Italic (⌘I)"
-          >
-            <Italic className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-            className={`bubble-btn ${editor.isActive("underline") ? "is-active" : ""}`}
-            title="Underline (⌘U)"
-          >
-            <Underline className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-            className={`bubble-btn ${editor.isActive("strike") ? "is-active" : ""}`}
-            title="Strikethrough (⌘⇧S)"
-          >
-            <Strikethrough className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleCode().run()}
-            className={`bubble-btn ${editor.isActive("code") ? "is-active" : ""}`}
-            title="Inline code (⌘E)"
-          >
-            <Code className="h-3.5 w-3.5" />
-          </button>
-          <div className="w-px h-4 bg-border mx-0.5" />
-          <button
-            onClick={setLink}
-            className={`bubble-btn ${editor.isActive("link") ? "is-active" : ""}`}
-            title="Link (⌘K)"
-          >
-            <LinkIcon className="h-3.5 w-3.5" />
-          </button>
-          <ColorDropdown editor={editor} />
-        </BubbleMenu>
+        <BubbleMenuToolbar editor={editor} onSetLink={setLink} />
       )}
       <EditorContent editor={editor} className="w-full min-w-0" />
     </div>

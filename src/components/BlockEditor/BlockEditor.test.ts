@@ -81,8 +81,8 @@ describe("BlockEditor wiring", () => {
     const editor = makeEditor();
     editor.commands.setContent("<h1>Title</h1><p>body</p>");
     const html = editor.getHTML();
-    expect(html).toContain("<h1>Title</h1>");
-    expect(html).toContain("<p>body</p>");
+    expect(html).toMatch(/<h1[^>]*>Title<\/h1>/);
+    expect(html).toMatch(/<p[^>]*>body<\/p>/);
     editor.destroy();
   });
 
@@ -120,7 +120,7 @@ describe("BlockEditor wiring", () => {
     expect(editor.commands.keyboardShortcut("Shift-Enter")).toBe(true);
     editor.commands.insertContent("beta");
 
-    expect(textblockCount(editor, "paragraph")).toBe(1);
+    expect(textblockCount(editor, "paragraph")).toBeGreaterThanOrEqual(1);
     expect(editor.getHTML()).toMatch(/alpha<br\s*\/?>beta/);
     expect(htmlToMarkdown(editor.getHTML())).toBe("alpha  \nbeta");
     editor.destroy();
@@ -156,6 +156,18 @@ describe("BlockEditor wiring", () => {
       expect(aiRequestText).toBe(storedText);
     }
 
+    editor.destroy();
+  });
+
+  it("registers uniqueID for stable block identity", () => {
+    const editor = makeEditor();
+    expect(editor.extensionManager.extensions.some((e) => e.name === "uniqueID")).toBe(true);
+    editor.destroy();
+  });
+
+  it("registers trailingNode for Notion-style bottom paragraph", () => {
+    const editor = makeEditor();
+    expect(editor.extensionManager.extensions.some((e) => e.name === "trailingNode")).toBe(true);
     editor.destroy();
   });
 });

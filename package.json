@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
+    "@hocuspocus/provider": "^4.4.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -50,6 +51,8 @@
     "@tiptap/core": "^3.25.0",
     "@tiptap/extension-bubble-menu": "^3.25.0",
     "@tiptap/extension-code-block-lowlight": "^3.25.0",
+    "@tiptap/extension-collaboration": "^3.28.0",
+    "@tiptap/extension-collaboration-caret": "^3.28.0",
     "@tiptap/extension-color": "^3.25.0",
     "@tiptap/extension-dropcursor": "^3.25.0",
     "@tiptap/extension-font-family": "^3.25.0",
@@ -68,10 +71,12 @@
     "@tiptap/extension-text-align": "^3.25.0",
     "@tiptap/extension-text-style": "^3.25.0",
     "@tiptap/extension-typography": "^3.25.0",
+    "@tiptap/extension-unique-id": "^3.28.0",
     "@tiptap/pm": "^3.25.0",
     "@tiptap/react": "^3.25.0",
     "@tiptap/starter-kit": "^3.25.0",
     "@tiptap/suggestion": "^3.25.0",
+    "@tiptap/y-tiptap": "^3.0.7",
     "@types/katex": "^0.16.8",
     "@types/turndown": "^5.0.6",
     "@vercel/analytics": "^2.0.1",
@@ -105,6 +110,8 @@
     "tippy.js": "^6.3.7",
     "turndown": "^7.2.4",
     "vaul": "^0.9.9",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.31",
     "zod": "^3.25.76"
   },
   "devDependencies": {

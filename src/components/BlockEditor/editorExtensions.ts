@@ -5,6 +5,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import Dropcursor from "@tiptap/extension-dropcursor";
 import Typography from "@tiptap/extension-typography";
+import UniqueID from "@tiptap/extension-unique-id";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
@@ -26,12 +27,20 @@ import { CodeBlockExtension } from "./CodeBlockExtension";
 import { Column, ColumnList } from "./ColumnExtension";
 import { Bookmark } from "./BookmarkExtension";
 import { Embed } from "./EmbedExtension";
+import type { Extensions } from "@tiptap/core";
 
 interface BlockEditorExtensionHandlers {
   onImageUpload?: (file?: File) => void;
   onLinkPage?: () => void;
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
+}
+
+interface BlockEditorExtensionOptions extends BlockEditorExtensionHandlers {
+  /** When true, disable local history (Yjs owns undo during collab). */
+  collab?: boolean;
+  /** Extra extensions (e.g. Collaboration + CollaborationCaret). */
+  extraExtensions?: Extensions;
 }
 
 const PLACEHOLDER_BY_NODE: Record<string, string> = {
@@ -44,14 +53,26 @@ const PLACEHOLDER_BY_NODE: Record<string, string> = {
   callout: "Callout",
 };
 
-export function createBlockEditorExtensions(handlers: BlockEditorExtensionHandlers = {}) {
+export function createBlockEditorExtensions(handlers: BlockEditorExtensionOptions = {}) {
+  const { collab = false, extraExtensions = [] } = handlers;
   return [
     WritingExperience,
     BlockHandle,
+    UniqueID.configure({
+      types: [
+        "paragraph", "heading", "blockquote", "codeBlock", "horizontalRule",
+        "bulletList", "orderedList", "taskList", "listItem", "taskItem",
+        "callout", "toggle", "columnList", "column", "bookmark", "embed",
+        "blockMath", "excalidraw",
+      ],
+      attributeName: "id",
+    }),
     StarterKit.configure({
       heading: { levels: [1, 2, 3] },
       codeBlock: false,
       dropcursor: false,
+      // Yjs owns undo/redo during collab — StarterKit v3 calls this `undoRedo`, not `history`.
+      ...(collab ? { undoRedo: false as const } : {}),
       horizontalRule: {
         HTMLAttributes: { class: "editor-hr" },
       },
@@ -121,5 +142,6 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionHandle
       onNewPage: (title: string) => handlers.onNewPage?.(title),
       onAskAI: () => handlers.onAskAI?.(),
     }),
+    ...extraExtensions,
   ];
 }

@@ -1,29 +1,80 @@
-// Local-first draft cache for offline resilience and undo-safety.
-// We persist every keystroke locally (synchronously) so reloads, crashes
-// or network errors never lose user text. The DB write is debounced separately.
+// Local-first draft cache for offline resilience.
+// Draft writes are throttled — never sync localStorage on every keystroke.
+
+import type { JSONContent } from "@tiptap/core";
 
 const DRAFT_PREFIX = "wings_draft_";
+const DRAFT_JSON_PREFIX = "wings_draft_json_";
 const PENDING_PREFIX = "wings_pending_";
 
-// Backward-compatible read of the older "nw_draft_" prefix so existing users
-// don't lose any in-progress text after the rename.
 const LEGACY_DRAFT_PREFIX = "nw_draft_";
 const LEGACY_PENDING_PREFIX = "nw_pending_";
 
-export function saveDraft(entryId: string, content: string): void {
+export interface DraftPayload {
+  markdown: string;
+  json?: JSONContent | null;
+}
+
+interface PendingWrite {
+  entryId: string;
+  content: string;
+  contentJson?: JSONContent | null;
+  timestamp: number;
+}
+
+const draftTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const DRAFT_THROTTLE_MS = 400;
+
+function writeDraft(entryId: string, payload: DraftPayload): void {
   try {
-    localStorage.setItem(DRAFT_PREFIX + entryId, content);
+    localStorage.setItem(DRAFT_PREFIX + entryId, payload.markdown);
+    if (payload.json) {
+      localStorage.setItem(DRAFT_JSON_PREFIX + entryId, JSON.stringify(payload.json));
+    }
   } catch {
     // Storage full — silently ignore
   }
 }
 
-export function getDraft(entryId: string): string | null {
+/** Throttled draft save — coalesces rapid keystrokes. */
+export function saveDraftThrottled(entryId: string, payload: DraftPayload): void {
+  const existing = draftTimers.get(entryId);
+  if (existing) clearTimeout(existing);
+  draftTimers.set(
+    entryId,
+    setTimeout(() => {
+      draftTimers.delete(entryId);
+      writeDraft(entryId, payload);
+    }, DRAFT_THROTTLE_MS),
+  );
+}
+
+/** Immediate draft write (flush on unload / route change). */
+export function saveDraft(entryId: string, payload: DraftPayload): void {
+  const existing = draftTimers.get(entryId);
+  if (existing) {
+    clearTimeout(existing);
+    draftTimers.delete(entryId);
+  }
+  writeDraft(entryId, payload);
+}
+
+export function getDraft(entryId: string): DraftPayload | null {
   try {
-    return (
+    const markdown =
       localStorage.getItem(DRAFT_PREFIX + entryId) ??
-      localStorage.getItem(LEGACY_DRAFT_PREFIX + entryId)
-    );
+      localStorage.getItem(LEGACY_DRAFT_PREFIX + entryId);
+    if (markdown == null) return null;
+    const jsonRaw = localStorage.getItem(DRAFT_JSON_PREFIX + entryId);
+    let json: JSONContent | null = null;
+    if (jsonRaw) {
+      try {
+        json = JSON.parse(jsonRaw) as JSONContent;
+      } catch {
+        json = null;
+      }
+    }
+    return { markdown, json };
   } catch {
     return null;
   }
@@ -32,22 +83,21 @@ export function getDraft(entryId: string): string | null {
 export function clearDraft(entryId: string): void {
   try {
     localStorage.removeItem(DRAFT_PREFIX + entryId);
+    localStorage.removeItem(DRAFT_JSON_PREFIX + entryId);
     localStorage.removeItem(LEGACY_DRAFT_PREFIX + entryId);
   } catch {
     // ignore
   }
 }
 
-// Pending writes queue for retry when offline
-interface PendingWrite {
-  entryId: string;
-  content: string;
-  timestamp: number;
-}
-
-export function queuePendingWrite(entryId: string, content: string): void {
+export function queuePendingWrite(entryId: string, payload: DraftPayload): void {
   try {
-    const pending: PendingWrite = { entryId, content, timestamp: Date.now() };
+    const pending: PendingWrite = {
+      entryId,
+      content: payload.markdown,
+      contentJson: payload.json ?? null,
+      timestamp: Date.now(),
+    };
     localStorage.setItem(PENDING_PREFIX + entryId, JSON.stringify(pending));
   } catch {
     // ignore

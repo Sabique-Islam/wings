@@ -1178,3 +1178,26 @@
 /* ============ Iconography ============ */
 /* Uniform lucide stroke — CSS wins over the presentation attribute. */
 .lucide { stroke-width: 1.5px; }
+
+/* ============ Yjs collaboration carets ============ */
+.collaboration-carets__caret {
+  border-left: 2px solid var(--collaboration-caret-color, hsl(var(--primary)));
+  margin-left: -1px;
+  margin-right: -1px;
+  pointer-events: none;
+  position: relative;
+  word-break: normal;
+}
+.collaboration-carets__label {
+  border-radius: 3px 3px 3px 0;
+  color: #fff;
+  font-size: 10px;
+  font-family: ui-monospace, monospace;
+  left: -1px;
+  line-height: 1.2;
+  padding: 1px 4px;
+  position: absolute;
+  top: -1.1em;
+  user-select: none;
+  white-space: nowrap;
+}
