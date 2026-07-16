@@ -87,6 +87,28 @@ export function BlockEditor({
     [collabSession],
   );
 
+  const extensions = useMemo(
+    () =>
+      createBlockEditorExtensions({
+        onImageUpload,
+        onLinkPage,
+        onNewPage,
+        onAskAI,
+        getPages: pages.length > 0 ? () => pagesRef.current : undefined,
+        collab: !!collabSession,
+        extraExtensions,
+      }),
+    [
+      collabSession,
+      extraExtensions,
+      onAskAI,
+      onImageUpload,
+      onLinkPage,
+      onNewPage,
+      pages.length,
+    ],
+  );
+
   const serialize = useCallback((editor: NonNullable<ReturnType<typeof useEditor>>, immediate = false) => {
     const run = () => {
       const md = htmlToMarkdown(editor.getHTML());
@@ -106,15 +128,7 @@ export function BlockEditor({
   }, []);
 
   const editor = useEditor({
-    extensions: createBlockEditorExtensions({
-      onImageUpload,
-      onLinkPage,
-      onNewPage,
-      onAskAI,
-      getPages: () => pagesRef.current,
-      collab: !!collabSession,
-      extraExtensions,
-    }),
+    extensions,
     content: initialContent.current,
     editable,
     shouldRerenderOnTransaction: false,

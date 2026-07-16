@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { Editor } from "@tiptap/core";
 import { createBlockEditorExtensions } from "./editorExtensions";
+import { slashCommandSuggestionKey, pageMentionSuggestionKey } from "./suggestionPluginKeys";
 import { htmlToMarkdown } from "@/lib/markdown";
 
 function makeEditor(content = "<p>hello</p>") {
@@ -192,6 +193,36 @@ describe("BlockEditor wiring", () => {
     const editor = makeEditor();
     expect(editor.extensionManager.extensions.some((e) => e.name === "blockSelection")).toBe(true);
     expect(editor.extensionManager.extensions.some((e) => e.name === "markdownShortcuts")).toBe(true);
+    editor.destroy();
+  });
+
+  it("registers slash + page mention suggestion plugins with distinct keys", () => {
+    const editor = new Editor({
+      extensions: createBlockEditorExtensions({
+        getPages: () => [{ id: "1", title: "Test page" }],
+      }),
+      content: "<p></p>",
+    });
+    const slashKey = editor.state.plugins.find((p) => p.spec.key === slashCommandSuggestionKey)?.spec.key;
+    const pageKey = editor.state.plugins.find((p) => p.spec.key === pageMentionSuggestionKey)?.spec.key;
+    expect(slashKey).toBe(slashCommandSuggestionKey);
+    expect(pageKey).toBe(pageMentionSuggestionKey);
+    editor.destroy();
+  });
+
+  it("registers slash suggestion under a dedicated plugin key", () => {
+    const editor = makeEditor("<p></p>");
+    const slashKey = editor.state.plugins.find((p) => p.spec.key === slashCommandSuggestionKey)?.spec.key;
+    expect(slashKey).toBe(slashCommandSuggestionKey);
+    editor.destroy();
+  });
+
+  it("activates slash suggestion when typing /callout", () => {
+    const editor = makeEditor("<p></p>");
+    editor.commands.focus();
+    editor.commands.insertContent("/callout");
+    const suggestionState = slashCommandSuggestionKey.getState(editor.state) as { active?: boolean } | undefined;
+    expect(suggestionState?.active).toBe(true);
     editor.destroy();
   });
 });

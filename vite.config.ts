@@ -27,6 +27,7 @@ export default defineConfig({
       "prosemirror-transform",
       "@tiptap/core",
       "@tiptap/pm",
+      "@tiptap/suggestion",
     ],
   },
 });

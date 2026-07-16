@@ -1,6 +1,7 @@
 import { Extension } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion, { SuggestionOptions } from "@tiptap/suggestion";
+import { slashCommandSuggestionKey } from "./suggestionPluginKeys";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import {
   forwardRef,
@@ -456,6 +457,7 @@ export function createSlashCommandExtension(handlers: SlashHandlers = {}) {
         Suggestion({
           editor: this.editor,
           ...this.options.suggestion,
+          pluginKey: slashCommandSuggestionKey,
         }),
       ];
     },

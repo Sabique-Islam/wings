@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { focusEditor } from "./editor-helpers";
 
 async function expectParity(page: import("@playwright/test").Page) {
   const [stored, preview, aiText] = await Promise.all([
@@ -14,9 +15,8 @@ async function expectParity(page: import("@playwright/test").Page) {
 test("Enter, Shift+Enter, Markdown rendering, and AI parity survive the full editor stack", async ({ page }) => {
   await page.goto("/__editor-e2e");
 
-  const editor = page.locator(".ProseMirror");
+  const editor = await focusEditor(page);
   await expect(editor).toBeVisible();
-  await editor.click();
 
   await page.keyboard.type("alpha");
   await expectParity(page);
@@ -59,17 +59,17 @@ test("Enter, Shift+Enter, Markdown rendering, and AI parity survive the full edi
   await expectParity(page);
 
   await page.keyboard.press("Enter");
-  await page.keyboard.type("```ts ");
-  await expect(editor.locator("pre code")).toBeVisible();
+  await page.keyboard.type("```ts");
+  await page.keyboard.press("Enter");
+  await expect(editor.locator("pre .code-block-content")).toBeVisible();
   await page.keyboard.type("const x = 1;");
-  await expect(editor.locator("pre code")).toContainText("const x = 1;");
+  await expect(editor.locator("pre .code-block-content")).toContainText("const x = 1;");
   await expectParity(page);
 });
 
 test("Enter mid-paragraph splits the block (regression: createParagraphNear was jumping the cursor)", async ({ page }) => {
   await page.goto("/__editor-e2e");
-  const editor = page.locator(".ProseMirror");
-  await editor.click();
+  const editor = await focusEditor(page);
 
   await page.keyboard.type("hello world");
   // Place the caret programmatically — headless Chromium's ArrowLeft is
@@ -89,13 +89,12 @@ test("Enter mid-paragraph splits the block (regression: createParagraphNear was 
 
 test("Backspace at start of a heading collapses it to a paragraph", async ({ page }) => {
   await page.goto("/__editor-e2e");
-  const editor = page.locator(".ProseMirror");
-  await editor.click();
+  const editor = await focusEditor(page);
 
   await page.keyboard.type("# Title");
   await expect(editor.locator("h1")).toContainText("Title");
   await page.keyboard.press("Home");
   await page.keyboard.press("Backspace");
   await expect(editor.locator("h1")).toHaveCount(0);
-  await expect(editor.locator("p")).toContainText("Title");
+  await expect(editor.locator("p").first()).toContainText("Title");
 });

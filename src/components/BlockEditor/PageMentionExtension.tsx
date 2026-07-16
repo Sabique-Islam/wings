@@ -1,6 +1,7 @@
 import { Extension } from "@tiptap/core";
 import { ReactRenderer } from "@tiptap/react";
 import Suggestion from "@tiptap/suggestion";
+import { pageMentionSuggestionKey } from "./suggestionPluginKeys";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import { forwardRef, useEffect, useImperativeHandle, useState, useCallback } from "react";
 import { FileText } from "lucide-react";
@@ -150,6 +151,7 @@ export function createPageMentionExtension(getPages: () => PageOption[]) {
         Suggestion({
           editor: this.editor,
           ...this.options.suggestion,
+          pluginKey: pageMentionSuggestionKey,
         }),
       ];
     },
