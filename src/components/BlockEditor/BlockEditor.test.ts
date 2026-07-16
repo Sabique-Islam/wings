@@ -170,4 +170,28 @@ describe("BlockEditor wiring", () => {
     expect(editor.extensionManager.extensions.some((e) => e.name === "trailingNode")).toBe(true);
     editor.destroy();
   });
+
+  it("registers underline mark for bubble menu", () => {
+    const editor = makeEditor();
+    expect(editor.extensionManager.extensions.some((e) => e.name === "underline")).toBe(true);
+    editor.commands.toggleUnderline();
+    editor.commands.insertContent("under");
+    expect(editor.getHTML()).toMatch(/<u>under<\/u>/);
+    editor.destroy();
+  });
+
+  it("registers toggleBlock node for Tab-nest and UniqueID", () => {
+    const editor = makeEditor();
+    expect(editor.state.schema.nodes.toggleBlock).toBeTruthy();
+    const uniqueId = editor.extensionManager.extensions.find((e) => e.name === "uniqueID");
+    expect(uniqueId).toBeTruthy();
+    editor.destroy();
+  });
+
+  it("registers blockSelection and markdownShortcuts extensions", () => {
+    const editor = makeEditor();
+    expect(editor.extensionManager.extensions.some((e) => e.name === "blockSelection")).toBe(true);
+    expect(editor.extensionManager.extensions.some((e) => e.name === "markdownShortcuts")).toBe(true);
+    editor.destroy();
+  });
 });

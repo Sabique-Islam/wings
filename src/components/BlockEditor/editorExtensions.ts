@@ -23,10 +23,13 @@ import { BlockMath, InlineMath } from "./MathExtension";
 import { ExcalidrawNode } from "./ExcalidrawExtension";
 import { WritingExperience } from "./WritingExperienceExtension";
 import { BlockHandle } from "./BlockHandleExtension";
+import { BlockSelection } from "./BlockSelectionExtension";
+import { MarkdownShortcuts } from "./MarkdownShortcutsExtension";
 import { CodeBlockExtension } from "./CodeBlockExtension";
 import { Column, ColumnList } from "./ColumnExtension";
 import { Bookmark } from "./BookmarkExtension";
 import { Embed } from "./EmbedExtension";
+import { createPageMentionExtension, type PageOption } from "./PageMentionExtension";
 import type { Extensions } from "@tiptap/core";
 
 interface BlockEditorExtensionHandlers {
@@ -34,6 +37,7 @@ interface BlockEditorExtensionHandlers {
   onLinkPage?: () => void;
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
+  getPages?: () => PageOption[];
 }
 
 interface BlockEditorExtensionOptions extends BlockEditorExtensionHandlers {
@@ -51,18 +55,26 @@ const PLACEHOLDER_BY_NODE: Record<string, string> = {
   taskList: "To-do",
   taskItem: "To-do",
   callout: "Callout",
+  toggleBlock: "Toggle",
 };
 
 export function createBlockEditorExtensions(handlers: BlockEditorExtensionOptions = {}) {
   const { collab = false, extraExtensions = [] } = handlers;
+  const pageMention =
+    handlers.getPages != null
+      ? createPageMentionExtension(() => handlers.getPages?.() ?? [])
+      : null;
+
   return [
     WritingExperience,
+    BlockSelection,
     BlockHandle,
+    MarkdownShortcuts,
     UniqueID.configure({
       types: [
         "paragraph", "heading", "blockquote", "codeBlock", "horizontalRule",
         "bulletList", "orderedList", "taskList", "listItem", "taskItem",
-        "callout", "toggle", "columnList", "column", "bookmark", "embed",
+        "callout", "toggleBlock", "columnList", "column", "bookmark", "embed",
         "blockMath", "excalidraw",
       ],
       attributeName: "id",
@@ -71,7 +83,6 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
       heading: { levels: [1, 2, 3] },
       codeBlock: false,
       dropcursor: false,
-      // Yjs owns undo/redo during collab — StarterKit v3 calls this `undoRedo`, not `history`.
       ...(collab ? { undoRedo: false as const } : {}),
       horizontalRule: {
         HTMLAttributes: { class: "editor-hr" },
@@ -87,7 +98,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
           const isOnlyBlock =
             doc.childCount === 1 && doc.firstChild?.type.name === "paragraph";
           if (isFirstTopLevel && isOnlyBlock) {
-            return "Write, press '/' for commands, or ask AI…";
+            return "Write, press '/' for commands, or '@' for pages…";
           }
           return "";
         }
@@ -98,8 +109,8 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
         return PLACEHOLDER_BY_NODE[node.type.name] ?? "";
       },
       showOnlyWhenEditable: true,
-      showOnlyCurrent: true,
-      includeChildren: false,
+      showOnlyCurrent: false,
+      includeChildren: true,
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
@@ -110,7 +121,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
     Link.configure({
       openOnClick: false,
       autolink: true,
-      linkOnPaste: true,
+      linkOnPaste: false,
       HTMLAttributes: { class: "editor-link" },
     }),
     Dropcursor.configure({ color: "hsl(var(--muted-foreground) / 0.4)", width: 2 }),
@@ -142,6 +153,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
       onNewPage: (title: string) => handlers.onNewPage?.(title),
       onAskAI: () => handlers.onAskAI?.(),
     }),
+    ...(pageMention ? [pageMention] : []),
     ...extraExtensions,
   ];
 }

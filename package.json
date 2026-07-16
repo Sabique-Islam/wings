@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:editor": "vitest run src/lib/markdown.test.ts src/components/BlockEditor/BlockEditor.test.ts",
-    "test:e2e": "playwright test tests/editor-enter.spec.ts",
+    "test:e2e": "playwright test tests/editor-enter.spec.ts tests/editor-notion-parity.spec.ts",
     "test:ci": "bun run test:editor && bun run test:e2e",
     "test:watch": "vitest"
   },
@@ -71,6 +71,7 @@
     "@tiptap/extension-text-align": "^3.25.0",
     "@tiptap/extension-text-style": "^3.25.0",
     "@tiptap/extension-typography": "^3.25.0",
+    "@tiptap/extension-underline": "^3.25.0",
     "@tiptap/extension-unique-id": "^3.28.0",
     "@tiptap/pm": "^3.25.0",
     "@tiptap/react": "^3.25.0",

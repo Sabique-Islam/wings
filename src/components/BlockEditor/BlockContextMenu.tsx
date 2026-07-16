@@ -1,24 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Editor } from "@tiptap/core";
-import { turnInto, type TurnIntoType } from "./blockCommands";
+import { turnInto, TURN_INTO_ITEMS } from "./blockCommands";
 
 interface Props {
   editor: Editor;
 }
 
-const ITEMS: { label: string; type: TurnIntoType }[] = [
-  { label: "Text", type: "paragraph" },
-  { label: "Heading 1", type: "heading1" },
-  { label: "Heading 2", type: "heading2" },
-  { label: "Heading 3", type: "heading3" },
-  { label: "Bullet list", type: "bulletList" },
-  { label: "Numbered list", type: "orderedList" },
-  { label: "To-do list", type: "taskList" },
-  { label: "Quote", type: "blockquote" },
-  { label: "Code", type: "codeBlock" },
-  { label: "Toggle", type: "toggle" },
-  { label: "Callout", type: "callout" },
-];
+const ITEMS = TURN_INTO_ITEMS;
 
 /** Notion-style right-click turn-into menu on the current block. */
 export function BlockContextMenu({ editor }: Props) {

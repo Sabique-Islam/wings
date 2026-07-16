@@ -1,6 +1,7 @@
 import { Extension } from "@tiptap/core";
-import { TextSelection, NodeSelection } from "@tiptap/pm/state";
+import { TextSelection } from "@tiptap/pm/state";
 import { turnInto, type TurnIntoType } from "./blockCommands";
+import { findTopLevelDepth } from "./blockUtils";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WritingExperience — the "Notion-parity" keymap.
@@ -55,8 +56,6 @@ function applyEnterMarkdownShortcut(editor: any): boolean {
   return false;
 }
 
-/** Notion behavior: pressing Enter on an empty heading/quote/callout leaves
- *  that block-type and converts the current line to a plain paragraph. */
 function convertEmptyDecorationToParagraph(editor: any): boolean {
   const block = currentTextBlock(editor);
   if (!block) return false;
@@ -66,8 +65,6 @@ function convertEmptyDecorationToParagraph(editor: any): boolean {
   return editor.chain().setParagraph().run();
 }
 
-/** Backspace at position 0 of a heading/quote/callout collapses it back to
- *  a paragraph — matches Notion and every serious block editor. */
 function backspaceAtStartOfDecoration(editor: any): boolean {
   const { selection } = editor.state;
   if (!selection.empty) return false;
@@ -78,12 +75,56 @@ function backspaceAtStartOfDecoration(editor: any): boolean {
   return editor.chain().setParagraph().run();
 }
 
-/** Nest the current top-level block into the previous sibling when it's a container. */
+/** Empty list item → lift or exit to paragraph (Notion list behavior). */
+function exitEmptyListItem(editor: any): boolean {
+  const { selection } = editor.state;
+  if (!selection.empty) return false;
+  const { $from } = selection;
+  const parent = $from.parent;
+  if (parent.type.name !== "listItem" && parent.type.name !== "taskItem") return false;
+  if (parent.textContent.length > 0) return false;
+  const listType = parent.type.name;
+  if (editor.can().liftListItem(listType)) {
+    return editor.chain().focus().liftListItem(listType).run();
+  }
+  return editor.chain().focus().setParagraph().run();
+}
+
+/** Backspace on empty block merges/deletes upward (Notion merge-up). */
+function mergeEmptyBlockUp(editor: any): boolean {
+  const { state, view } = editor;
+  const { selection } = state;
+  if (!selection.empty) return false;
+  const { $from } = selection;
+
+  if (exitEmptyListItem(editor)) return true;
+
+  const block = currentTextBlock(editor);
+  if (!block || block.text.length !== 0 || block.offset !== 0) return false;
+
+  const depth = findTopLevelDepth($from);
+  if (depth < 1) return false;
+  const indexInParent = $from.index(depth - 1);
+  if (indexInParent === 0) return false;
+
+  const blockPos = $from.before(depth);
+  const blockNode = $from.node(depth);
+  const parent = $from.node(depth - 1);
+  const prev = parent.child(indexInParent - 1);
+  const prevPos = blockPos - prev.nodeSize;
+
+  const tr = state.tr.delete(blockPos, blockPos + blockNode.nodeSize);
+  const caretPos = prevPos + Math.max(1, prev.content.size);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(caretPos, tr.doc.content.size - 1))));
+  tr.scrollIntoView();
+  view.dispatch(tr);
+  return true;
+}
+
 function nestIntoPreviousSibling(editor: any): boolean {
   const { state, view } = editor;
   const { $from } = state.selection;
-  let depth = $from.depth;
-  while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+  const depth = findTopLevelDepth($from);
   if (depth < 1) return false;
 
   const indexInParent = $from.index(depth - 1);
@@ -91,7 +132,7 @@ function nestIntoPreviousSibling(editor: any): boolean {
 
   const parent = $from.node(depth - 1);
   const prev = parent.child(indexInParent - 1);
-  const nestable = new Set(["blockquote", "callout", "toggle"]);
+  const nestable = new Set(["blockquote", "callout", "toggleBlock"]);
   if (!nestable.has(prev.type.name)) return false;
 
   const blockPos = $from.before(depth);
@@ -108,19 +149,41 @@ function nestIntoPreviousSibling(editor: any): boolean {
   return true;
 }
 
-/** Move the current block up or down by one sibling. */
+/** Shift+Tab at block start — lift out of container blocks. */
+function liftOutOfContainer(editor: any): boolean {
+  const { selection } = editor.state;
+  if (!selection.empty) return false;
+  const { $from } = selection;
+  if ($from.parentOffset !== 0) return false;
+
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d);
+    if (node.type.name === "blockquote" || node.type.name === "callout" || node.type.name === "toggleBlock") {
+      const depth = findTopLevelDepth($from);
+      if (depth < 1) return false;
+      const blockPos = $from.before(depth);
+      const block = $from.node(depth);
+      const afterPos = blockPos + block.nodeSize;
+      const tr = editor.state.tr;
+      tr.delete(blockPos, afterPos);
+      tr.insert($from.after(d), block);
+      tr.setSelection(TextSelection.near(tr.doc.resolve($from.after(d) + 1)));
+      editor.view.dispatch(tr.scrollIntoView());
+      return true;
+    }
+  }
+  return false;
+}
+
 function moveBlock(editor: any, direction: "up" | "down"): boolean {
   const { state, view } = editor;
   const { $from } = state.selection;
-  // Find the ancestor that's a direct child of the doc.
-  let depth = $from.depth;
-  while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+  const depth = findTopLevelDepth($from);
   if (depth < 1) return false;
 
   const parent = $from.node(depth - 1);
   const indexInParent = $from.index(depth - 1);
-  const targetIndex =
-    direction === "up" ? indexInParent - 1 : indexInParent + 1;
+  const targetIndex = direction === "up" ? indexInParent - 1 : indexInParent + 1;
   if (targetIndex < 0 || targetIndex >= parent.childCount) return false;
 
   const blockPos = $from.before(depth);
@@ -145,12 +208,10 @@ function moveBlock(editor: any, direction: "up" | "down"): boolean {
   return true;
 }
 
-/** Duplicate the current top-level block below itself. */
 function duplicateBlock(editor: any): boolean {
   const { state, view } = editor;
   const { $from } = state.selection;
-  let depth = $from.depth;
-  while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+  const depth = findTopLevelDepth($from);
   if (depth < 1) return false;
 
   const blockPos = $from.before(depth);
@@ -164,20 +225,35 @@ function duplicateBlock(editor: any): boolean {
   return true;
 }
 
-/** Select the top-level block containing the cursor. */
-function selectCurrentBlock(editor: any): boolean {
-  const { $from } = editor.state.selection;
-  let depth = $from.depth;
-  while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
-  if (depth < 1) return false;
-  const pos = $from.before(depth);
-  try {
-    const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos));
-    editor.view.dispatch(tr);
-    return true;
-  } catch {
-    return false;
+/** Cmd+Enter — toggle todo, toggle block, or open page link. */
+function modifyCurrentBlock(editor: any): boolean {
+  const { state } = editor;
+  const { $from, from } = state.selection;
+
+  for (let d = $from.depth; d > 0; d--) {
+    const node = $from.node(d);
+    if (node.type.name === "taskItem") {
+      return editor
+        .chain()
+        .focus()
+        .updateAttributes("taskItem", { checked: !node.attrs.checked })
+        .run();
+    }
+    if (node.type.name === "toggleBlock") {
+      const open = node.attrs.open !== false;
+      return editor.chain().focus().updateAttributes("toggleBlock", { open: !open }).run();
+    }
   }
+
+  const marks = state.doc.resolve(from).marks();
+  const link = marks.find((m) => m.type.name === "link");
+  if (link?.attrs.href?.startsWith("#page:")) {
+    window.dispatchEvent(
+      new CustomEvent("nw:navigate", { detail: link.attrs.href.replace("#page:", "") }),
+    );
+    return true;
+  }
+  return false;
 }
 
 const TURN_INTO_KEYS: Record<string, TurnIntoType> = {
@@ -194,26 +270,13 @@ const TURN_INTO_KEYS: Record<string, TurnIntoType> = {
 
 export const WritingExperience = Extension.create({
   name: "writingExperience",
-  // Above StarterKit (100), below Suggestion (500). This keeps the slash menu
-  // in control of Enter while its popup is open, and never masks node-typed
-  // handlers we haven't overridden.
   priority: 200,
 
   addKeyboardShortcuts() {
     const enter = () => {
       if (!this.editor.isEditable) return false;
-
-      // 1. Markdown shortcuts at end-of-line (code fences, horizontal rules).
       if (applyEnterMarkdownShortcut(this.editor)) return true;
-
-      // 2. Empty heading/quote/callout → convert back to paragraph.
       if (convertEmptyDecorationToParagraph(this.editor)) return true;
-
-      // 3. Delegate the rest to a strict Notion-order chain. Crucially we do
-      //    NOT run `createParagraphNear` here — it inserts a sibling paragraph
-      //    below the current block even when the caret is mid-line, which is
-      //    the "Enter did nothing / text jumped" bug users reported. Falling
-      //    through to `splitBlock({ keepMarks: true })` is what Notion does.
       return this.editor.commands.first(({ commands }) => [
         () => commands.newlineInCode(),
         () =>
@@ -231,10 +294,11 @@ export const WritingExperience = Extension.create({
     return {
       Enter: enter,
       "Shift-Enter": () => this.editor.commands.setHardBreak(),
-      "Mod-Enter": () =>
-        this.editor.commands.exitCode() || this.editor.commands.setHardBreak(),
+      "Mod-Enter": () => modifyCurrentBlock(this.editor),
 
-      Backspace: () => backspaceAtStartOfDecoration(this.editor),
+      Backspace: () =>
+        backspaceAtStartOfDecoration(this.editor) ||
+        mergeEmptyBlockUp(this.editor),
 
       Tab: () => {
         if (this.editor.can().sinkListItem("listItem")) {
@@ -252,19 +316,13 @@ export const WritingExperience = Extension.create({
         if (this.editor.can().liftListItem("taskItem")) {
           return this.editor.chain().focus().liftListItem("taskItem").run();
         }
-        return false;
+        return liftOutOfContainer(this.editor);
       },
-
-      Escape: () => selectCurrentBlock(this.editor),
 
       "Mod-a": () => {
         const { selection, doc } = this.editor.state;
-        if (selection instanceof NodeSelection) {
-          return this.editor.commands.selectAll();
-        }
         const { $from } = selection;
-        let depth = $from.depth;
-        while (depth > 0 && $from.node(depth - 1).type.name !== "doc") depth--;
+        const depth = findTopLevelDepth($from);
         if (depth >= 1) {
           const from = $from.before(depth);
           const to = from + $from.node(depth).nodeSize;
@@ -279,7 +337,6 @@ export const WritingExperience = Extension.create({
         return this.editor.commands.selectAll();
       },
 
-      // Block movement / duplication — Notion parity keymap.
       "Mod-Shift-ArrowUp": () => moveBlock(this.editor, "up"),
       "Mod-Shift-ArrowDown": () => moveBlock(this.editor, "down"),
       "Mod-d": () => duplicateBlock(this.editor),

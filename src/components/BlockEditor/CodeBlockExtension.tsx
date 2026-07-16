@@ -38,8 +38,8 @@ function CodeBlockView({ node, updateAttributes, extension }: NodeViewProps) {
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         </button>
       </div>
-      <pre>
-        <NodeViewContent as="code" className={`language-${lang}`} />
+      <pre className={`language-${lang}`}>
+        <NodeViewContent as="div" className="code-block-content" />
       </pre>
     </NodeViewWrapper>
   );

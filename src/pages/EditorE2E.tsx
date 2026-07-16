@@ -1,17 +1,18 @@
 import { useCallback, useState } from "react";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { htmlToMarkdown } from "@/lib/markdown";
+import type { EditorChangePayload } from "@/lib/editorPayload";
 
 export default function EditorE2E() {
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState("");
   const [aiText, setAiText] = useState("");
 
-  const handleChange = useCallback((markdown: string) => {
+  const handleChange = useCallback((payload: EditorChangePayload) => {
     const editor = (window as any).__nw_editor;
-    const renderedMarkdown = editor ? htmlToMarkdown(editor.getHTML()) : markdown;
-    const requestMarkdown = (window as any).__nw_getMarkdown?.() ?? markdown;
-    setContent(markdown);
+    const renderedMarkdown = editor ? htmlToMarkdown(editor.getHTML()) : payload.markdown;
+    const requestMarkdown = (window as any).__nw_getMarkdown?.() ?? payload.markdown;
+    setContent(payload.markdown);
     setPreview(renderedMarkdown);
     setAiText(requestMarkdown);
   }, []);

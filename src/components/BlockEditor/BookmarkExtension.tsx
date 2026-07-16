@@ -6,16 +6,22 @@ import { isSafeHttpUrl } from "@/lib/safeUrl";
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     bookmark: {
-      insertBookmark: (attrs: { url: string; title?: string; description?: string }) => ReturnType;
+      insertBookmark: (attrs: {
+        url: string;
+        title?: string;
+        description?: string;
+        favicon?: string;
+      }) => ReturnType;
     };
   }
 }
 
 function BookmarkView({ node }: NodeViewProps) {
-  const { url, title, description } = node.attrs as {
+  const { url, title, description, favicon } = node.attrs as {
     url: string;
     title: string;
     description: string;
+    favicon: string;
   };
   const safe = isSafeHttpUrl(url);
   const host = (() => {
@@ -36,6 +42,9 @@ function BookmarkView({ node }: NodeViewProps) {
         contentEditable={false}
       >
         <div className="bookmark-body">
+          {favicon ? (
+            <img src={favicon} alt="" className="bookmark-favicon w-4 h-4 rounded-sm object-cover" />
+          ) : null}
           <p className="bookmark-title">{title || host}</p>
           {description ? <p className="bookmark-desc">{description}</p> : null}
           <p className="bookmark-url">{host}</p>
@@ -57,6 +66,7 @@ export const Bookmark = Node.create({
       url: { default: "" },
       title: { default: "" },
       description: { default: "" },
+      favicon: { default: "" },
     };
   },
 

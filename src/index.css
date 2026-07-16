@@ -255,7 +255,18 @@
   outline: none;
 }
 
-/* Headings — Notion scale */
+/* Multi-block selection halo (Notion-style) */
+.block-editor-content .nw-block-selected {
+  background: hsl(var(--foreground) / 0.06);
+  border-radius: 4px;
+  outline: 1px solid hsl(var(--foreground) / 0.08);
+}
+
+/* Paragraphs — Notion line height */
+.block-editor-content p {
+  @apply text-base text-foreground/90;
+  line-height: 1.5;
+}
 .block-editor-content h1 {
   @apply text-[1.875rem] font-semibold text-foreground mb-1;
   letter-spacing: -0.02em;
@@ -272,11 +283,6 @@
 .block-editor-content h3 {
   @apply text-xl font-semibold text-foreground mt-4 mb-1;
   line-height: 1.35;
-}
-
-/* Paragraphs */
-.block-editor-content p {
-  @apply text-base text-foreground/90;
 }
 
 /* Placeholder */
@@ -342,7 +348,8 @@
   @apply bg-secondary/60 rounded-md text-sm overflow-x-auto my-2 p-0;
 }
 .block-editor-content pre code,
-.code-block-wrapper pre code {
+.code-block-wrapper pre code,
+.code-block-wrapper pre .code-block-content {
   @apply bg-transparent p-0 text-foreground;
   color: inherit;
 }
@@ -526,6 +533,7 @@
 .bookmark-card {
   @apply flex items-center gap-3 p-3 rounded-md border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors no-underline;
 }
+.bookmark-body { @apply flex flex-col gap-0.5 min-w-0 flex-1; }
 .bookmark-title { @apply text-sm font-medium text-foreground truncate; }
 .bookmark-desc { @apply text-xs text-muted-foreground truncate; }
 .bookmark-url { @apply text-[10px] text-muted-foreground/60 truncate; }

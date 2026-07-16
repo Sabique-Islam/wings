@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
+import { useState } from "react";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -21,16 +22,13 @@ const CALLOUT_COLORS = [
 
 const ALLOWED_BG_COLORS = new Set(CALLOUT_COLORS.map((c) => c.value).filter(Boolean));
 
+const EMOJI_OPTIONS = ["💡", "⚠️", "✅", "❌", "📌", "🔥", "💬", "📝", "🎯", "⭐"];
+
 function CalloutView({ node, updateAttributes }: NodeViewProps) {
   const emoji = (node.attrs.emoji as string) || "💡";
   const rawBg = (node.attrs.bgColor as string) || "";
-  // Only honor colors from our known palette — reject arbitrary stored values.
   const bgColor = ALLOWED_BG_COLORS.has(rawBg) ? rawBg : "";
-
-  const pickEmoji = () => {
-    const next = window.prompt("Emoji", emoji);
-    if (next != null && next.trim()) updateAttributes({ emoji: next.trim() });
-  };
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   return (
     <NodeViewWrapper
@@ -39,9 +37,32 @@ function CalloutView({ node, updateAttributes }: NodeViewProps) {
       data-emoji={emoji}
       style={bgColor ? { backgroundColor: bgColor } : undefined}
     >
-      <button type="button" className="callout-emoji" onClick={pickEmoji} contentEditable={false}>
-        {emoji}
-      </button>
+      <div className="relative" contentEditable={false}>
+        <button
+          type="button"
+          className="callout-emoji"
+          onClick={() => setPickerOpen((o) => !o)}
+        >
+          {emoji}
+        </button>
+        {pickerOpen && (
+          <div className="callout-emoji-picker absolute left-0 top-full z-20 flex flex-wrap gap-1 p-2 rounded-md border border-border bg-popover shadow-md">
+            {EMOJI_OPTIONS.map((em) => (
+              <button
+                key={em}
+                type="button"
+                className="text-lg p-1 rounded hover:bg-muted"
+                onClick={() => {
+                  updateAttributes({ emoji: em });
+                  setPickerOpen(false);
+                }}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="callout-content">
         <NodeViewContent />
       </div>

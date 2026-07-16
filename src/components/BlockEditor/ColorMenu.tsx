@@ -1,5 +1,5 @@
 import type { Editor } from "@tiptap/core";
-import { turnInto, type TurnIntoType, TEXT_COLORS, BG_COLORS } from "./blockCommands";
+import { turnInto, TURN_INTO_ITEMS, TEXT_COLORS, BG_COLORS } from "./blockCommands";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,17 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Palette } from "lucide-react";
 
-const TURN_INTO: { label: string; type: TurnIntoType }[] = [
-  { label: "Text", type: "paragraph" },
-  { label: "Heading 1", type: "heading1" },
-  { label: "Heading 2", type: "heading2" },
-  { label: "Heading 3", type: "heading3" },
-  { label: "Bullet list", type: "bulletList" },
-  { label: "Numbered list", type: "orderedList" },
-  { label: "To-do list", type: "taskList" },
-  { label: "Quote", type: "blockquote" },
-  { label: "Code", type: "codeBlock" },
-];
+const TURN_INTO = TURN_INTO_ITEMS;
 
 export function TurnIntoDropdown({ editor }: { editor: Editor }) {
   return (

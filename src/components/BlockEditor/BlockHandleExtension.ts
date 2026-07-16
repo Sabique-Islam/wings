@@ -296,10 +296,13 @@ export const BlockHandle = Extension.create({
             autoScrollRaf = requestAnimationFrame(tick);
           };
 
+          let duplicateOnDrop = false;
+
           const onDragStart = (e: DragEvent) => {
             if (state.targetPos == null || !state.target) return;
             const node = view.state.doc.nodeAt(state.targetPos);
             if (!node) return;
+            duplicateOnDrop = e.altKey;
             dragging = true;
             didDrag = true;
             show();
@@ -318,6 +321,15 @@ export const BlockHandle = Extension.create({
 
           const onDragEnd = () => {
             dragging = false;
+            if (duplicateOnDrop && state.targetPos != null) {
+              const node = view.state.doc.nodeAt(state.targetPos);
+              if (node) {
+                const insertPos = state.targetPos + node.nodeSize;
+                const tr = view.state.tr.insert(insertPos, node.copy(node.content));
+                view.dispatch(tr);
+              }
+            }
+            duplicateOnDrop = false;
             (view as any).dragging = null;
             state.dropLine.style.display = "none";
             stopAutoScroll();

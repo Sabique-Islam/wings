@@ -41,6 +41,21 @@ export type TurnIntoType =
   | "toggle"
   | "callout";
 
+/** Shared turn-into menu items for bubble, block, and context menus. */
+export const TURN_INTO_ITEMS: { label: string; type: TurnIntoType }[] = [
+  { label: "Text", type: "paragraph" },
+  { label: "Heading 1", type: "heading1" },
+  { label: "Heading 2", type: "heading2" },
+  { label: "Heading 3", type: "heading3" },
+  { label: "Bullet list", type: "bulletList" },
+  { label: "Numbered list", type: "orderedList" },
+  { label: "To-do list", type: "taskList" },
+  { label: "Quote", type: "blockquote" },
+  { label: "Code", type: "codeBlock" },
+  { label: "Toggle", type: "toggle" },
+  { label: "Callout", type: "callout" },
+];
+
 export function turnInto(editor: Editor, type: TurnIntoType): boolean {
   const chain = editor.chain().focus();
   switch (type) {
@@ -79,15 +94,30 @@ export function insertColumns(editor: Editor, count: 2 | 3): void {
   editor.chain().focus().insertContent({ type: "columnList", content: cols }).run();
 }
 
-export function insertBookmark(editor: Editor, url: string): boolean {
+export function insertBookmark(
+  editor: Editor,
+  url: string,
+  meta?: { title?: string; description?: string; favicon?: string },
+): boolean {
   if (!isSafeHttpUrl(url)) return false;
-  let title = url;
-  try {
-    title = new URL(url).hostname;
-  } catch {
-    /* keep url */
+  let title = meta?.title || url;
+  if (!meta?.title) {
+    try {
+      title = new URL(url).hostname;
+    } catch {
+      /* keep url */
+    }
   }
-  return editor.chain().focus().insertBookmark({ url, title }).run();
+  return editor
+    .chain()
+    .focus()
+    .insertBookmark({
+      url,
+      title,
+      description: meta?.description ?? "",
+      favicon: meta?.favicon ?? "",
+    })
+    .run();
 }
 
 export function insertEmbed(editor: Editor, url: string): boolean {

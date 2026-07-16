@@ -35,7 +35,10 @@ function ToggleView({ node, updateAttributes }: NodeViewProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              (e.target as HTMLElement).blur();
+              const contentEl = (e.currentTarget.closest(".toggle-block") as HTMLElement)?.querySelector(
+                ".toggle-content .ProseMirror, .toggle-content [contenteditable]",
+              ) as HTMLElement | null;
+              contentEl?.focus();
             }
           }}
         >

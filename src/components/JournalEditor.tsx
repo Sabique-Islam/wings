@@ -348,6 +348,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               onLinkPage={canEdit ? () => window.dispatchEvent(new CustomEvent("nw:linkpage")) : undefined}
               onNewPage={canEdit ? (title: string) => onNewSubpageWithTitle(entry.id, title) : undefined}
               onAskAI={canEdit ? onOpenAI : undefined}
+              pages={allEntries.map((e) => ({ id: e.id, title: e.title || "Untitled" }))}
               editable={canEdit}
               collabSession={collabSession}
             />

@@ -1,23 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import type { Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
-import { turnInto, type TurnIntoType } from "./blockCommands";
-import { TEXT_COLORS, BG_COLORS } from "./blockCommands";
+import { turnInto, TURN_INTO_ITEMS, TEXT_COLORS, BG_COLORS } from "./blockCommands";
 import { Trash2, Copy, ChevronRight } from "lucide-react";
 
-const TURN_INTO: { label: string; type: TurnIntoType }[] = [
-  { label: "Text", type: "paragraph" },
-  { label: "Heading 1", type: "heading1" },
-  { label: "Heading 2", type: "heading2" },
-  { label: "Heading 3", type: "heading3" },
-  { label: "Bullet list", type: "bulletList" },
-  { label: "Numbered list", type: "orderedList" },
-  { label: "To-do list", type: "taskList" },
-  { label: "Quote", type: "blockquote" },
-  { label: "Code", type: "codeBlock" },
-  { label: "Toggle", type: "toggle" },
-  { label: "Callout", type: "callout" },
-];
+const TURN_INTO = TURN_INTO_ITEMS;
 
 interface Props {
   editor: Editor | null;

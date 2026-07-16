@@ -16,8 +16,7 @@ import {
   Sparkles, FilePlus2, Layout,
 } from "lucide-react";
 import { TEMPLATES } from "@/lib/templates";
-import { toast } from "sonner";
-import { fuzzyMatch, insertBookmark, insertEmbed, insertTemplateMarkdown } from "./blockCommands";
+import { fuzzyMatch, insertTemplateMarkdown } from "./blockCommands";
 
 export interface CommandItem {
   title: string;
@@ -234,9 +233,10 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     icon: FilePlus2,
     category: "Pages",
     command: ({ editor, range }) => {
-      const title = window.prompt("Title for the new page", "Untitled") || "Untitled";
       editor.chain().focus().deleteRange(range).run();
-      h.onNewPage?.(title);
+      window.dispatchEvent(
+        new CustomEvent("nw:slashPrompt", { detail: { type: "newPage", editor } }),
+      );
     },
   },
   {
@@ -256,12 +256,10 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     category: "Media",
     aliases: ["bookmark", "link preview"],
     command: ({ editor, range }) => {
-      const url = window.prompt("Paste URL");
-      if (!url) return;
       editor.chain().focus().deleteRange(range).run();
-      if (!insertBookmark(editor, url)) {
-        toast.error("Only http(s) links can be bookmarked");
-      }
+      window.dispatchEvent(
+        new CustomEvent("nw:slashPrompt", { detail: { type: "bookmark", editor } }),
+      );
     },
   },
   {
@@ -271,12 +269,10 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     category: "Media",
     aliases: ["iframe", "youtube", "video"],
     command: ({ editor, range }) => {
-      const url = window.prompt("Paste embed URL (YouTube, Figma, etc.)");
-      if (!url) return;
       editor.chain().focus().deleteRange(range).run();
-      if (!insertEmbed(editor, url)) {
-        toast.error("Embeds are only allowed from trusted https sources (YouTube, Vimeo, Figma, etc.)");
-      }
+      window.dispatchEvent(
+        new CustomEvent("nw:slashPrompt", { detail: { type: "embed", editor } }),
+      );
     },
   },
   // Templates
