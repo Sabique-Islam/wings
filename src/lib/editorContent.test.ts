@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isEmptyDoc, resolveInitialEditorContent, shouldApplyDraft, shouldBlockEmptySave } from "./editorContent";
+import { isEmptyDoc, resolveInitialEditorContent, shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "./editorContent";
 
 describe("editorContent", () => {
   it("detects empty TipTap docs", () => {
@@ -38,5 +38,11 @@ describe("editorContent", () => {
     expect(shouldBlockEmptySave("x".repeat(25), "")).toBe(true);
     expect(shouldBlockEmptySave("short", "")).toBe(false);
     expect(shouldBlockEmptySave("long content here", "still writing")).toBe(false);
+  });
+
+  it("blocks replaying empty pending writes over server content", () => {
+    expect(shouldReplayPendingWrite("saved notes with enough text here", "")).toBe(false);
+    expect(shouldReplayPendingWrite("", "")).toBe(true);
+    expect(shouldReplayPendingWrite("saved", "offline edit")).toBe(true);
   });
 });

@@ -48,3 +48,8 @@ export function shouldBlockEmptySave(existingContent: string, nextMarkdown: stri
   const next = nextMarkdown.trim().length;
   return had >= 20 && next === 0;
 }
+
+/** Block offline pending-write replay that would wipe server content. */
+export function shouldReplayPendingWrite(serverContent: string, pendingMarkdown: string): boolean {
+  return !shouldBlockEmptySave(serverContent, pendingMarkdown);
+}

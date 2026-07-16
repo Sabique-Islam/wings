@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
 import type { EditorChangePayload } from "@/lib/editorPayload";
-import { shouldApplyDraft, shouldBlockEmptySave } from "@/lib/editorContent";
+import { shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
 import { JournalSidebar } from "@/components/JournalSidebar";
@@ -69,9 +69,17 @@ export default function Index() {
   }, [routeId]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || loading) return;
     const pending = getPendingWrites();
+    if (!pending.length) return;
     pending.forEach(async (pw) => {
+      const server = entries.find((e) => e.id === pw.entryId);
+      const serverContent = server?.content ?? "";
+      if (!shouldReplayPendingWrite(serverContent, pw.content)) {
+        clearPendingWrite(pw.entryId);
+        clearDraft(pw.entryId);
+        return;
+      }
       try {
         await updateEntry(pw.entryId, {
           markdown: pw.content,
@@ -83,7 +91,7 @@ export default function Index() {
         // Still offline, will retry next load
       }
     });
-  }, [user]);
+  }, [user, loading, entries]);
 
   useEffect(() => {
     if (!user) return;
@@ -281,6 +289,11 @@ export default function Index() {
       flushEditor();
       const toSave = pendingPayloadRef.current;
       if (!activeId || !toSave) return;
+      const existing = entries.find((e) => e.id === activeId);
+      if (existing && shouldBlockEmptySave(existing.content, toSave.markdown)) {
+        console.warn("[wings] blocked empty collab flush over existing content");
+        return;
+      }
       try {
         await updateEntry(activeId, toSave);
         clearDraft(activeId);
@@ -290,7 +303,7 @@ export default function Index() {
     };
     window.addEventListener("nw:collab-flush", onCollabFlush);
     return () => window.removeEventListener("nw:collab-flush", onCollabFlush);
-  }, [activeId, flushEditor]);
+  }, [activeId, entries, flushEditor]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {

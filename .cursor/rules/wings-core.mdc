@@ -1,0 +1,29 @@
+---
+description: Core Wings invariants — always apply. Data loss prevention is non-negotiable.
+alwaysApply: true
+---
+
+# Wings core (mandatory)
+
+## Before ANY PR touching editor or saves
+
+1. Read `.cursor/skills/wings-data-safety/SKILL.md`
+2. Read `.cursor/skills/wings-ship-gate/SKILL.md` Tier 0
+3. Run `bun run test:editor && bun run test:e2e`
+
+## Non-negotiable invariants
+
+- Load: `resolveInitialEditorContent` — empty JSON never beats markdown
+- Save: `shouldBlockEmptySave` — never persist empty over ≥20 chars
+- Drafts: `shouldApplyDraft` — empty draft never overwrites server content
+- Pending: `shouldReplayPendingWrite` — after fetch, before replay
+- Editor: one Link; suggestion keys from `suggestionPluginKeys.ts`; WritingExperience priority 200
+- Supabase: never DELETE/TRUNCATE entries in migrations without explicit approval
+
+## If user reports missing content
+
+Follow `.cursor/skills/wings-incident-response/SKILL.md` — rollback first, recover second.
+
+## Agent loops
+
+For recurring verify/fix/research: read `.cursor/loops/protocol.md`. Clarify intent before acting. Never assume skills match code — run docs-research loop to verify.

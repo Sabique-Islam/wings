@@ -1,0 +1,29 @@
+---
+description: Mandatory data safety when touching persistence, drafts, or entry content
+globs: src/pages/Index.tsx,src/lib/journal.ts,src/lib/draftCache.ts,src/lib/editorContent.ts,src/lib/editorPayload.ts,src/components/BlockEditor/BlockEditor.tsx,src/components/JournalEditor.tsx,scripts/recover-entries.ts
+alwaysApply: false
+---
+
+# Data safety (strict)
+
+## Required reading
+- `.cursor/skills/wings-data-safety/SKILL.md`
+- `.cursor/skills/wings-data-safety/incident-postmortem.md`
+
+## Every save path MUST
+1. Call `shouldBlockEmptySave(existingContent, nextMarkdown)` before `updateEntry`
+2. Write `content` + `content_json` together
+3. Have unit test in `editorContent.test.ts`
+
+## Every load path MUST
+1. Use `resolveInitialEditorContent` — never inline JSON preference
+2. Use `shouldApplyDraft` before merging localStorage drafts
+
+## Pending writes MUST
+1. Replay only after `fetchEntries` (entries in state)
+2. Use `shouldReplayPendingWrite`
+
+## Before merge
+- `bun run test -- src/lib/editorContent.test.ts`
+- `bun run recover:entries` dry run
+- Manual refresh test on page with existing content

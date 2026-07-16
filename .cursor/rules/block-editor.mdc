@@ -1,0 +1,44 @@
+---
+description: BlockEditor and TipTap extension invariants — apply when editing editor code
+globs: src/components/BlockEditor/**/*
+alwaysApply: false
+---
+
+# BlockEditor rules (strict)
+
+## Read before editing
+- `.cursor/skills/wings-block-editor/SKILL.md`
+- `.cursor/skills/wings-block-editor/pitfalls.md`
+- `.cursor/skills/wings-block-editor/extension-checklist.md`
+
+## Immutable config
+- StarterKit: `link: false`, `codeBlock: false`
+- Register `Link` exactly once (test: `registers Link exactly once`)
+- WritingExperience priority **200** — never 1000
+- Suggestion keys ONLY from `suggestionPluginKeys.ts`
+- Pass `pluginKey` **after** spread in `Suggestion({ ...options, pluginKey })`
+- Page mentions only when `getPages` defined (`pages.length > 0`)
+
+## React / lifecycle
+- Memoize `createBlockEditorExtensions()` in `useMemo`
+- `useEditor(..., [collabSession])` — minimal deps
+- `key={entry.id}` on BlockEditor — do not remove
+- Load via `resolveInitialEditorContent` — never inline JSON preference
+- Do not emit empty onChange on mount when props had content
+
+## Serialize → save chain
+Editor changes eventually reach `Index.handleChange` → `shouldBlockEmptySave` → `updateEntry`.
+If you change serialize timing or onChange behavior, read **wings-data-safety/code-paths.md**.
+
+## Before merge (mandatory)
+```bash
+bun run test:editor && bun run test:e2e
+```
+Editor PR without green Playwright is a production data-loss risk.
+
+## Crash signature → fix
+| Error | Fix |
+|-------|-----|
+| `suggestion$` duplicate plugin | Distinct keys + vite dedupe |
+| No `.ProseMirror` in E2E | ErrorBoundary — fix before ship |
+| Enter ignores slash menu | WritingExperience priority ≠ 200 |

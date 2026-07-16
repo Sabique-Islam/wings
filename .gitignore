@@ -50,9 +50,6 @@ supabase/.temp/
 .DS_Store
 Thumbs.db
 
-# Cursor (local agent state — commit rules/skills separately if needed)
-.cursor/
-
 # Misc
 *.pem
 .cache/

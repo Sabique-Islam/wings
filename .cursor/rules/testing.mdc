@@ -1,0 +1,13 @@
+---
+description: Playwright E2E and Vitest editor test conventions
+globs: tests/**/*,src/**/*.test.ts,vitest.config.ts,playwright.config.ts
+alwaysApply: false
+---
+
+# Testing rules
+
+- Vitest for wiring/schema; Playwright for keyboard and DOM (Enter, slash, caret).
+- E2E: dismiss cookie banner via `focusEditor()` before typing.
+- Use `/__editor-e2e` harness; assert parity test IDs when testing serialize path.
+- Slash menu in E2E: click menu buttons, not Enter alone.
+- CI: `bun run test:ci` with frozen lockfile and Playwright chromium install.
