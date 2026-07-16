@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Mail, Github } from "lucide-react";
+import { Mail } from "lucide-react";
 import { FOOTER_LINKS, SOCIAL } from "@/config/navigation";
 import { Logo } from "@/components/Logo";
 import { SITE } from "@/config/site";
@@ -20,7 +20,6 @@ export function Footer() {
               <a href={SOCIAL.discord} target="_blank" rel="noreferrer" aria-label="discord" className="w-8 h-8 grid place-items-center rounded border border-border-subtle hover:bg-accent/40 hover:border-border-strong transition-colors">
                 <DiscordGlyph />
               </a>
-              <a href={SOCIAL.github} target="_blank" rel="noreferrer" aria-label="github" className="w-8 h-8 grid place-items-center rounded border border-border-subtle hover:bg-accent/40 hover:border-border-strong transition-colors"><Github className="w-3.5 h-3.5" /></a>
               <a href={SOCIAL.email} aria-label="email" className="w-8 h-8 grid place-items-center rounded border border-border-subtle hover:bg-accent/40 hover:border-border-strong transition-colors"><Mail className="w-3.5 h-3.5" /></a>
             </div>
           </div>

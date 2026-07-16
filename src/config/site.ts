@@ -6,7 +6,7 @@ export const SITE = {
   description:
     "Block editor for notes with nested pages, LaTeX math, Excalidraw drawings, and an AI panel. Share pages by link, export markdown, drafts cache locally.",
   tagline: "notes, math, drawings, and ai in one editor.",
-  email: "hello@mail.wings.nopejs.me",
+  email: "mail@wings.nopejs.me",
   mail: {
     domain: "mail.wings.nopejs.me",
     from: {
@@ -16,7 +16,7 @@ export const SITE = {
   },
   social: {
     discord: "https://discord.gg/mJsCnBHr",
-    github: "https://github.com/nopejs",
+    github: "https://github.com/Sabique-Islam",
   },
   ogImage: "/og.png",
   twitterHandle: "@nopeJS",
