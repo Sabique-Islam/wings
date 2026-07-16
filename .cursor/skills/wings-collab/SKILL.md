@@ -85,8 +85,8 @@ supabase db push   # content_yjs column
 
 ## Gotchas
 
-- Empty Y.Doc must not overwrite seeded content — seed from markdown before first collab session
-- Postgres `bytea` may arrive as hex string — server parses `\\x...`
+- **D7 (fixed 2026-07-16):** Server `fetch` seeds from `content_json` or markdown when `content_yjs` null — `collab/server.ts`, `collab/seedDocument.ts`. Persists binary once. Stub schema in `collab/seedExtensions.ts` must stay in sync with custom block names.
+- Postgres `bytea` may arrive as hex string — server parses `\\x...` (`collab/server.ts:91-98`)
 - `@hocuspocus/provider` v4 (client) vs `@hocuspocus/server` v2 — verify compatibility on upgrade
 - Vercel CSP must allow `wss:` in `connect-src`
 

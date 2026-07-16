@@ -12,7 +12,7 @@ Every item here caused or could cause production failure. Check before merge.
 | D4 | Empty pending replay | Login wipes page | `shouldReplayPendingWrite` after fetch | editorContent.test |
 | D5 | onChange on crash/empty init | Blank save after ErrorBoundary | BlockEditor returns null if !editor | E2E mount |
 | D6 | Duplicate suggestion PluginKey | ErrorBoundary, no .ProseMirror | suggestionPluginKeys.ts | BlockEditor.test + E2E |
-| D7 | Collab empty Y.Doc seed | Shared page cleared | Seed from markdown | Manual shared test |
+| D7 | Collab empty Y.Doc seed | Shared page cleared | Server fetch seeds from `content_json`/markdown | `collab/seedDocument.ts` + manual shared test |
 
 ## 🟠 Tier 1 — Editor broken (indirect data risk)
 

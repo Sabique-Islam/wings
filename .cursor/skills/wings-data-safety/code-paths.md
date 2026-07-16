@@ -62,7 +62,14 @@ Uses markdown only — does not use `content_json`. OK for read path.
 
 When collab connects, Y.Doc must be seeded from resolved content — not empty doc.
 
-See **wings-collab** — risk D7 in pitfalls.
+**Code reality (verified 2026-07-16):**
+
+- Server: `collab/server.ts` fetch → `seedStateFromEntry` when `content_yjs` empty
+- Seed: `collab/seedDocument.ts` — `content_json` preferred, markdown fallback; persists binary once
+- Client: `useCollabProvider.ts:47` — bare `Y.Doc`; initial state from server sync
+- Schema stubs: `collab/seedExtensions.ts` — keep custom node names in sync with editor
+
+See **wings-collab**.
 
 ---
 
@@ -91,13 +98,13 @@ BlockEditor onUpdate/onBlur
 ### 2. Collab flush (disconnect)
 
 ```
-nw:collab-flush event                    [Index.tsx ~287+]
+nw:collab-flush event                    [Index.tsx:287-306]
   → flushEditor()
-  → shouldBlockEmptySave                 ← REQUIRED (same as autosave)
-  → updateEntry
+  → shouldBlockEmptySave                 [Index.tsx:292-295]
+  → updateEntry                            [Index.tsx:298]
 ```
 
-**Guard:** Same as autosave — never bypass.
+**Guard:** Same as autosave — never bypass. Effect deps: `[activeId, entries, flushEditor]`.
 
 ### 3. Pending queue (offline retry)
 
@@ -133,9 +140,9 @@ New rows with empty or initial content — safe (no overwrite).
 
 | Location | Guard | Notes |
 |----------|-------|-------|
-| Index handleChange debounce | `shouldBlockEmptySave` | Primary autosave |
-| Index pending replay | `shouldReplayPendingWrite` | After entries loaded |
-| Index collab flush | `shouldBlockEmptySave` | On disconnect |
+| Index `handleChange` debounce | `shouldBlockEmptySave` at `Index.tsx:198` | Primary autosave |
+| Index pending replay | `shouldReplayPendingWrite` at `Index.tsx:78` | After entries loaded (`deps: [user, loading, entries]`) |
+| Index collab flush | `shouldBlockEmptySave` at `Index.tsx:293` | On `nw:collab-flush` |
 
 **There is no other client `updateEntry` caller.** AI edits go through editor serialize → handleChange.
 

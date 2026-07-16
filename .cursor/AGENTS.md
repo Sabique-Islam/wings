@@ -55,6 +55,7 @@ Recurring **research → clarify → act → verify → document** workflows. Re
 | Skills sync | `/loop 1h @.cursor/loops/skills-sync.loop.md` |
 | Incident watch | `/loop 15m @.cursor/loops/incident-watch.loop.md` |
 | Editor health | `/loop 20m @.cursor/loops/editor-health.loop.md` |
+| Latest audit | [loops/reports/docs-research-latest.md](loops/reports/docs-research-latest.md) |
 
 **Rule:** Nothing assumed — verify against code every tick. Ask back if intent, environment, or risk is unclear.
 
