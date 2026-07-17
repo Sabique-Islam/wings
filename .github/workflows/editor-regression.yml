@@ -1,8 +1,13 @@
+# Editor regression (Vitest + Playwright).
+# AUTO-RUN DISABLED — push/PR triggers commented out to save Actions minutes.
+# Run manually: Actions → "Editor regression tests" → Run workflow.
+
 name: Editor regression tests
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
+  # push:
+  # pull_request:
 
 jobs:
   markdown-blockeditor:
