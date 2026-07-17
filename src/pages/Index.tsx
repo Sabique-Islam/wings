@@ -181,11 +181,12 @@ export default function Index() {
     addCreatedEntry(entry, user.id);
   }, [user, addCreatedEntry]);
 
-  const handleChange = useCallback((payload: EditorChangePayload) => {
+  const handleChange = useCallback((entryId: string, payload: EditorChangePayload) => {
+    saveDraftThrottled(entryId, { markdown: payload.markdown, json: payload.json });
+    // Stale serialize from a note we already left — draft only, no autosave / pending ref.
+    if (entryId !== activeId) return;
+
     pendingPayloadRef.current = payload;
-    if (activeId) {
-      saveDraftThrottled(activeId, { markdown: payload.markdown, json: payload.json });
-    }
 
     // While Yjs collab is live, Hocuspocus owns persistence — skip full-doc UPDATE.
     if (entryShared && import.meta.env.VITE_COLLAB_URL) return;
@@ -270,6 +271,14 @@ export default function Index() {
     }
   }, [activeId]);
 
+  /** On page switch, persist draft for the note we're leaving (BlockEditor unmount serializes first). */
+  const flushDraftForEntry = useCallback((entryId: string) => {
+    const payload = pendingPayloadRef.current;
+    if (payload && entryId === activeId) {
+      saveDraft(entryId, { markdown: payload.markdown, json: payload.json });
+    }
+  }, [activeId]);
+
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === "hidden") flushEditor();
@@ -282,7 +291,12 @@ export default function Index() {
     };
   }, [flushEditor]);
 
-  useEffect(() => () => flushEditor(), [activeId, flushEditor]);
+  useEffect(() => {
+    const leavingId = activeId;
+    return () => {
+      if (leavingId) flushDraftForEntry(leavingId);
+    };
+  }, [activeId, flushDraftForEntry]);
 
   useEffect(() => {
     const onCollabFlush = async () => {

@@ -28,7 +28,7 @@ interface Props {
   allEntries?: Entry[];
   roleMap?: Record<string, ShareRole>;
   userId: string;
-  onChange: (payload: EditorChangePayload) => void;
+  onChange: (entryId: string, payload: EditorChangePayload) => void;
   onTitleChange?: (title: string) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
@@ -130,7 +130,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
       if ((window as any).__nw_insertImage) {
         (window as any).__nw_insertImage(url);
       } else {
-        onChange({
+        onChange(entry.id, {
           markdown: entry.content + `\n![image](${url})\n`,
           json: entry.content_json ?? { type: "doc", content: [] },
         });
@@ -341,9 +341,10 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
             />
             <BlockEditor
               key={entry.id}
+              entryId={entry.id}
               content={entry.content}
               contentJson={entry.content_json}
-              onChange={onChange}
+              onChange={(payload) => onChange(entry.id, payload)}
               onImageUpload={canEdit ? handleImageUpload : undefined}
               onLinkPage={canEdit ? () => window.dispatchEvent(new CustomEvent("nw:linkpage")) : undefined}
               onNewPage={canEdit ? (title: string) => onNewSubpageWithTitle(entry.id, title) : undefined}
@@ -377,7 +378,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               if (editor && editor.commands.insertDrawing) {
                 editor.chain().focus("end").insertDrawing({ sceneId, imageUrl }).run();
               } else if (imageUrl) {
-                onChange({
+                onChange(entry.id, {
                   markdown: entry.content + `\n\n![drawing](${imageUrl})\n`,
                   json: entry.content_json ?? { type: "doc", content: [] },
                 });

@@ -80,6 +80,7 @@ export default function SharedEntry() {
       </header>
       <div className="max-w-2xl mx-auto px-2 sm:px-0">
         <BlockEditor
+          entryId={`shared-${token ?? "readonly"}`}
           content={content || ""}
           onChange={() => {}}
           editable={false}

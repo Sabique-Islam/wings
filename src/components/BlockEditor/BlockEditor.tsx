@@ -24,6 +24,7 @@ const SERIALIZE_DEBOUNCE_MS = 200;
 const URL_ONLY = /^https?:\/\/[^\s]+$/i;
 
 interface Props {
+  entryId: string;
   content: string;
   contentJson?: JSONContent | null;
   onChange: (payload: EditorChangePayload) => void;
@@ -55,6 +56,7 @@ function pastePlainParagraphs(view: import("@tiptap/pm/view").EditorView, text: 
 }
 
 export function BlockEditor({
+  entryId,
   content,
   contentJson,
   onChange,
@@ -66,11 +68,15 @@ export function BlockEditor({
   editable = true,
   collabSession = null,
 }: Props) {
-  const initialContent = useRef(resolveInitialContent(content, contentJson));
+  const resolvedContent = useMemo(
+    () => resolveInitialContent(content, contentJson),
+    [entryId, content, contentJson],
+  );
   const lastEmittedMarkdown = useRef(content);
   const lastEmittedJson = useRef<JSONContent | null>(contentJson ?? null);
   const localVersion = useRef(0);
   const acceptedVersion = useRef(0);
+  const loadedEntryId = useRef(entryId);
   const serializeTimer = useRef<ReturnType<typeof setTimeout>>();
   const onChangeRef = useRef(onChange);
   const pagesRef = useRef(pages);
@@ -127,7 +133,7 @@ export function BlockEditor({
 
   const editor = useEditor({
     extensions,
-    content: initialContent.current,
+    content: resolvedContent,
     editable,
     shouldRerenderOnTransaction: false,
     editorProps: {
@@ -199,7 +205,18 @@ export function BlockEditor({
     onBlur: ({ editor: ed }) => {
       serialize(ed, true);
     },
-  }, [collabSession]);
+  }, [collabSession, entryId]);
+
+  useEffect(() => {
+    if (loadedEntryId.current === entryId) return;
+    loadedEntryId.current = entryId;
+    localVersion.current = 0;
+    acceptedVersion.current = 0;
+    lastEmittedMarkdown.current = content;
+    lastEmittedJson.current = contentJson ?? null;
+    if (!editor) return;
+    editor.commands.setContent(resolvedContent, { emitUpdate: false });
+  }, [entryId, content, contentJson, editor, resolvedContent]);
 
   useEffect(() => {
     if (editor && editor.isEditable !== editable) editor.setEditable(editable);
@@ -309,8 +326,11 @@ export function BlockEditor({
       delete (window as any).__nw_currentMarkdown;
       window.removeEventListener("nw:slashPrompt", onSlashPrompt);
       if (serializeTimer.current) clearTimeout(serializeTimer.current);
+      if (editor && !editor.isDestroyed) {
+        serialize(editor, true);
+      }
     };
-  }, [insertImage, editor, serialize, onNewPage]);
+  }, [insertImage, editor, serialize, onNewPage, entryId]);
 
   if (!editor) return null;
 

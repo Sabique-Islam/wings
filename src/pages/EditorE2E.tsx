@@ -20,7 +20,7 @@ export default function EditorE2E() {
   return (
     <main className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-3xl mx-auto border border-border rounded-md min-h-[360px] p-4">
-        <BlockEditor content={content} onChange={handleChange} />
+        <BlockEditor entryId="e2e-harness" content={content} onChange={handleChange} />
       </div>
       <section aria-label="editor parity" className="sr-only">
         <pre data-testid="stored-text">{content}</pre>
