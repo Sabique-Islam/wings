@@ -18,8 +18,8 @@ BEGIN
   FOR r IN
     SELECT user_id, username
     FROM public.user_preferences
-    WHERE username IN (
-      SELECT username FROM public.user_preferences GROUP BY lower(username) HAVING count(*) > 1
+    WHERE lower(username) IN (
+      SELECT lower(username) FROM public.user_preferences GROUP BY lower(username) HAVING count(*) > 1
     )
   LOOP
     n := 1;

@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:editor": "vitest run src/lib/markdown.test.ts src/components/BlockEditor/BlockEditor.test.ts",
+    "test:editor": "vitest run src/lib/markdown.test.ts src/lib/sharedEntry.test.ts src/components/BlockEditor/BlockEditor.test.ts",
     "test:e2e": "playwright test tests/editor-enter.spec.ts tests/editor-notion-parity.spec.ts",
     "test:ci": "bun run test:editor && bun run test:e2e",
     "test:watch": "vitest",

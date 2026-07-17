@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { Seo } from "@/components/Seo";
+import { fetchSharedEntry, isValidShareToken } from "@/lib/sharedEntry";
 
 export default function SharedEntry() {
   const { token } = useParams<{ token: string }>();
@@ -15,29 +15,37 @@ export default function SharedEntry() {
 
   useEffect(() => {
     if (!token) return;
-    // Share tokens are 32 hex chars. Reject anything else before hitting the DB.
-    if (!/^[a-f0-9]{32}$/.test(token)) {
+    if (!isValidShareToken(token)) {
       setNotFound(true);
       setLoading(false);
       return;
     }
-    const fetchShared = async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        const { data, error } = await supabase.rpc("get_shared_entry", { _token: token });
-        const row = Array.isArray(data) ? data[0] : data;
-        if (!error && row) {
+        const row = await fetchSharedEntry(token);
+        if (cancelled) return;
+        if (row) {
           setContent(row.content);
           setTitle(row.title || "");
-          setDate(new Date(row.created_at).toLocaleDateString("default", { day: "numeric", month: "long", year: "numeric" }));
+          setDate(
+            new Date(row.created_at).toLocaleDateString("default", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            }),
+          );
         } else {
           setNotFound(true);
         }
       } catch {
-        setNotFound(true);
+        if (!cancelled) setNotFound(true);
       }
-      setLoading(false);
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchShared();
   }, [token]);
 
   if (loading) {
@@ -80,6 +88,7 @@ export default function SharedEntry() {
       </header>
       <div className="max-w-2xl mx-auto px-2 sm:px-0">
         <BlockEditor
+          key={token}
           entryId={`shared-${token ?? "readonly"}`}
           content={content || ""}
           onChange={() => {}}

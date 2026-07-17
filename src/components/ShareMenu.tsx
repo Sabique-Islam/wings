@@ -86,14 +86,18 @@ export function ShareMenu({ entry, onUpdate }: Props) {
   const togglePublicShare = useCallback(async () => {
     setLoading(true);
     const newToken = isShared ? null : generateToken();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("entries")
       .update({ share_token: newToken })
-      .eq("id", entry.id);
+      .eq("id", entry.id)
+      .select("share_token")
+      .maybeSingle();
     if (error) {
       toast.error("Couldn't update public link", { description: error.message });
+    } else if (!data) {
+      toast.error("Couldn't update public link", { description: "Permission denied or page not found." });
     } else {
-      onUpdate({ ...entry, share_token: newToken });
+      onUpdate({ ...entry, share_token: data.share_token });
     }
     setLoading(false);
   }, [entry, isShared, onUpdate]);
