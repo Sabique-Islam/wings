@@ -9,6 +9,8 @@ const shortcuts = [
   { keys: "⌘ /", desc: "Search sidebar" },
   { keys: "⌘ J", desc: "Toggle AI assistant" },
   { keys: "⌘ B", desc: "Toggle sidebar / Bold in editor" },
+  { keys: "⌘ ⇧ G", desc: "Graph view" },
+  { keys: "[[", desc: "Link to a page (wikilink)" },
   { keys: "⌘ ?", desc: "Keyboard shortcuts" },
   { keys: "⌘ D", desc: "Duplicate block" },
   { keys: "⌘ ⇧ ↑/↓", desc: "Move block up/down" },

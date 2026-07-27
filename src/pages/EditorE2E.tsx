@@ -5,10 +5,17 @@ import { requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPa
 
 const ENTRY_ID = "e2e-harness";
 
+/** Fixed workspace so the `@` and `[[` page pickers have something to offer. */
+const PAGES = [
+  { id: "page-reading-list", title: "Reading List" },
+  { id: "page-release-notes", title: "Release Notes" },
+];
+
 export default function EditorE2E() {
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState("");
   const [aiText, setAiText] = useState("");
+  const [requestedPage, setRequestedPage] = useState("");
 
   const handleChange = useCallback((payload: EditorChangePayload) => {
     // Mirror the app's save path: typing emits JSON, markdown comes from a
@@ -25,12 +32,19 @@ export default function EditorE2E() {
   return (
     <main className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-3xl mx-auto border border-border rounded-md min-h-[360px] p-4">
-        <BlockEditor entryId={ENTRY_ID} content={content} onChange={handleChange} />
+        <BlockEditor
+          entryId={ENTRY_ID}
+          content={content}
+          onChange={handleChange}
+          pages={PAGES}
+          onNewPage={setRequestedPage}
+        />
       </div>
       <section aria-label="editor parity" className="sr-only">
         <pre data-testid="stored-text">{content}</pre>
         <pre data-testid="markdown-preview">{preview}</pre>
         <pre data-testid="ai-request-text">{aiText}</pre>
+        <pre data-testid="requested-page">{requestedPage}</pre>
       </section>
     </main>
   );

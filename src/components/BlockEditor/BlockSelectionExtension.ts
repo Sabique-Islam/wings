@@ -8,6 +8,7 @@ import {
   getDocChildBlockPositions,
   getTopLevelBlockPos,
   selectCurrentBlock,
+  stepBlockSelection,
   type BlockDoc,
   type BlockPos,
 } from "./blockUtils";
@@ -44,6 +45,49 @@ function rangeSelect(anchor: number, target: number, doc: BlockDoc): number[] {
   if (ai < 0 || ti < 0) return [target];
   const [from, to] = ai < ti ? [ai, ti] : [ti, ai];
   return all.slice(from, to + 1);
+}
+
+/** How far left of the text column counts as the gutter. */
+const MARGIN_DRAG_ZONE_PX = 64;
+
+/**
+ * Notion's margin drag: pressing in the left gutter and dragging sweeps whole
+ * blocks rather than placing a caret. Ignored on a plain click so clicking the
+ * margin still focuses the nearest line.
+ */
+function startMarginDrag(view: EditorView, event: MouseEvent): boolean {
+  if (event.button !== 0) return false;
+  const contentRect = view.dom.getBoundingClientRect();
+  const offsetFromLeft = event.clientX - contentRect.left;
+  if (offsetFromLeft > 0 || offsetFromLeft < -MARGIN_DRAG_ZONE_PX) return false;
+
+  const anchor = posFromEvent(view, event);
+  if (anchor == null) return false;
+
+  let dragged = false;
+
+  const onMove = (move: MouseEvent) => {
+    const target = posFromEvent(view, move);
+    if (target == null) return;
+    dragged = true;
+    setBlockSelection(view, rangeSelect(anchor, target, view.state.doc as BlockDoc), anchor);
+  };
+
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    // A press without movement is a click in the margin, not a selection.
+    if (!dragged) setBlockSelection(view, [], null);
+  };
+
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+  event.preventDefault();
+  return true;
+}
+
+function getSelectionState(state: EditorState): BlockSelectionState {
+  return (blockSelectionKey.getState(state) as BlockSelectionState) ?? { positions: [], anchor: null };
 }
 
 export const BlockSelection = Extension.create({
@@ -89,10 +133,21 @@ export const BlockSelection = Extension.create({
             }
             return DecorationSet.create(state.doc, decos);
           },
+          // Typing or clicking exits block selection the way Notion does.
+          handleTextInput(view) {
+            if (getSelectionState(view.state).positions.length > 0) {
+              setBlockSelection(view, [], null);
+            }
+            return false;
+          },
           handleDOMEvents: {
             mousedown(view, event) {
               const e = event as MouseEvent;
               if (!e.shiftKey && !(e.metaKey && e.shiftKey) && !(e.altKey && e.shiftKey)) {
+                if (startMarginDrag(view, e)) return true;
+                if (getSelectionState(view.state).positions.length > 0) {
+                  setBlockSelection(view, [], null);
+                }
                 return false;
               }
               const blockPos = posFromEvent(view, e);
@@ -128,22 +183,56 @@ export const BlockSelection = Extension.create({
   },
 
   addKeyboardShortcuts() {
+    /**
+     * Only acts while blocks are selected, so the caret keeps its normal arrow
+     * behaviour when the user is just typing.
+     */
+    const walk = (direction: -1 | 1, extend: boolean) => () => {
+      const { positions, anchor } = getSelectionState(this.editor.state);
+      if (positions.length === 0) return false;
+      const next = stepBlockSelection(
+        this.editor.state.doc as BlockDoc,
+        positions,
+        anchor,
+        direction,
+        extend,
+      );
+      if (!next) return false;
+      const view = this.editor.view;
+      const head = direction > 0 ? Math.max(...next.positions) : Math.min(...next.positions);
+      let tr = view.state.tr.setMeta(blockSelectionKey, next satisfies BlockSelectionState);
+      try {
+        tr = tr.setSelection(NodeSelection.create(view.state.doc, head));
+      } catch {
+        // Not every block accepts a node selection; the highlight still moves.
+      }
+      view.dispatch(tr.scrollIntoView());
+      return true;
+    };
+
     return {
+      ArrowDown: walk(1, false),
+      ArrowUp: walk(-1, false),
+      "Shift-ArrowDown": walk(1, true),
+      "Shift-ArrowUp": walk(-1, true),
+
       Escape: () => {
         const positions = getSelectedBlockPositions(this.editor.state);
         if (positions.length > 0) {
           setBlockSelection(this.editor.view, [], null);
           return true;
         }
-        return selectCurrentBlock(this.editor);
+        // Record the block in plugin state so arrow keys and block actions see it.
+        const pos = selectCurrentBlock(this.editor);
+        if (pos == null) return false;
+        setBlockSelection(this.editor.view, [pos], pos);
+        return true;
       },
 
       "Mod-/": () => {
         let positions = getSelectedBlockPositions(this.editor.state);
         if (positions.length === 0) {
-          selectCurrentBlock(this.editor);
-          const { $from } = this.editor.state.selection;
-          const pos = getTopLevelBlockPos($from as BlockPos);
+          const pos = selectCurrentBlock(this.editor);
           if (pos != null) positions = [pos];
         }
         if (positions.length === 0) return false;
@@ -179,12 +268,6 @@ export const BlockSelection = Extension.create({
           duplicateBlocksAtPositions(this.editor, positions);
           return true;
         }
-        return false;
-      },
-
-      "Mod-Shift-ArrowUp": () => {
-        const positions = getSelectedBlockPositions(this.editor.state);
-        if (positions.length <= 1) return false;
         return false;
       },
     };

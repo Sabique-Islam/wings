@@ -17,6 +17,13 @@ import {
   getModelFor, setModelFor,
 } from "@/lib/ai/storage";
 import { collectDrawingsFromContent, snapshotsAsAttachments } from "@/lib/ai/excalidrawContext";
+import {
+  buildPromptContext,
+  mentionsDrawing,
+  NO_CONTEXT_SENT,
+  type ActivePage,
+  type SentContext,
+} from "@/lib/ai/promptContext";
 import { uploadImage } from "@/lib/imageUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -92,6 +99,8 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // What the model has already been told, so we don't pay for it twice.
+  const sentContextRef = useRef<SentContext>(NO_CONTEXT_SENT);
 
   // Re-sync settings draft whenever the panel opens or provider changes.
   useEffect(() => {
@@ -172,22 +181,20 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
     return actions;
   }, [activeEntry, user, onCreateEntry, onNavigate]);
 
-  const buildContext = useCallback(() => {
-    const pages = allEntries.slice(0, 30).map((e) => `- ${getEntryTitle(e)} (id:${e.id})`).join("\n");
-    let ctx = `## User's workspace\nPages (most recent first):\n${pages || "(none)"}\n\n`;
-    if (activeEntry) {
-      const liveContent = (window as any).__nw_getMarkdown?.() ?? activeEntry.content;
-      const drawings = collectDrawingsFromContent(liveContent);
-      ctx += `## Currently open page\nTitle: ${getEntryTitle(activeEntry)}\n\nContent:\n\`\`\`md\n${liveContent.slice(0, 6000)}\n\`\`\``;
-      if (drawings.length) {
-        ctx += `\n\n## Excalidraw drawings on this page\n` +
-          drawings.map((d, i) => `- drawing ${i + 1}: sceneId=${d.sceneId}, elements=${d.elementCount}${d.imageUrl ? " (image attached below)" : ""}`).join("\n");
-      }
-    } else {
-      ctx += "## Currently open page\n(none — user is on the home view)";
-    }
-    return ctx;
-  }, [activeEntry, allEntries]);
+  const activePageContext = useCallback((): ActivePage | null => {
+    if (!activeEntry) return null;
+    const liveContent = (window as any).__nw_getMarkdown?.() ?? activeEntry.content;
+    return {
+      id: activeEntry.id,
+      title: getEntryTitle(activeEntry),
+      content: liveContent,
+      drawings: collectDrawingsFromContent(liveContent).map((d) => ({
+        sceneId: d.sceneId,
+        elementCount: d.elementCount,
+        hasImage: Boolean(d.imageUrl),
+      })),
+    };
+  }, [activeEntry]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -203,23 +210,25 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    // Gather excalidraw snapshots for the active page. We attach them on
-    // EVERY request so the AI always has the latest drawing context for this
-    // file session — providers/models that don't accept images will simply
-    // ignore the attachments.
+    const page = activePageContext();
+    const { context, sent } = buildPromptContext(
+      allEntries.map((e) => ({ id: e.id, title: getEntryTitle(e) })),
+      page,
+      sentContextRef.current,
+    );
+    sentContextRef.current = sent;
+
+    // Drawing snapshots are large, so they only go out when the message is
+    // about them — the text context always lists what drawings exist.
     let images: { base64: string; mimeType: string }[] | undefined;
-    if (activeEntry) {
-      const liveContent = (window as any).__nw_getMarkdown?.() ?? activeEntry.content;
-      const snaps = collectDrawingsFromContent(liveContent);
-      if (snaps.length) {
-        images = await snapshotsAsAttachments(snaps);
-        if (!images.length) images = undefined;
-      }
+    if (page?.drawings.length && mentionsDrawing(text)) {
+      const attachments = await snapshotsAsAttachments(
+        collectDrawingsFromContent(page.content),
+      );
+      if (attachments.length) images = attachments;
     }
 
     const history: ChatMessage[] = [
-      { role: "user", content: buildContext() },
-      { role: "model", content: "Understood. I have your workspace context." },
       ...messages.map<ChatMessage>((m) => ({ role: m.role, content: m.content })),
       { role: "user", content: text },
     ];
@@ -228,7 +237,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
       let acc = "";
       for await (const chunk of streamChat({
         messages: history,
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: `${SYSTEM_PROMPT}\n${context}`,
         signal: ctrl.signal,
         images,
       })) {
@@ -252,7 +261,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, streaming, messages, buildContext, applyTools, activeEntry]);
+  }, [input, streaming, messages, allEntries, activePageContext, applyTools]);
 
   const stop = () => abortRef.current?.abort();
 

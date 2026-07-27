@@ -5,8 +5,11 @@ import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, 
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
 import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
 import { forgetLinkIndex, hydrateLinkIndex, scheduleLinkIndex } from "@/lib/linkIndex";
+import { appendMarkdown, payloadFromMarkdown } from "@/lib/entryContent";
+import { deleteBlocksAtPositions } from "@/components/BlockEditor/blockUtils";
 import { isFullPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
-import { shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
+import { resolveInitialEditorContent, shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
+import { getEntryVersion, recordEntryVersion } from "@/lib/entryVersions";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
 import { JournalSidebar } from "@/components/JournalSidebar";
@@ -14,6 +17,7 @@ import { JournalEditor } from "@/components/JournalEditor";
 import { QuickSwitcher } from "@/components/QuickSwitcher";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardPalette } from "@/components/KeyboardPalette";
+import { GraphView } from "@/components/GraphView";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { AIAssistant } from "@/components/AIAssistant";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +34,14 @@ function resolveEntryOwnerId(
   const role = roleMap[parentId];
   if (parent && role && role !== "owner") return parent.user_id;
   return userId;
+}
+
+/** Insert a link to `entryId` at the editor's cursor, if an editor is mounted. */
+function insertPageLink(entryId: string, title: string): void {
+  const editor = (window as {
+    __nw_editor?: { chain: () => { focus: () => { insertContent: (html: string) => { run: () => void } } } };
+  }).__nw_editor;
+  editor?.chain().focus().insertContent(`<a href="#page:${entryId}">${title}</a>`).run();
 }
 
 function entryErrorMessage(err: unknown): string {
@@ -225,10 +237,7 @@ export default function Index() {
       const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
       const entry = await createEntry(ownerId, `# ${title}\n\n`, parentId);
       addCreatedEntry(entry, user.id);
-      const editor = (window as { __nw_editor?: { chain: () => { focus: () => { insertContent: (html: string) => { run: () => void } } } } }).__nw_editor;
-      if (editor) {
-        editor.chain().focus().insertContent(`<a href="#page:${entry.id}">${title}</a>`).run();
-      }
+      insertPageLink(entry.id, title);
     } catch (err) {
       console.error("Failed to create sub-page:", err);
       toast.error("Couldn't create sub-page", { description: entryErrorMessage(err) });
@@ -284,6 +293,10 @@ export default function Index() {
         );
         clearDraft(activeId);
         clearPendingWrite(activeId);
+        void recordEntryVersion(activeId, userId ?? null, {
+          content: toSave.markdown,
+          content_json: toSave.json,
+        });
         setSaveStatus("saved");
         if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
         savedFlashRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
@@ -293,6 +306,121 @@ export default function Index() {
       }
     }, SAVE_DEBOUNCE_MS);
   }, [activeId, collabEnabled, userId]);
+
+  // Turn selected blocks into a sub-page. The editor has already removed them
+  // and left the cursor where they were, so the link lands in their place.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { title, markdown } = (event as CustomEvent<{ title: string; markdown: string }>).detail;
+      if (!user || !activeId) return;
+      void (async () => {
+        try {
+          const ownerId = resolveEntryOwnerId(activeId, user.id, entriesRef.current, roleMap);
+          const entry = await createEntry(ownerId, markdown, activeId);
+          addCreatedEntry(entry, user.id);
+          insertPageLink(entry.id, title);
+          toast.success(`Moved into “${title}”`);
+        } catch (err) {
+          console.error("Failed to turn blocks into a page:", err);
+          toast.error("Couldn't create the page", { description: entryErrorMessage(err) });
+        }
+      })();
+    };
+    window.addEventListener("nw:turnIntoPage", handler);
+    return () => window.removeEventListener("nw:turnIntoPage", handler);
+  }, [user, activeId, roleMap, addCreatedEntry]);
+
+  // The action menu stashes what it wants moved; the page picker supplies where.
+  const pendingBlockMoveRef = useRef<{ markdown: string; positions: number[] } | null>(null);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      pendingBlockMoveRef.current = (
+        event as CustomEvent<{ markdown: string; positions: number[] }>
+      ).detail;
+    };
+    window.addEventListener("nw:moveBlocksToPage", handler);
+    return () => window.removeEventListener("nw:moveBlocksToPage", handler);
+  }, []);
+
+  const handleMoveBlocksToPage = useCallback(async (target: Entry) => {
+    const move = pendingBlockMoveRef.current;
+    pendingBlockMoveRef.current = null;
+    if (!move) return;
+    const nextMarkdown = appendMarkdown(target.content, move.markdown);
+    // Appending can only grow the page, so anything shorter means the extraction
+    // went wrong and this write would destroy the destination.
+    if (shouldBlockEmptySave(target.content, nextMarkdown)) {
+      console.warn("[wings] blocked empty block move over existing content");
+      toast.error("Couldn't move those blocks");
+      return;
+    }
+    const payload = payloadFromMarkdown(nextMarkdown);
+    try {
+      await updateEntry(target.id, payload);
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === target.id ? { ...e, content: payload.markdown, content_json: payload.json } : e,
+        ),
+      );
+      if (userId) {
+        void putCachedEntry(userId, {
+          ...target,
+          content: payload.markdown,
+          content_json: payload.json,
+        });
+      }
+      // Only now is it safe to drop them from the page they came from.
+      const editor = (window as { __nw_editor?: Parameters<typeof deleteBlocksAtPositions>[0] }).__nw_editor;
+      if (editor) deleteBlocksAtPositions(editor, move.positions);
+      toast.success(`Moved to “${getEntryTitle(target)}”`);
+    } catch (err) {
+      console.error("Failed to move blocks:", err);
+      toast.error("Couldn't move those blocks", { description: entryErrorMessage(err) });
+    }
+  }, [userId]);
+
+  const handleRestoreVersion = useCallback(async (entryId: string, versionId: string) => {
+    const current = entriesRef.current.find((e) => e.id === entryId);
+    if (!current) return;
+    try {
+      const snapshot = await getEntryVersion(versionId);
+      if (!snapshot) {
+        toast.error("That version is no longer available");
+        return;
+      }
+      if (shouldBlockEmptySave(current.content, snapshot.content)) {
+        toast.error("That snapshot is empty — restoring it would clear the page");
+        return;
+      }
+      const payload = snapshot.content_json
+        ? { markdown: snapshot.content, json: snapshot.content_json }
+        : payloadFromMarkdown(snapshot.content);
+      await updateEntry(entryId, payload);
+      // A draft from before the restore would immediately overwrite it.
+      clearDraft(entryId);
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === entryId ? { ...e, content: payload.markdown, content_json: payload.json } : e,
+        ),
+      );
+      if (userId) {
+        void putCachedEntry(userId, {
+          ...current,
+          content: payload.markdown,
+          content_json: payload.json,
+        });
+      }
+      const editor = (window as { __nw_editor?: Parameters<typeof deleteBlocksAtPositions>[0] })
+        .__nw_editor;
+      if (entryId === activeId && editor) {
+        editor.commands.setContent(resolveInitialEditorContent(payload.markdown, payload.json));
+      }
+      toast.success("Restored earlier version");
+    } catch (err) {
+      console.error("Failed to restore version:", err);
+      toast.error("Couldn't restore that version", { description: entryErrorMessage(err) });
+    }
+  }, [activeId, userId]);
 
   const handleTitleChange = useCallback((title: string) => {
     if (!activeId) return;
@@ -394,13 +522,17 @@ export default function Index() {
       try {
         await updateEntry(activeId, toSave);
         clearDraft(activeId);
+        void recordEntryVersion(activeId, userId ?? null, {
+          content: toSave.markdown,
+          content_json: toSave.json,
+        });
       } catch {
         queuePendingWrite(activeId, { markdown: toSave.markdown, json: toSave.json });
       }
     };
     window.addEventListener("nw:collab-flush", onCollabFlush);
     return () => window.removeEventListener("nw:collab-flush", onCollabFlush);
-  }, [activeId, flushEditor]);
+  }, [activeId, flushEditor, userId]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -519,6 +651,7 @@ export default function Index() {
         onUpdateEntry={handleUpdateEntry}
         userRole={activeId ? (roleMap[activeId] || "owner") : "owner"}
         onNewSubpageWithTitle={handleNewSubpageWithTitle}
+        onRestoreVersion={handleRestoreVersion}
         onOpenAI={openAI}
         onNew={handleNew}
         onImported={() => void loadEntries()}
@@ -528,13 +661,8 @@ export default function Index() {
       <QuickSwitcher
         entries={entries}
         onSelect={setActiveId}
-        onLinkPage={(entry) => {
-          const title = getEntryTitle(entry);
-          const editor = (window as { __nw_editor?: { chain: () => { focus: () => { insertContent: (html: string) => { run: () => void } } } } }).__nw_editor;
-          if (editor) {
-            editor.chain().focus().insertContent(`<a href="#page:${entry.id}">${title}</a>`).run();
-          }
-        }}
+        onLinkPage={(entry) => insertPageLink(entry.id, getEntryTitle(entry))}
+        onMoveBlocks={handleMoveBlocksToPage}
       />
       <CommandPalette
         entries={entries}
@@ -543,6 +671,7 @@ export default function Index() {
         onToggleSidebar={() => setSidebarOpen((s) => !s)}
       />
       <KeyboardPalette />
+      <GraphView entries={entries} activeId={activeId} onNavigate={setActiveId} />
       <SettingsPanel />
       <AIAssistant
         open={aiOpen}

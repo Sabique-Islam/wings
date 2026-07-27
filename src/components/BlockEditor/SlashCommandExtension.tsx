@@ -383,6 +383,9 @@ CommandList.displayName = "CommandList";
 export function createSlashCommandExtension(handlers: SlashHandlers = {}) {
   return Extension.create({
     name: "slashCommand",
+    // Above WritingExperience (200) so Enter and the arrow keys reach the open
+    // menu instead of splitting the block underneath it.
+    priority: 500,
     addOptions() {
       return {
         suggestion: {

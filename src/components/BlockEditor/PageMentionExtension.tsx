@@ -12,6 +12,9 @@ export interface PageOption {
 export function createPageMentionExtension(getPages: () => PageOption[]) {
   return Extension.create({
     name: "pageMention",
+    // Above WritingExperience (200) so Enter and the arrow keys reach the open
+    // picker instead of splitting the block underneath it.
+    priority: 500,
     addOptions() {
       return {
         suggestion: {

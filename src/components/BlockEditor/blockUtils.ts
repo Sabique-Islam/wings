@@ -47,16 +47,68 @@ export function getDocChildBlockPositions(doc: BlockDoc): number[] {
   return positions;
 }
 
-export function selectCurrentBlock(editor: Editor): boolean {
+export interface BlockSelectionRange {
+  positions: number[];
+  anchor: number;
+}
+
+function clamp(value: number, max: number): number {
+  return Math.max(0, Math.min(max, value));
+}
+
+/**
+ * Move or grow a block selection by one block, Notion-style.
+ *
+ * `extend` keeps the anchor put and walks the far end of the range, which makes
+ * Shift+Arrow shrink the selection when it is travelling back toward the anchor.
+ * Returns null when there is nothing selected, so the caller can fall through to
+ * ordinary caret movement.
+ */
+export function stepBlockSelection(
+  doc: BlockDoc,
+  positions: number[],
+  anchor: number | null,
+  direction: -1 | 1,
+  extend: boolean,
+): BlockSelectionRange | null {
+  const all = getDocChildBlockPositions(doc);
+  const indices = positions
+    .map((pos) => all.indexOf(pos))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b);
+  if (indices.length === 0) return null;
+
+  const last = all.length - 1;
+  const anchorIndex =
+    anchor != null && all.indexOf(anchor) >= 0 ? all.indexOf(anchor) : indices[0]!;
+
+  if (!extend) {
+    const from = direction > 0 ? indices[indices.length - 1]! : indices[0]!;
+    const next = clamp(from + direction, last);
+    return { positions: [all[next]!], anchor: all[next]! };
+  }
+
+  const head = indices.reduce(
+    (furthest, index) =>
+      Math.abs(index - anchorIndex) > Math.abs(furthest - anchorIndex) ? index : furthest,
+    indices[0]!,
+  );
+  const nextHead = clamp(head + direction, last);
+  const [from, to] = anchorIndex <= nextHead ? [anchorIndex, nextHead] : [nextHead, anchorIndex];
+  return { positions: all.slice(from, to + 1), anchor: all[anchorIndex]! };
+}
+
+/** Selects the block containing the caret and returns its position, or null. */
+export function selectCurrentBlock(editor: Editor): number | null {
   const { $from } = editor.state.selection;
   const pos = getTopLevelBlockPos($from as BlockPos);
-  if (pos == null) return false;
+  if (pos == null) return null;
   try {
     const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos));
     editor.view.dispatch(tr);
-    return true;
+    return pos;
   } catch {
-    return false;
+    return null;
   }
 }
 

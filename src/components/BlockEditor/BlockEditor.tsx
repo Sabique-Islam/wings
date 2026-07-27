@@ -255,6 +255,23 @@ export const BlockEditor = memo(function BlockEditor({
     if (editor && editor.isEditable !== editable) editor.setEditable(editable);
   }, [editable, editor]);
 
+  /** Resolve a `#block=<id>` permalink once the document has rendered. */
+  useEffect(() => {
+    if (!editor) return;
+    const blockId = window.location.hash.startsWith("#block=")
+      ? window.location.hash.slice("#block=".length)
+      : "";
+    if (!blockId) return;
+    const timer = setTimeout(() => {
+      const target = editor.view.dom.querySelector(`[id="${CSS.escape(blockId)}"]`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("nw-block-flash");
+      setTimeout(() => target.classList.remove("nw-block-flash"), 1600);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [editor, entryId]);
+
   useEffect(() => {
     if (!editor) return;
     if (editor.isFocused) return;

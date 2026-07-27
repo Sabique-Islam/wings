@@ -42,10 +42,64 @@ test.describe("Notion parity keyboard and blocks", () => {
     await expect(filled).toHaveCount(2);
   });
 
+  test("Enter picks the highlighted page in the @ menu instead of splitting the block", async ({ page }) => {
+    const editor = page.locator(".ProseMirror");
+    await page.keyboard.type("@Reading");
+    await expect(page.getByRole("button", { name: "Reading List" })).toBeVisible();
+
+    await page.keyboard.press("Enter");
+
+    await expect(editor.locator('a[href="#page:page-reading-list"]')).toHaveCount(1);
+    await expect(editor.locator("p")).toHaveCount(1);
+  });
+
+  test("Enter picks the highlighted slash command instead of splitting the block", async ({ page }) => {
+    const editor = page.locator(".ProseMirror");
+    await page.keyboard.type("/callout");
+    await expect(page.locator(".slash-menu button", { hasText: "Callout" })).toBeVisible();
+
+    await page.keyboard.press("Enter");
+
+    await expect(editor.locator('[data-type="callout"]')).toHaveCount(1);
+  });
+
   test("Esc selects current block", async ({ page }) => {
     const editor = page.locator(".ProseMirror");
     await page.keyboard.type("block one");
     await page.keyboard.press("Escape");
     await expect(editor.locator(".ProseMirror-selectednode, .nw-block-selected")).toHaveCount(1);
+  });
+
+  test("arrow keys move the block selection once a block is selected", async ({ page }) => {
+    const editor = page.locator(".ProseMirror");
+    await page.keyboard.type("first");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("second");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("ArrowUp");
+    await expect(editor.locator(".nw-block-selected")).toHaveText("first");
+
+    await page.keyboard.press("ArrowDown");
+    await expect(editor.locator(".nw-block-selected")).toHaveText("second");
+  });
+
+  test("Shift+Arrow extends and shrinks the block selection", async ({ page }) => {
+    const editor = page.locator(".ProseMirror");
+    await page.keyboard.type("first");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("second");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("third");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("Shift+ArrowUp");
+    await expect(editor.locator(".nw-block-selected")).toHaveCount(2);
+
+    await page.keyboard.press("Shift+ArrowUp");
+    await expect(editor.locator(".nw-block-selected")).toHaveCount(3);
+
+    await page.keyboard.press("Shift+ArrowDown");
+    await expect(editor.locator(".nw-block-selected")).toHaveCount(2);
   });
 });

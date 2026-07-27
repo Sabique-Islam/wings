@@ -3,11 +3,13 @@ import type { Entry, ShareRole } from "@/lib/journal";
 import type { EditorChangePayload } from "@/lib/editorPayload";
 import { useCollabProvider } from "@/lib/collab/useCollabProvider";
 import { useAuth } from "@/hooks/useAuth";
-import { Trash2, PanelLeft, Download, Pin, PinOff, FilePlus, Keyboard, Sparkles, PenTool, Hash, Upload, FileJson, FileText } from "lucide-react";
+import { Trash2, PanelLeft, Download, Pin, PinOff, FilePlus, History, Keyboard, Sparkles, PenTool, Hash, Upload, FileJson, FileText } from "lucide-react";
 import { EmptyStateAscii } from "@/components/AsciiAnimation";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { BacklinksPanel } from "@/components/BacklinksPanel";
+import { VersionHistory } from "@/components/VersionHistory";
 import { ShareMenu } from "@/components/ShareMenu";
 import { exportSingleEntry, exportSingleAsJson, importFile } from "@/lib/export";
 import { toast } from "sonner";
@@ -41,6 +43,7 @@ interface Props {
   onUpdateEntry: (entry: Entry) => void;
   userRole: ShareRole;
   onNewSubpageWithTitle: (parentId: string, title: string) => Promise<void>;
+  onRestoreVersion: (entryId: string, versionId: string) => Promise<void>;
   onOpenAI: () => void;
   onImported?: () => void;
   onNew?: () => void;
@@ -54,7 +57,7 @@ function canEditRole(role: ShareRole): boolean {
   return role === "owner" || role === "admin" || role === "editor";
 }
 
-export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
+export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
   const { user } = useAuth();
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -77,6 +80,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
   }, [userId, onImported]);
 
   const [uploading, setUploading] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [drawingOpen, setDrawingOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [showLineNumbers, setShowLineNumbers] = useState<boolean>(() => {
@@ -271,6 +275,13 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 </button>
               )}
               <button
+                onClick={() => setHistoryOpen(true)}
+                className="p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors"
+                title="Version history"
+              >
+                <History className="h-3.5 w-3.5" />
+              </button>
+              <button
                 onClick={() => setShowLineNumbers((s) => !s)}
                 className={`p-1.5 rounded transition-colors ${showLineNumbers ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 title={showLineNumbers ? "Hide line numbers" : "Show line numbers"}
@@ -398,6 +409,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 collabSession={collabSession}
               />
             )}
+            <BacklinksPanel entryId={entry.id} entries={allEntries} onNavigate={onNavigate} />
             <InlineAIMenu />
             <input
               ref={fileInputRef}
@@ -409,6 +421,15 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
           </div>
         )}
       </div>
+      {entry && (
+        <VersionHistory
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          entryId={entry.id}
+          canRestore={canEdit}
+          onRestore={(versionId) => onRestoreVersion(entry.id, versionId)}
+        />
+      )}
       {entry && (
         <DrawingCanvas
           open={drawingOpen}

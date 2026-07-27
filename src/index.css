@@ -258,6 +258,15 @@
   background: hsl(var(--foreground) / 0.04);
 }
 
+/* Brief highlight when arriving via a #block= permalink. */
+@keyframes nw-block-flash {
+  0%, 60% { background: hsl(var(--accent-soft) / 0.55); }
+  100% { background: transparent; }
+}
+.nw-block-flash {
+  animation: nw-block-flash 1.6s ease-out;
+}
+
 .block-editor-content > .ProseMirror-selectednode,
 .block-editor-content > [data-node-view-wrapper].ProseMirror-selectednode {
   background: hsl(var(--accent-soft) / 0.35);

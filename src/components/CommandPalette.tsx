@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, Plus, Search, Settings, Sparkles, PanelLeft, Star } from "lucide-react";
+import { FileText, Plus, Search, Settings, Share2, Sparkles, PanelLeft, Star } from "lucide-react";
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut,
 } from "@/components/ui/command";
@@ -50,6 +50,9 @@ export function CommandPalette({ entries, onSelect, onNew, onToggleSidebar }: Pr
           </CommandItem>
           <CommandItem onSelect={() => run(() => window.dispatchEvent(new CustomEvent("nw:search")))}>
             <Search className="mr-2" /> search pages <CommandShortcut>⌘/</CommandShortcut>
+          </CommandItem>
+          <CommandItem onSelect={() => run(() => window.dispatchEvent(new CustomEvent("nw:graph")))}>
+            <Share2 className="mr-2" /> open graph view <CommandShortcut>⌘⇧G</CommandShortcut>
           </CommandItem>
           <CommandItem onSelect={() => run(onToggleSidebar)}>
             <PanelLeft className="mr-2" /> toggle sidebar <CommandShortcut>⌘B</CommandShortcut>

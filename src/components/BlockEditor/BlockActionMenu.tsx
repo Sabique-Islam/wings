@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { Editor } from "@tiptap/core";
+import { toast } from "sonner";
 import { turnInto, TURN_INTO_ITEMS, TEXT_COLORS, BG_COLORS, type TurnIntoType } from "./blockCommands";
 import { deleteBlocksAtPositions, duplicateBlocksAtPositions } from "./blockUtils";
+import { blockIdAt, blockLink, blocksToMarkdown, blocksToTitle } from "./blockTransfer";
 import { fuzzyMatch } from "./blockCommands";
 
 interface Props {
@@ -84,6 +86,48 @@ export function BlockActionMenu({ editor }: Props) {
     close();
   };
 
+  // The shell owns page creation and cross-page writes, so both handoffs pass
+  // the extracted markdown outward rather than reaching for Supabase here.
+  const turnIntoPage = () => {
+    const markdown = blocksToMarkdown(editor, positions);
+    if (!markdown.trim()) {
+      toast.error("Nothing to turn into a page");
+      return;
+    }
+    const title = blocksToTitle(editor, positions);
+    deleteBlocksAtPositions(editor, positions);
+    window.dispatchEvent(new CustomEvent("nw:turnIntoPage", { detail: { title, markdown } }));
+    close();
+  };
+
+  const moveToPage = () => {
+    const markdown = blocksToMarkdown(editor, positions);
+    if (!markdown.trim()) {
+      toast.error("Nothing to move");
+      return;
+    }
+    // Blocks are removed only after the target page accepts them.
+    window.dispatchEvent(
+      new CustomEvent("nw:moveBlocksToPage", { detail: { markdown, positions } }),
+    );
+    close();
+  };
+
+  const copyBlockLink = async () => {
+    const blockId = blockIdAt(editor, positions[0]!);
+    if (!blockId) {
+      toast.error("This block has no anchor yet");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(blockLink(blockId));
+      toast.success("Block link copied");
+    } catch {
+      toast.error("Couldn't copy the link");
+    }
+    close();
+  };
+
   return (
     <div
       ref={menuRef}
@@ -147,6 +191,28 @@ export function BlockActionMenu({ editor }: Props) {
             />
           ))}
         </div>
+        <div className="my-1 border-t border-border" />
+        <button
+          type="button"
+          className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+          onClick={turnIntoPage}
+        >
+          Turn into page
+        </button>
+        <button
+          type="button"
+          className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+          onClick={moveToPage}
+        >
+          Move to…
+        </button>
+        <button
+          type="button"
+          className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+          onClick={copyBlockLink}
+        >
+          Copy link to block
+        </button>
         <div className="my-1 border-t border-border" />
         <button
           type="button"
