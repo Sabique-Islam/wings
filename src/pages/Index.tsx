@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
-import type { EditorChangePayload } from "@/lib/editorPayload";
+import { isFullPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
 import { shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
@@ -56,7 +56,7 @@ export default function Index() {
   const savedFlashRef = useRef<ReturnType<typeof setTimeout>>();
   const creatingRef = useRef(false);
   const pendingPayloadRef = useRef<EditorChangePayload | null>(null);
-  const [entryShared, setEntryShared] = useState(false);
+  const [sharedEntryIds, setSharedEntryIds] = useState<Set<string>>(() => new Set());
   const SAVE_DEBOUNCE_MS = 1500;
 
   const setActiveId = useCallback((id: string | null) => {
@@ -93,22 +93,34 @@ export default function Index() {
     });
   }, [user, loading, entries]);
 
+  const loadEntries = useCallback(async () => {
+    if (!user) return;
+    const { entries: data, roleMap: roles, sharedEntryIds: shared } = await fetchEntries(user.id);
+    setEntries(data);
+    setRoleMap(roles);
+    setSharedEntryIds(shared);
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
-    fetchEntries(user.id)
-      .then(({ entries: data, roleMap: roles }) => {
-        setEntries(data);
-        setRoleMap(roles);
-      })
+    loadEntries()
       .catch((err) => {
         console.error("Failed to fetch entries:", err);
         toast.error("Couldn't load pages", { description: entryErrorMessage(err) });
       })
       .finally(() => setLoading(false));
-  }, [user]);
+  }, [user, loadEntries]);
 
   const activeEntry = entries.find((e) => e.id === activeId) ?? null;
   const breadcrumbTrail = activeId ? getBreadcrumbTrail(entries, activeId) : [];
+  // Read by debounced save work so the callbacks feeding the editor keep a
+  // stable identity across the state updates each save produces.
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+  // Known before the editor mounts: TipTap cannot switch into collaborative
+  // mode later without throwing away the editor the user is typing in.
+  const collabEnabled =
+    Boolean(activeId && sharedEntryIds.has(activeId)) && Boolean(import.meta.env.VITE_COLLAB_URL);
 
   // Redirect when URL points to a missing/deleted page
   useEffect(() => {
@@ -189,13 +201,18 @@ export default function Index() {
     pendingPayloadRef.current = payload;
 
     // While Yjs collab is live, Hocuspocus owns persistence — skip full-doc UPDATE.
-    if (entryShared && import.meta.env.VITE_COLLAB_URL) return;
+    if (collabEnabled) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const toSave = pendingPayloadRef.current;
-      if (!activeId || !toSave) return;
-      const existing = entries.find((e) => e.id === activeId);
+      if (!activeId) return;
+      // Typing emits JSON only, so ask the editor for markdown now — `content`
+      // and `content_json` must come from one serialize of one document.
+      const pending = pendingPayloadRef.current;
+      const toSave = requestEditorSerialize(activeId) ?? (isFullPayload(pending) ? pending : null);
+      if (!toSave) return;
+      pendingPayloadRef.current = toSave;
+      const existing = entriesRef.current.find((e) => e.id === activeId);
       if (existing && shouldBlockEmptySave(existing.content, toSave.markdown)) {
         console.warn("[wings] blocked empty autosave over existing content");
         return;
@@ -220,7 +237,7 @@ export default function Index() {
         setSaveStatus("error");
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [activeId, entryShared, entries]);
+  }, [activeId, collabEnabled]);
 
   const handleTitleChange = useCallback((title: string) => {
     if (!activeId) return;
@@ -243,40 +260,47 @@ export default function Index() {
     if (draft == null) return;
     setEntries((prev) => prev.map((e) => {
       if (e.id !== activeId) return e;
-      if (!shouldApplyDraft(e.content, draft.markdown)) return e;
+      if (!shouldApplyDraft(e.content, draft.markdown, draft.json)) return e;
       if (e.content === draft.markdown && e.content_json === draft.json) return e;
-      return { ...e, content: draft.markdown, content_json: draft.json ?? e.content_json };
+      // A JSON-only draft has no markdown to restore — keep the server copy so
+      // the empty-save guard still measures against the real content length.
+      const content = draft.markdown.trim().length > 0 ? draft.markdown : e.content;
+      return { ...e, content, content_json: draft.json ?? e.content_json };
     }));
   }, [activeId]);
 
   useEffect(() => {
-    if (!activeId) {
-      setEntryShared(false);
-      return;
-    }
-    entryHasShares(activeId).then(setEntryShared);
-    const onSharesChanged = (e: Event) => {
+    const onSharesChanged = async (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
-      if (id === activeId) entryHasShares(activeId).then(setEntryShared);
+      if (!id) return;
+      const shared = await entryHasShares(id);
+      setSharedEntryIds((prev) => {
+        if (prev.has(id) === shared) return prev;
+        const next = new Set(prev);
+        if (shared) next.add(id);
+        else next.delete(id);
+        return next;
+      });
     };
     window.addEventListener("nw:shares-changed", onSharesChanged);
     return () => window.removeEventListener("nw:shares-changed", onSharesChanged);
-  }, [activeId]);
+  }, []);
 
   const flushEditor = useCallback(() => {
-    (window as { __nw_flushEditor?: () => void }).__nw_flushEditor?.();
-    const payload = pendingPayloadRef.current;
-    if (activeId && payload) {
-      saveDraft(activeId, { markdown: payload.markdown, json: payload.json });
-    }
+    if (!activeId) return;
+    const payload = requestEditorSerialize(activeId);
+    if (!payload) return;
+    pendingPayloadRef.current = payload;
+    saveDraft(activeId, payload);
   }, [activeId]);
 
-  /** On page switch, persist draft for the note we're leaving (BlockEditor unmount serializes first). */
+  /** On page switch, persist draft for the note we're leaving. */
   const flushDraftForEntry = useCallback((entryId: string) => {
-    const payload = pendingPayloadRef.current;
-    if (payload && entryId === activeId) {
-      saveDraft(entryId, { markdown: payload.markdown, json: payload.json });
-    }
+    if (entryId !== activeId) return;
+    // Its editor is still mounted at this point, so take a full serialize
+    // rather than the JSON-only payload the typing path leaves behind.
+    const payload = requestEditorSerialize(entryId) ?? pendingPayloadRef.current;
+    if (payload) saveDraft(entryId, payload);
   }, [activeId]);
 
   useEffect(() => {
@@ -300,10 +324,11 @@ export default function Index() {
 
   useEffect(() => {
     const onCollabFlush = async () => {
+      if (!activeId) return;
       flushEditor();
       const toSave = pendingPayloadRef.current;
-      if (!activeId || !toSave) return;
-      const existing = entries.find((e) => e.id === activeId);
+      if (!isFullPayload(toSave)) return;
+      const existing = entriesRef.current.find((e) => e.id === activeId);
       if (existing && shouldBlockEmptySave(existing.content, toSave.markdown)) {
         console.warn("[wings] blocked empty collab flush over existing content");
         return;
@@ -317,7 +342,7 @@ export default function Index() {
     };
     window.addEventListener("nw:collab-flush", onCollabFlush);
     return () => window.removeEventListener("nw:collab-flush", onCollabFlush);
-  }, [activeId, entries, flushEditor]);
+  }, [activeId, flushEditor]);
 
   const handleDelete = useCallback(async (id: string) => {
     try {
@@ -395,6 +420,9 @@ export default function Index() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const openAI = useCallback(() => setAiOpen(true), []);
+  const toggleSidebar = useCallback(() => setSidebarOpen((s) => !s), []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -414,7 +442,7 @@ export default function Index() {
         onNew={handleNew}
         sidebarOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onRefetch={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); }).catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
+        onRefetch={() => void loadEntries().catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
         onHome={() => setActiveId(null)}
       />
       <JournalEditor
@@ -427,18 +455,18 @@ export default function Index() {
         onDelete={handleDelete}
         onTogglePin={handleTogglePin}
         sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={toggleSidebar}
         breadcrumbTrail={breadcrumbTrail}
         onNavigate={setActiveId}
         onNewSubpage={handleNewSubpage}
         onUpdateEntry={handleUpdateEntry}
         userRole={activeId ? (roleMap[activeId] || "owner") : "owner"}
         onNewSubpageWithTitle={handleNewSubpageWithTitle}
-        onOpenAI={() => setAiOpen(true)}
+        onOpenAI={openAI}
         onNew={handleNew}
-        onImported={() => user && fetchEntries(user.id).then(({ entries: data, roleMap: roles }) => { setEntries(data); setRoleMap(roles); })}
+        onImported={() => void loadEntries()}
         saveStatus={saveStatus}
-        collabEnabled={entryShared}
+        collabEnabled={collabEnabled}
       />
       <QuickSwitcher
         entries={entries}

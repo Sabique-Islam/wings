@@ -1,0 +1,129 @@
+---
+alwaysApply: true
+---
+
+You are contributing to an existing production codebase, not writing a coding challenge solution.
+
+Your primary objective is to write code that another engineer can understand six months later with minimal effort.
+
+Core principles
+
+- Write obvious code before clever code.
+- Every abstraction must earn its existence.
+- Prefer deleting code over adding more.
+- Minimize cognitive load.
+- Optimize for maintainability first, performance second, unless performance is a stated requirement.
+- Follow existing project conventions instead of introducing new patterns.
+
+Architecture
+
+- Keep modules focused on a single responsibility.
+- Separate business logic from infrastructure.
+- Avoid tightly coupling unrelated components.
+- Prefer composition over inheritance where appropriate.
+- Design APIs that are predictable rather than flexible for every possible future use case.
+
+Consistency
+
+- Match the surrounding codebase's naming, formatting, project structure, and conventions.
+- Never introduce a different architectural style inside an existing project.
+- Preserve existing patterns unless there is a clear technical reason to change them.
+- Keep diffs as small as possible.
+
+Naming
+
+- Names should describe intent, not implementation.
+- Avoid abbreviations unless they are industry standard.
+- Avoid generic names like helper, util, manager, data, thing, temp, misc, processData, handleStuff.
+- Prefer names that read naturally.
+
+Functions
+
+- Each function should have one clear responsibility.
+- Functions should hide implementation details.
+- Avoid long parameter lists.
+- Return early instead of creating deep nesting.
+- Remove duplicated logic instead of copying it.
+
+Classes / Modules
+
+- Each module should expose a minimal public API.
+- Keep internal implementation private whenever possible.
+- Avoid "god objects."
+- Don't create classes that only wrap other classes.
+
+Error handling
+
+- Fail loudly when assumptions are violated.
+- Return useful errors.
+- Never silently swallow exceptions.
+- Handle expected failures explicitly.
+- Keep error messages actionable.
+
+State
+
+- Minimize mutable shared state.
+- Prefer explicit data flow over hidden side effects.
+- Avoid global state unless unavoidable.
+- Make dependencies explicit.
+
+Comments
+
+- Code should explain how.
+- Comments should explain why.
+- Remove comments that simply repeat the code.
+- Leave documentation only where future readers benefit.
+
+Dependencies
+
+- Avoid introducing new dependencies unless they provide significant value.
+- Prefer platform or standard library functionality where reasonable.
+- Don't replace simple code with a heavy framework.
+
+Performance
+
+- Don't micro-optimize.
+- Measure before optimizing.
+- Optimize bottlenecks, not guesses.
+- Avoid premature caching or complexity.
+
+Security
+
+- Treat all external input as untrusted.
+- Validate inputs.
+- Escape output where appropriate.
+- Never expose secrets.
+- Follow the principle of least privilege.
+
+Testing
+
+- Write code that is easy to test.
+- Separate pure logic from I/O.
+- Avoid hidden state that makes testing difficult.
+- Consider edge cases while implementing, not afterwards.
+
+Code reviews
+
+Before considering the implementation complete, ask yourself:
+
+- Is there a simpler implementation?
+- Am I introducing an unnecessary abstraction?
+- Will another engineer understand this without explanation?
+- Does this match the surrounding codebase?
+- Am I solving today's problem instead of a hypothetical future one?
+- Can any code be removed?
+
+When modifying existing code
+
+- Preserve behaviour unless a change is explicitly requested.
+- Minimize unrelated refactoring.
+- Do not rename files, variables, or functions purely for personal preference.
+- Explain significant architectural changes before making them.
+
+Communication
+
+- If requirements are ambiguous, ask concise clarifying questions instead of making assumptions.
+- State trade-offs when multiple reasonable approaches exist.
+- If something appears unsafe, brittle, or unnecessarily complex, explain why and propose a better alternative.
+
+The best code is often the code that never needed to exist. Prefer simple systems with clear data flow over clever abstractions and unnecessary indirection.
