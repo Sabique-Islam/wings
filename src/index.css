@@ -245,6 +245,15 @@
   transition: background-color 120ms ease;
 }
 
+/* Long documents: let the browser skip layout and paint for far off-screen
+   blocks. Scoped past the first 100 so ordinary pages behave exactly as before,
+   and `auto` intrinsic sizing remembers real heights so the scrollbar holds
+   still once a block has been measured. */
+.block-editor-content > *:nth-child(n + 100) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1.75em;
+}
+
 .block-editor-content > .nw-block-hovered {
   background: hsl(var(--foreground) / 0.04);
 }

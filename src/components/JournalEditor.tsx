@@ -15,6 +15,7 @@ import { uploadImage } from "@/lib/imageUpload";
 import { InlineAIMenu } from "@/components/InlineAIMenu";
 import { DrawingCanvas } from "@/components/DrawingCanvas";
 import { rememberDrawingSnapshot } from "@/lib/ai/excalidrawContext";
+import { countWords, countWordsInDoc, readingTime } from "@/lib/documentStats";
 import { Check, CloudOff } from "lucide-react";
 import {
   DropdownMenu,
@@ -47,14 +48,7 @@ interface Props {
   collabEnabled?: boolean;
 }
 
-function wordCount(text: string): number {
-  return text.trim() ? text.trim().split(/\s+/).length : 0;
-}
-
-function readingTime(words: number): string {
-  const mins = Math.ceil(words / 200);
-  return mins < 1 ? "<1 min" : `${mins} min`;
-}
+const WORD_COUNT_DEBOUNCE_MS = 300;
 
 function canEditRole(role: ShareRole): boolean {
   return role === "owner" || role === "admin" || role === "editor";
@@ -111,7 +105,11 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
   // Excalidraw is used for any free-form drawing/canvas needs.
 
 
-  const words = entry ? wordCount(entry.content) : 0;
+  // `entry.content` only catches up after a save lands, so it reads stale for as
+  // long as someone keeps typing. Fall back to it only until the first emit.
+  const [liveWords, setLiveWords] = useState<number | null>(null);
+  const wordCountTimer = useRef<ReturnType<typeof setTimeout>>();
+  const words = liveWords ?? (entry ? countWords(entry.content) : 0);
   const canEdit = canEditRole(userRole);
   const { session: collabSession, connecting: collabConnecting } = useCollabProvider(
     entry?.id ?? null,
@@ -168,8 +166,21 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
   const editorEntryId = entry?.id ?? null;
 
   const handleEditorChange = useCallback((payload: EditorChangePayload) => {
-    if (editorEntryId) onChange(editorEntryId, payload);
+    if (!editorEntryId) return;
+    onChange(editorEntryId, payload);
+    if (wordCountTimer.current) clearTimeout(wordCountTimer.current);
+    wordCountTimer.current = setTimeout(
+      () => setLiveWords(countWordsInDoc(payload.json)),
+      WORD_COUNT_DEBOUNCE_MS,
+    );
   }, [editorEntryId, onChange]);
+
+  useEffect(() => {
+    setLiveWords(null);
+    return () => {
+      if (wordCountTimer.current) clearTimeout(wordCountTimer.current);
+    };
+  }, [editorEntryId]);
 
   const handleLinkPage = useCallback(() => {
     window.dispatchEvent(new CustomEvent("nw:linkpage"));

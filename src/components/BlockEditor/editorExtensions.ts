@@ -30,6 +30,7 @@ import { Column, ColumnList } from "./ColumnExtension";
 import { Bookmark } from "./BookmarkExtension";
 import { Embed } from "./EmbedExtension";
 import { createPageMentionExtension, type PageOption } from "./PageMentionExtension";
+import { createWikiLinkExtension } from "./WikiLinkExtension";
 import type { Extensions } from "@tiptap/core";
 
 interface BlockEditorExtensionHandlers {
@@ -60,10 +61,16 @@ const PLACEHOLDER_BY_NODE: Record<string, string> = {
 
 export function createBlockEditorExtensions(handlers: BlockEditorExtensionOptions = {}) {
   const { collab = false, extraExtensions = [] } = handlers;
-  const pageMention =
+  const pageSuggestions =
     handlers.getPages != null
-      ? createPageMentionExtension(() => handlers.getPages?.() ?? [])
-      : null;
+      ? [
+          createPageMentionExtension(() => handlers.getPages?.() ?? []),
+          createWikiLinkExtension(
+            () => handlers.getPages?.() ?? [],
+            handlers.onNewPage ? (title) => handlers.onNewPage?.(title) : undefined,
+          ),
+        ]
+      : [];
 
   return [
     WritingExperience,
@@ -98,7 +105,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
           const isOnlyBlock =
             doc.childCount === 1 && doc.firstChild?.type.name === "paragraph";
           if (isFirstTopLevel && isOnlyBlock) {
-            return "Write, press '/' for commands, or '@' for pages…";
+            return "Write, press '/' for commands, or '@' / '[[' for pages…";
           }
           return "";
         }
@@ -155,7 +162,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
       onNewPage: (title: string) => handlers.onNewPage?.(title),
       onAskAI: () => handlers.onAskAI?.(),
     }),
-    ...(pageMention ? [pageMention] : []),
+    ...pageSuggestions,
     ...extraExtensions,
   ];
 }

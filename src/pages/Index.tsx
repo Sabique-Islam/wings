@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
-import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite } from "@/lib/draftCache";
+import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
+import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
+import { forgetLinkIndex, hydrateLinkIndex, scheduleLinkIndex } from "@/lib/linkIndex";
 import { isFullPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
 import { shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
@@ -40,6 +42,7 @@ function entryErrorMessage(err: unknown): string {
 
 export default function Index() {
   const { user } = useAuth();
+  const userId = user?.id;
   const navigate = useNavigate();
   const location = useLocation();
   const { id: routeId, username } = useParams<{ id?: string; username?: string }>();
@@ -50,6 +53,9 @@ export default function Index() {
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== "undefined" ? window.innerWidth >= 768 : true);
   const [aiOpen, setAiOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Distinct from `loading`: the cached paint clears `loading` early, but a
+  // page missing from the mirror is not yet proof the page is gone.
+  const [serverSynced, setServerSynced] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -58,6 +64,10 @@ export default function Index() {
   const pendingPayloadRef = useRef<EditorChangePayload | null>(null);
   const [sharedEntryIds, setSharedEntryIds] = useState<Set<string>>(() => new Set());
   const SAVE_DEBOUNCE_MS = 1500;
+  // Read by debounced save work so the callbacks feeding the editor keep a
+  // stable identity across the state updates each save produces.
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
 
   const setActiveId = useCallback((id: string | null) => {
     setActiveIdRaw(id);
@@ -70,28 +80,30 @@ export default function Index() {
 
   useEffect(() => {
     if (!user || loading) return;
-    const pending = getPendingWrites();
-    if (!pending.length) return;
-    pending.forEach(async (pw) => {
-      const server = entries.find((e) => e.id === pw.entryId);
-      const serverContent = server?.content ?? "";
-      if (!shouldReplayPendingWrite(serverContent, pw.content)) {
-        clearPendingWrite(pw.entryId);
-        clearDraft(pw.entryId);
-        return;
+    void (async () => {
+      const pending = await getPendingWrites();
+      if (!pending.length) return;
+      for (const pw of pending) {
+        const server = entriesRef.current.find((e) => e.id === pw.entryId);
+        const serverContent = server?.content ?? "";
+        if (!shouldReplayPendingWrite(serverContent, pw.content)) {
+          clearPendingWrite(pw.entryId);
+          clearDraft(pw.entryId);
+          continue;
+        }
+        try {
+          await updateEntry(pw.entryId, {
+            markdown: pw.content,
+            json: pw.contentJson ?? { type: "doc", content: [] },
+          });
+          clearPendingWrite(pw.entryId);
+          clearDraft(pw.entryId);
+        } catch {
+          // Still offline, will retry next load
+        }
       }
-      try {
-        await updateEntry(pw.entryId, {
-          markdown: pw.content,
-          json: pw.contentJson ?? { type: "doc", content: [] },
-        });
-        clearPendingWrite(pw.entryId);
-        clearDraft(pw.entryId);
-      } catch {
-        // Still offline, will retry next load
-      }
-    });
-  }, [user, loading, entries]);
+    })();
+  }, [user, loading]);
 
   const loadEntries = useCallback(async () => {
     if (!user) return;
@@ -101,22 +113,59 @@ export default function Index() {
     setSharedEntryIds(shared);
   }, [user]);
 
+  // Paint from the IndexedDB mirror before the network answers, then reconcile.
+  // Share state comes from the same snapshot so the editor knows whether to
+  // mount collaboratively without waiting on Supabase.
   useEffect(() => {
     if (!user) return;
-    loadEntries()
-      .catch((err) => {
+    let cancelled = false;
+    void (async () => {
+      await Promise.all([hydrateDraftCache(), hydrateLinkIndex()]);
+      const [cached, meta] = await Promise.all([
+        readCachedEntries(user.id),
+        readWorkspaceMeta(user.id),
+      ]);
+      if (cancelled) return;
+      if (cached.length > 0 && meta) {
+        setEntries(cached);
+        setRoleMap(meta.roleMap);
+        setSharedEntryIds(new Set(meta.sharedEntryIds));
+        setLoading(false);
+      }
+      try {
+        await loadEntries();
+      } catch (err) {
         console.error("Failed to fetch entries:", err);
         toast.error("Couldn't load pages", { description: entryErrorMessage(err) });
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setServerSynced(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user, loadEntries]);
+
+  // Refresh the mirror off the typing path so the next open is instant.
+  useEffect(() => {
+    if (!user || loading || entries.length === 0) return;
+    const timer = setTimeout(() => {
+      void replaceCachedEntries(user.id, entries);
+      void putWorkspaceMeta({
+        userId: user.id,
+        roleMap,
+        sharedEntryIds: Array.from(sharedEntryIds),
+        fetchedAt: Date.now(),
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [user, loading, entries, roleMap, sharedEntryIds]);
 
   const activeEntry = entries.find((e) => e.id === activeId) ?? null;
   const breadcrumbTrail = activeId ? getBreadcrumbTrail(entries, activeId) : [];
-  // Read by debounced save work so the callbacks feeding the editor keep a
-  // stable identity across the state updates each save produces.
-  const entriesRef = useRef(entries);
-  entriesRef.current = entries;
   // Known before the editor mounts: TipTap cannot switch into collaborative
   // mode later without throwing away the editor the user is typing in.
   const collabEnabled =
@@ -124,11 +173,11 @@ export default function Index() {
 
   // Redirect when URL points to a missing/deleted page
   useEffect(() => {
-    if (loading || !activeId) return;
+    if (!serverSynced || !activeId) return;
     if (activeEntry) return;
     setActiveIdRaw(null);
     navigate(basePath || "/app", { replace: true });
-  }, [loading, activeId, activeEntry, basePath, navigate]);
+  }, [serverSynced, activeId, activeEntry, basePath, navigate]);
 
   const addCreatedEntry = useCallback((entry: Entry, ownerId: string) => {
     setEntries((prev) => [entry, ...prev]);
@@ -195,6 +244,7 @@ export default function Index() {
 
   const handleChange = useCallback((entryId: string, payload: EditorChangePayload) => {
     saveDraftThrottled(entryId, { markdown: payload.markdown, json: payload.json });
+    scheduleLinkIndex(entryId, payload.json);
     // Stale serialize from a note we already left — draft only, no autosave / pending ref.
     if (entryId !== activeId) return;
 
@@ -218,6 +268,11 @@ export default function Index() {
         return;
       }
       setSaveStatus("saving");
+      // Durable locally before the network is attempted, so a refresh while the
+      // request is in flight still shows what was typed.
+      if (userId && existing) {
+        void putCachedEntry(userId, { ...existing, content: toSave.markdown, content_json: toSave.json });
+      }
       try {
         await updateEntry(activeId, toSave);
         setEntries((prev) =>
@@ -237,7 +292,7 @@ export default function Index() {
         setSaveStatus("error");
       }
     }, SAVE_DEBOUNCE_MS);
-  }, [activeId, collabEnabled]);
+  }, [activeId, collabEnabled, userId]);
 
   const handleTitleChange = useCallback((title: string) => {
     if (!activeId) return;
@@ -254,8 +309,11 @@ export default function Index() {
     }, 500);
   }, [activeId]);
 
+  // Runs again once loading clears: on a cold start the entries list is still
+  // empty when `activeId` first arrives, so a draft written just before the tab
+  // closed would otherwise never be restored.
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId || loading) return;
     const draft = getDraft(activeId);
     if (draft == null) return;
     setEntries((prev) => prev.map((e) => {
@@ -267,7 +325,7 @@ export default function Index() {
       const content = draft.markdown.trim().length > 0 ? draft.markdown : e.content;
       return { ...e, content, content_json: draft.json ?? e.content_json };
     }));
-  }, [activeId]);
+  }, [activeId, loading]);
 
   useEffect(() => {
     const onSharesChanged = async (e: Event) => {
@@ -347,15 +405,14 @@ export default function Index() {
   const handleDelete = useCallback(async (id: string) => {
     try {
       await deleteEntry(id);
-      setEntries((prev) => {
-        const idsToRemove = new Set<string>();
-        const collect = (pid: string) => {
-          idsToRemove.add(pid);
-          prev.filter((e) => e.parent_id === pid).forEach((e) => collect(e.id));
-        };
-        collect(id);
-        return prev.filter((e) => !idsToRemove.has(e.id));
-      });
+      const removed = new Set<string>();
+      const collect = (pid: string) => {
+        removed.add(pid);
+        entriesRef.current.filter((e) => e.parent_id === pid).forEach((e) => collect(e.id));
+      };
+      collect(id);
+      removed.forEach(forgetLinkIndex);
+      setEntries((prev) => prev.filter((e) => !removed.has(e.id)));
       setActiveId(null);
     } catch (err) {
       console.error("Failed to delete page:", err);

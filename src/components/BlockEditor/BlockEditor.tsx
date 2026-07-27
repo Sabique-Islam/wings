@@ -82,6 +82,14 @@ export const BlockEditor = memo(function BlockEditor({
   const lastEmittedJson = useRef<JSONContent | null>(contentJson ?? null);
   const localVersion = useRef(0);
   const acceptedVersion = useRef(0);
+  /**
+   * `localVersion` at which `lastEmittedMarkdown` was rendered, or -1 when no
+   * full serialize has run yet. Never seed this from the props: markdown and
+   * JSON only describe the same document once the editor has serialized both,
+   * and persisting a mismatched pair is what `resolveInitialEditorContent`
+   * exists to recover from.
+   */
+  const markdownVersion = useRef(-1);
   const loadedEntryId = useRef(entryId);
   const serializeTimer = useRef<ReturnType<typeof setTimeout>>();
   const onChangeRef = useRef(onChange);
@@ -126,10 +134,17 @@ export const BlockEditor = memo(function BlockEditor({
    */
   const serializeFull = useCallback((editor: MountedEditor): FullEditorChangePayload => {
     if (serializeTimer.current) clearTimeout(serializeTimer.current);
+    // Blur fires on every click outside the editor and the save pipeline asks
+    // again on its own schedule, so most full serializes see an unchanged
+    // document. Reuse the last markdown rather than walking the whole doc again.
+    if (markdownVersion.current === localVersion.current && lastEmittedJson.current) {
+      return { markdown: lastEmittedMarkdown.current, json: lastEmittedJson.current };
+    }
     const markdown = htmlToMarkdown(editor.getHTML());
     const json = editor.getJSON();
     lastEmittedMarkdown.current = markdown;
     lastEmittedJson.current = json;
+    markdownVersion.current = localVersion.current;
     (window as any).__nw_currentMarkdown = markdown;
     return { markdown, json };
   }, []);
@@ -229,6 +244,7 @@ export const BlockEditor = memo(function BlockEditor({
     loadedEntryId.current = entryId;
     localVersion.current = 0;
     acceptedVersion.current = 0;
+    markdownVersion.current = -1;
     lastEmittedMarkdown.current = content;
     lastEmittedJson.current = contentJson ?? null;
     if (!editor) return;
@@ -248,6 +264,9 @@ export const BlockEditor = memo(function BlockEditor({
     editor.commands.setContent(next, { emitUpdate: false });
     lastEmittedMarkdown.current = content;
     lastEmittedJson.current = contentJson ?? null;
+    // The document changed without an update transaction, so `localVersion` is
+    // unchanged and can no longer vouch for the cached markdown.
+    markdownVersion.current = -1;
     acceptedVersion.current = localVersion.current;
   }, [content, contentJson, editor]);
 

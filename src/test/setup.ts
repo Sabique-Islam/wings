@@ -1,4 +1,7 @@
 import "@testing-library/jest-dom";
+// jsdom has no IndexedDB, and the local store degrades to no-ops without one —
+// which would silently skip the persistence assertions.
+import "fake-indexeddb/auto";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
