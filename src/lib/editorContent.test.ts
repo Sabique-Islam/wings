@@ -34,6 +34,16 @@ describe("editorContent", () => {
     expect(shouldApplyDraft("saved", "draft")).toBe(true);
   });
 
+  it("applies JSON-only drafts, which is what the typing path writes", () => {
+    const typed = {
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "unsaved edit" }] }],
+    };
+    expect(shouldApplyDraft("saved notes long enough to matter", "", typed)).toBe(true);
+    expect(shouldApplyDraft("saved notes long enough to matter", "", { type: "doc", content: [] })).toBe(false);
+    expect(shouldApplyDraft("saved notes long enough to matter", "", null)).toBe(false);
+  });
+
   it("blocks empty autosave over substantial content", () => {
     expect(shouldBlockEmptySave("x".repeat(25), "")).toBe(true);
     expect(shouldBlockEmptySave("short", "")).toBe(false);
