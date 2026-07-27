@@ -2,6 +2,7 @@
 // Draft writes are throttled — never sync localStorage on every keystroke.
 
 import type { JSONContent } from "@tiptap/core";
+import type { FullEditorChangePayload } from "./editorPayload";
 
 const DRAFT_PREFIX = "wings_draft_";
 const DRAFT_JSON_PREFIX = "wings_draft_json_";
@@ -11,8 +12,14 @@ const LEGACY_DRAFT_PREFIX = "nw_draft_";
 const LEGACY_PENDING_PREFIX = "nw_pending_";
 
 export interface DraftPayload {
-  markdown: string;
+  /** Absent on drafts written from the typing path, which carry JSON only. */
+  markdown?: string;
   json?: JSONContent | null;
+}
+
+export interface StoredDraft {
+  markdown: string;
+  json: JSONContent | null;
 }
 
 interface PendingWrite {
@@ -27,7 +34,12 @@ const DRAFT_THROTTLE_MS = 400;
 
 function writeDraft(entryId: string, payload: DraftPayload): void {
   try {
-    localStorage.setItem(DRAFT_PREFIX + entryId, payload.markdown);
+    // Keep the last markdown we stored rather than blanking it: a JSON-only
+    // draft means the editor hasn't rendered markdown since, not that the page
+    // is empty.
+    if (payload.markdown != null) {
+      localStorage.setItem(DRAFT_PREFIX + entryId, payload.markdown);
+    }
     if (payload.json) {
       localStorage.setItem(DRAFT_JSON_PREFIX + entryId, JSON.stringify(payload.json));
     }
@@ -59,13 +71,13 @@ export function saveDraft(entryId: string, payload: DraftPayload): void {
   writeDraft(entryId, payload);
 }
 
-export function getDraft(entryId: string): DraftPayload | null {
+export function getDraft(entryId: string): StoredDraft | null {
   try {
     const markdown =
       localStorage.getItem(DRAFT_PREFIX + entryId) ??
       localStorage.getItem(LEGACY_DRAFT_PREFIX + entryId);
-    if (markdown == null) return null;
     const jsonRaw = localStorage.getItem(DRAFT_JSON_PREFIX + entryId);
+    if (markdown == null && jsonRaw == null) return null;
     let json: JSONContent | null = null;
     if (jsonRaw) {
       try {
@@ -74,7 +86,7 @@ export function getDraft(entryId: string): DraftPayload | null {
         json = null;
       }
     }
-    return { markdown, json };
+    return { markdown: markdown ?? "", json };
   } catch {
     return null;
   }
@@ -90,7 +102,7 @@ export function clearDraft(entryId: string): void {
   }
 }
 
-export function queuePendingWrite(entryId: string, payload: DraftPayload): void {
+export function queuePendingWrite(entryId: string, payload: FullEditorChangePayload): void {
   try {
     const pending: PendingWrite = {
       entryId,

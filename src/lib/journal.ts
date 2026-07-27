@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { JSONContent } from "@tiptap/core";
 import { EntryLayoutMap, normalizeLayout } from "./layout";
 import { logError } from "./logger";
-import type { EditorChangePayload } from "./editorPayload";
+import type { FullEditorChangePayload } from "./editorPayload";
 
 export interface Entry {
   id: string;
@@ -73,7 +73,14 @@ export function getEntryTitle(entry: Entry): string {
 
 const ENTRY_COLS = "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
 
-export async function fetchEntries(userId: string, opts: { includeTrash?: boolean } = {}): Promise<{ entries: Entry[]; roleMap: Record<string, ShareRole> }> {
+export interface FetchedEntries {
+  entries: Entry[];
+  roleMap: Record<string, ShareRole>;
+  /** Entries with at least one share row — the pages that use realtime collab. */
+  sharedEntryIds: Set<string>;
+}
+
+export async function fetchEntries(userId: string, opts: { includeTrash?: boolean } = {}): Promise<FetchedEntries> {
   // Fetch own entries
   let query = supabase
     .from("entries")
@@ -90,17 +97,22 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
   const roleMap: Record<string, ShareRole> = {};
   (ownData ?? []).forEach((e: any) => { roleMap[e.id] = "owner"; });
 
-  // Fetch entries shared with user (non-critical — don't break if it fails)
+  // One pass over entry_shares (non-critical — don't break if it fails). RLS
+  // returns shares on entries the user owns plus shares made to them, which is
+  // exactly the set of pages that should open in collaborative mode.
+  const sharedEntryIds = new Set<string>();
   let sharedEntries: any[] = [];
   try {
-    const { data: sharedData } = await supabase
+    const { data: shareRows } = await supabase
       .from("entry_shares")
-      .select("entry_id, role")
-      .eq("shared_with_user_id", userId);
+      .select("entry_id, role, shared_with_user_id");
 
-    if (sharedData && sharedData.length > 0) {
-      sharedData.forEach((s: any) => { roleMap[s.entry_id] = s.role as ShareRole; });
-      const sharedIds = sharedData.map((s: any) => s.entry_id);
+    (shareRows ?? []).forEach((s: any) => sharedEntryIds.add(s.entry_id));
+
+    const sharedWithUser = (shareRows ?? []).filter((s: any) => s.shared_with_user_id === userId);
+    if (sharedWithUser.length > 0) {
+      sharedWithUser.forEach((s: any) => { roleMap[s.entry_id] = s.role as ShareRole; });
+      const sharedIds = sharedWithUser.map((s: any) => s.entry_id);
       let sharedQuery = supabase
         .from("entries")
         .select(ENTRY_COLS)
@@ -131,7 +143,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
     deleted_at: d.deleted_at ?? null,
   }));
 
-  return { entries: mapped, roleMap };
+  return { entries: mapped, roleMap, sharedEntryIds };
 }
 
 export async function fetchTrash(userId: string): Promise<Entry[]> {
@@ -173,7 +185,7 @@ export async function createEntry(userId: string, content: string, parentId?: st
   };
 }
 
-export async function updateEntry(id: string, payload: EditorChangePayload): Promise<void> {
+export async function updateEntry(id: string, payload: FullEditorChangePayload): Promise<void> {
   const { error } = await supabase
     .from("entries")
     .update({ content: payload.markdown, content_json: payload.json })

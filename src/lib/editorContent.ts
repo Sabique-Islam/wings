@@ -36,9 +36,19 @@ export function resolveInitialEditorContent(
   return markdownToHtml(markdown);
 }
 
-/** Ignore local drafts that would wipe existing server content. */
-export function shouldApplyDraft(existingContent: string, draftMarkdown: string): boolean {
+/**
+ * Ignore local drafts that would wipe existing server content.
+ *
+ * A draft with no markdown can still hold real work — the editor writes
+ * JSON-only drafts while the user is typing — so the JSON decides in that case.
+ */
+export function shouldApplyDraft(
+  existingContent: string,
+  draftMarkdown: string,
+  draftJson?: JSONContent | null,
+): boolean {
   if (draftMarkdown.trim().length > 0) return true;
+  if (!isEmptyDoc(draftJson)) return true;
   return existingContent.trim().length === 0;
 }
 

@@ -140,6 +140,7 @@ export const BlockHandle = Extension.create({
           let dragging = false;
           let didDrag = false;
           let autoScrollRaf = 0;
+          let pointerMoveRaf = 0;
 
           const clearHideTimer = () => {
             if (hideTimer) {
@@ -183,15 +184,23 @@ export const BlockHandle = Extension.create({
             show();
           };
 
+          // Hit-testing walks the document, so coalesce to one probe per frame
+          // rather than one per mousemove — the pointer often rests over the
+          // text the user is typing into.
           const onPointerMove = (e: MouseEvent) => {
-            if (!view.editable || dragging) return;
-            const hit = resolveBlock(e.clientX, e.clientY);
-            if (hit) {
-              activateBlock(hit);
-              clearHideTimer();
-            } else if (!pinned && !state.container.contains(e.target as Node)) {
-              scheduleHide();
-            }
+            if (!view.editable || dragging || pointerMoveRaf) return;
+            const { clientX, clientY, target } = e;
+            pointerMoveRaf = requestAnimationFrame(() => {
+              pointerMoveRaf = 0;
+              if (!view.editable || dragging) return;
+              const hit = resolveBlock(clientX, clientY);
+              if (hit) {
+                activateBlock(hit);
+                clearHideTimer();
+              } else if (!pinned && !state.container.contains(target as Node)) {
+                scheduleHide();
+              }
+            });
           };
 
           const onEditorLeave = (e: MouseEvent) => {
@@ -382,6 +391,7 @@ export const BlockHandle = Extension.create({
             destroy: () => {
               clearHideTimer();
               stopAutoScroll();
+              if (pointerMoveRaf) cancelAnimationFrame(pointerMoveRaf);
               editorRoot.removeEventListener("mousemove", onPointerMove);
               editorRoot.removeEventListener("mouseleave", onEditorLeave);
               view.dom.removeEventListener("dragover", onDragOver);

@@ -14,6 +14,24 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
+// Node exposes a stub `localStorage` that throws on use, which shadows jsdom's.
+if (typeof localStorage?.setItem !== "function") {
+  const store = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, String(value)),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+      key: (index: number) => [...store.keys()][index] ?? null,
+      get length() {
+        return store.size;
+      },
+    },
+  });
+}
+
 // jsdom doesn't implement these, but ProseMirror/TipTap call them.
 if (!(document as any).elementFromPoint) {
   (document as any).elementFromPoint = () => null;

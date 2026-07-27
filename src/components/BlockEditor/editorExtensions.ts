@@ -109,7 +109,9 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
         return PLACEHOLDER_BY_NODE[node.type.name] ?? "";
       },
       showOnlyWhenEditable: true,
-      showOnlyCurrent: false,
+      // Notion shows a hint on the block you are in, not on every empty block —
+      // which also keeps each transaction from rebuilding decorations doc-wide.
+      showOnlyCurrent: true,
       includeChildren: true,
     }),
     TaskList,

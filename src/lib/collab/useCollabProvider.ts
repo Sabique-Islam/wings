@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,69 +10,62 @@ export interface CollabSession {
   user: { id: string; name: string; color: string };
 }
 
+export interface CollabState {
+  session: CollabSession | null;
+  /** True while a shared page is still building its session. */
+  connecting: boolean;
+}
+
 /**
  * Connect Yjs when the entry is shared and the user can edit.
- * Returns null in solo mode (no WebSocket, no CRDT overhead).
+ * Returns no session in solo mode (no WebSocket, no CRDT overhead).
  */
 export function useCollabProvider(
   entryId: string | null,
   enabled: boolean,
   userId: string,
   userEmail: string,
-): CollabSession | null {
+): CollabState {
   const [session, setSession] = useState<CollabSession | null>(null);
-  const sessionRef = useRef<CollabSession | null>(null);
+  const collabUrl = import.meta.env.VITE_COLLAB_URL as string | undefined;
+  const canConnect = Boolean(enabled && entryId && userId && collabUrl);
 
   useEffect(() => {
-    if (!enabled || !entryId || !userId) {
-      sessionRef.current?.provider.destroy();
-      sessionRef.current = null;
+    if (!canConnect) {
       setSession(null);
       return;
     }
 
-    const collabUrl = import.meta.env.VITE_COLLAB_URL as string | undefined;
-    if (!collabUrl) {
-      setSession(null);
-      return;
-    }
+    const ydoc = new Y.Doc();
+    const name = userEmail.split("@")[0] || userEmail;
+    const user = { id: userId, name, color: collabColor(userId) };
 
-    let cancelled = false;
+    const provider = new HocuspocusProvider({
+      url: collabUrl as string,
+      name: `entry:${entryId}`,
+      document: ydoc,
+      // Resolved lazily so the session exists on the first render: TipTap cannot
+      // adopt collaboration extensions after the editor has been created, and
+      // waiting on the auth call here would force a second editor instance.
+      token: async () => {
+        const { data } = await supabase.auth.getSession();
+        return data.session?.access_token ?? "";
+      },
+      onAuthenticationFailed: () => {
+        provider.destroy();
+      },
+      onDisconnect: () => {
+        window.dispatchEvent(new CustomEvent("nw:collab-flush"));
+      },
+    });
 
-    (async () => {
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      const token = authSession?.access_token;
-      if (!token || cancelled) return;
-
-      const ydoc = new Y.Doc();
-      const name = userEmail.split("@")[0] || userEmail;
-      const user = { id: userId, name, color: collabColor(userId) };
-
-      const provider = new HocuspocusProvider({
-        url: collabUrl,
-        name: `entry:${entryId}`,
-        document: ydoc,
-        token,
-        onAuthenticationFailed: () => {
-          provider.destroy();
-        },
-        onDisconnect: () => {
-          window.dispatchEvent(new CustomEvent("nw:collab-flush"));
-        },
-      });
-
-      const next: CollabSession = { ydoc, provider, user };
-      sessionRef.current = next;
-      if (!cancelled) setSession(next);
-    })();
+    setSession({ ydoc, provider, user });
 
     return () => {
-      cancelled = true;
-      sessionRef.current?.provider.destroy();
-      sessionRef.current = null;
+      provider.destroy();
       setSession(null);
     };
-  }, [enabled, entryId, userId, userEmail]);
+  }, [canConnect, collabUrl, entryId, userId, userEmail]);
 
-  return session;
+  return { session, connecting: canConnect && !session };
 }
