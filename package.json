@@ -87,6 +87,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "dexie": "^4.4.4",
     "dodopayments-checkout": "^1.8.0",
     "dompurify": "^3.4.12",
     "embla-carousel-react": "^8.6.0",
