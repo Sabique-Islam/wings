@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { Entry, ShareRole } from "@/lib/journal";
 import type { EditorChangePayload } from "@/lib/editorPayload";
 import { useCollabProvider } from "@/lib/collab/useCollabProvider";
@@ -113,7 +113,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
 
   const words = entry ? wordCount(entry.content) : 0;
   const canEdit = canEditRole(userRole);
-  const collabSession = useCollabProvider(
+  const { session: collabSession, connecting: collabConnecting } = useCollabProvider(
     entry?.id ?? null,
     collabEnabled && canEdit,
     userId,
@@ -122,22 +122,29 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
   const canDelete = userRole === "owner" || userRole === "admin";
   const canManage = userRole === "owner" || userRole === "admin";
 
+  // The editor rebuilds its extension list whenever its handler props change
+  // identity, so the upload handler reads the entry through a ref rather than
+  // closing over an object that is replaced on every save.
+  const entryRef = useRef(entry);
+  entryRef.current = entry;
+
   const handleImageFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/") || !entry) return;
+    const current = entryRef.current;
+    if (!file.type.startsWith("image/") || !current) return;
     setUploading(true);
     const url = await uploadImage(file, userId);
     if (url) {
       if ((window as any).__nw_insertImage) {
         (window as any).__nw_insertImage(url);
       } else {
-        onChange(entry.id, {
-          markdown: entry.content + `\n![image](${url})\n`,
-          json: entry.content_json ?? { type: "doc", content: [] },
+        onChange(current.id, {
+          markdown: current.content + `\n![image](${url})\n`,
+          json: current.content_json ?? { type: "doc", content: [] },
         });
       }
     }
     setUploading(false);
-  }, [userId, entry, onChange]);
+  }, [userId, onChange]);
 
   const handleImageUpload = useCallback((file?: File) => {
     if (file) {
@@ -154,6 +161,28 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
     }
     e.target.value = "";
   }, [handleImageFile]);
+
+  // Bound to the id the editor was mounted with, not to whatever is active now:
+  // the outgoing editor serializes one last time during unmount, by which point
+  // the shell has already switched to the next page.
+  const editorEntryId = entry?.id ?? null;
+
+  const handleEditorChange = useCallback((payload: EditorChangePayload) => {
+    if (editorEntryId) onChange(editorEntryId, payload);
+  }, [editorEntryId, onChange]);
+
+  const handleLinkPage = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("nw:linkpage"));
+  }, []);
+
+  const handleNewPage = useCallback((title: string) => {
+    if (editorEntryId) void onNewSubpageWithTitle(editorEntryId, title);
+  }, [editorEntryId, onNewSubpageWithTitle]);
+
+  const pages = useMemo(
+    () => allEntries.map((e) => ({ id: e.id, title: e.title || "Untitled" })),
+    [allEntries],
+  );
 
   return (
     <div className="flex-1 flex flex-col h-screen min-w-0 w-full">
@@ -339,21 +368,26 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 t.style.height = `${t.scrollHeight}px`;
               }}
             />
-            <BlockEditor
-              key={entry.id}
-              entryId={entry.id}
-              content={entry.content}
-              contentJson={entry.content_json}
-              onChange={(payload) => onChange(entry.id, payload)}
-              onImageUpload={canEdit ? handleImageUpload : undefined}
-              onLinkPage={canEdit ? () => window.dispatchEvent(new CustomEvent("nw:linkpage")) : undefined}
-              onNewPage={canEdit ? (title: string) => onNewSubpageWithTitle(entry.id, title) : undefined}
-              onAskAI={canEdit ? onOpenAI : undefined}
-              pages={allEntries.map((e) => ({ id: e.id, title: e.title || "Untitled" }))}
-              editable={canEdit}
-              collabSession={collabSession}
-            />
-            <InlineAIMenu editor={(window as any).__nw_editor} />
+            {/* A shared page waits for its Yjs session: the editor cannot adopt
+                collaboration extensions once it exists, so mounting early would
+                throw away the instance a moment later. */}
+            {!collabConnecting && (
+              <BlockEditor
+                key={entry.id}
+                entryId={entry.id}
+                content={entry.content}
+                contentJson={entry.content_json}
+                onChange={handleEditorChange}
+                onImageUpload={canEdit ? handleImageUpload : undefined}
+                onLinkPage={canEdit ? handleLinkPage : undefined}
+                onNewPage={canEdit ? handleNewPage : undefined}
+                onAskAI={canEdit ? onOpenAI : undefined}
+                pages={pages}
+                editable={canEdit}
+                collabSession={collabSession}
+              />
+            )}
+            <InlineAIMenu />
             <input
               ref={fileInputRef}
               type="file"

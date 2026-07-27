@@ -2,7 +2,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { markdownToHtml, htmlToMarkdown } from "@/lib/markdown";
 import { insertBookmark, insertEmbed, looksLikeMarkdown } from "./blockCommands";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { createBlockEditorExtensions } from "./editorExtensions";
 import { BlockMenu } from "./BlockMenu";
 import { BlockContextMenu } from "./BlockContextMenu";
@@ -12,7 +12,7 @@ import { TableMenu } from "./TableMenu";
 import { EditorPopoverInput, promptEditorInput } from "./EditorPopoverInput";
 import { isSafeHttpUrl } from "@/lib/safeUrl";
 import { fetchLinkPreview } from "@/lib/linkPreview";
-import type { EditorChangePayload } from "@/lib/editorPayload";
+import type { EditorChangePayload, FullEditorChangePayload } from "@/lib/editorPayload";
 import { resolveInitialEditorContent } from "@/lib/editorContent";
 import { createCollabExtensions } from "@/lib/collab/collabExtensions";
 import type { CollabSession } from "@/lib/collab/useCollabProvider";
@@ -41,6 +41,8 @@ function resolveInitialContent(content: string, contentJson?: JSONContent | null
   return resolveInitialEditorContent(content, contentJson);
 }
 
+type MountedEditor = NonNullable<ReturnType<typeof useEditor>>;
+
 function pastePlainParagraphs(view: import("@tiptap/pm/view").EditorView, text: string): boolean {
   const lines = text.split(/\r?\n/);
   if (lines.length <= 1) return false;
@@ -55,7 +57,11 @@ function pastePlainParagraphs(view: import("@tiptap/pm/view").EditorView, text: 
   return true;
 }
 
-export function BlockEditor({
+/**
+ * Memoized: the journal shell re-renders on save-status and entry-list updates,
+ * and none of that should reconcile the subtree the user is typing into.
+ */
+export const BlockEditor = memo(function BlockEditor({
   entryId,
   content,
   contentJson,
@@ -113,22 +119,33 @@ export function BlockEditor({
     ],
   );
 
-  const serialize = useCallback((editor: NonNullable<ReturnType<typeof useEditor>>, immediate = false) => {
-    const run = () => {
-      const md = htmlToMarkdown(editor.getHTML());
-      const json = editor.getJSON();
-      lastEmittedMarkdown.current = md;
-      lastEmittedJson.current = json;
-      (window as any).__nw_currentMarkdown = md;
-      onChangeRef.current({ markdown: md, json });
-    };
-    if (immediate) {
-      if (serializeTimer.current) clearTimeout(serializeTimer.current);
-      run();
-      return;
-    }
+  /**
+   * Full serialize — getHTML plus a Turndown pass over the whole document.
+   * This is the expensive half, so it only runs where someone is about to read
+   * the markdown: blur, unmount, and the flush the save pipeline requests.
+   */
+  const serializeFull = useCallback((editor: MountedEditor): FullEditorChangePayload => {
     if (serializeTimer.current) clearTimeout(serializeTimer.current);
-    serializeTimer.current = setTimeout(run, SERIALIZE_DEBOUNCE_MS);
+    const markdown = htmlToMarkdown(editor.getHTML());
+    const json = editor.getJSON();
+    lastEmittedMarkdown.current = markdown;
+    lastEmittedJson.current = json;
+    (window as any).__nw_currentMarkdown = markdown;
+    return { markdown, json };
+  }, []);
+
+  const emitFull = useCallback((editor: MountedEditor) => {
+    onChangeRef.current(serializeFull(editor));
+  }, [serializeFull]);
+
+  /** Typing path — JSON only, so keystrokes never wait on markdown rendering. */
+  const scheduleJsonEmit = useCallback((editor: MountedEditor) => {
+    if (serializeTimer.current) clearTimeout(serializeTimer.current);
+    serializeTimer.current = setTimeout(() => {
+      const json = editor.getJSON();
+      lastEmittedJson.current = json;
+      onChangeRef.current({ json });
+    }, SERIALIZE_DEBOUNCE_MS);
   }, []);
 
   const editor = useEditor({
@@ -200,10 +217,10 @@ export function BlockEditor({
     },
     onUpdate: ({ editor: ed }) => {
       localVersion.current += 1;
-      serialize(ed);
+      scheduleJsonEmit(ed);
     },
     onBlur: ({ editor: ed }) => {
-      serialize(ed, true);
+      emitFull(ed);
     },
   }, [collabSession, entryId]);
 
@@ -284,7 +301,10 @@ export function BlockEditor({
     (window as any).__nw_insertImage = insertImage;
     (window as any).__nw_editor = editor;
     (window as any).__nw_getMarkdown = () => htmlToMarkdown(editor.getHTML());
-    (window as any).__nw_flushEditor = () => serialize(editor, true);
+    // Entry-scoped: a save scheduled before navigation must not be handed the
+    // next page's document.
+    (window as any).__nw_flushEditor = (id?: string) =>
+      id == null || id === entryId ? serializeFull(editor) : null;
     (window as any).__nw_currentMarkdown = htmlToMarkdown(editor.getHTML());
 
     const onSlashPrompt = async (e: Event) => {
@@ -327,10 +347,10 @@ export function BlockEditor({
       window.removeEventListener("nw:slashPrompt", onSlashPrompt);
       if (serializeTimer.current) clearTimeout(serializeTimer.current);
       if (editor && !editor.isDestroyed) {
-        serialize(editor, true);
+        emitFull(editor);
       }
     };
-  }, [insertImage, editor, serialize, onNewPage, entryId]);
+  }, [insertImage, editor, serializeFull, emitFull, onNewPage, entryId]);
 
   if (!editor) return null;
 
@@ -367,4 +387,4 @@ export function BlockEditor({
       <EditorContent editor={editor} className="w-full min-w-0" />
     </div>
   );
-}
+});

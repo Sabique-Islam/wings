@@ -1,7 +1,9 @@
 import { useCallback, useState } from "react";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { htmlToMarkdown } from "@/lib/markdown";
-import type { EditorChangePayload } from "@/lib/editorPayload";
+import { requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
+
+const ENTRY_ID = "e2e-harness";
 
 export default function EditorE2E() {
   const [content, setContent] = useState("");
@@ -9,10 +11,13 @@ export default function EditorE2E() {
   const [aiText, setAiText] = useState("");
 
   const handleChange = useCallback((payload: EditorChangePayload) => {
+    // Mirror the app's save path: typing emits JSON, markdown comes from a
+    // full serialize requested just before the content would be persisted.
+    const storedMarkdown = payload.markdown ?? requestEditorSerialize(ENTRY_ID)?.markdown ?? "";
     const editor = (window as any).__nw_editor;
-    const renderedMarkdown = editor ? htmlToMarkdown(editor.getHTML()) : payload.markdown;
-    const requestMarkdown = (window as any).__nw_getMarkdown?.() ?? payload.markdown;
-    setContent(payload.markdown);
+    const renderedMarkdown = editor ? htmlToMarkdown(editor.getHTML()) : storedMarkdown;
+    const requestMarkdown = (window as any).__nw_getMarkdown?.() ?? storedMarkdown;
+    setContent(storedMarkdown);
     setPreview(renderedMarkdown);
     setAiText(requestMarkdown);
   }, []);
@@ -20,7 +25,7 @@ export default function EditorE2E() {
   return (
     <main className="min-h-screen bg-background text-foreground p-6">
       <div className="max-w-3xl mx-auto border border-border rounded-md min-h-[360px] p-4">
-        <BlockEditor entryId="e2e-harness" content={content} onChange={handleChange} />
+        <BlockEditor entryId={ENTRY_ID} content={content} onChange={handleChange} />
       </div>
       <section aria-label="editor parity" className="sr-only">
         <pre data-testid="stored-text">{content}</pre>

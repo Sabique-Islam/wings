@@ -1,12 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Sparkles, Wand2, Languages, Scissors, Maximize2, ListChecks, Loader2 } from "lucide-react";
 import { generateOnce, getApiKey } from "@/lib/aiClient";
 import { toast } from "sonner";
 import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { markdownToHtml } from "@/lib/markdown";
 
-interface Props {
-  editor: any;
+/**
+ * The editor is published by BlockEditor after it mounts, so read it when the
+ * menu is used rather than capturing whatever was there at render time.
+ */
+function currentEditor(): any {
+  return (window as any).__nw_editor;
 }
 
 const PRESETS = [
@@ -17,7 +21,7 @@ const PRESETS = [
   { id: "translate", label: "Translate to English", icon: Languages, prompt: "Translate to natural English. If already English, translate to Spanish. Output ONLY the translated text." },
 ];
 
-export function InlineAIMenu({ editor }: Props) {
+export function InlineAIMenu() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -32,7 +36,8 @@ export function InlineAIMenu({ editor }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const openMenu = () => {
+  const openMenu = useCallback(() => {
+    const editor = currentEditor();
     if (!editor) return;
     const { from, to } = editor.state.selection;
     if (from === to) return;
@@ -42,7 +47,7 @@ export function InlineAIMenu({ editor }: Props) {
     setPos({ top: rect.bottom + window.scrollY + 6, left: rect.left + window.scrollX });
     setOpen(true);
     setCustom("");
-  };
+  }, []);
 
   // Expose globally so BubbleMenu button can trigger
   useEffect(() => {
@@ -50,9 +55,10 @@ export function InlineAIMenu({ editor }: Props) {
     return () => {
       delete (window as any).__nw_openInlineAI;
     };
-  }, [editor]);
+  }, [openMenu]);
 
   const runPrompt = async (instruction: string) => {
+    const editor = currentEditor();
     if (!editor) return;
     if (!getApiKey()) {
       window.dispatchEvent(new CustomEvent("nw:openAI"));
