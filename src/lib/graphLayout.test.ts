@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { buildGraph, graphBounds, nodeRadius, stepLayout, type GraphSource } from "./graphLayout";
+import {
+  applyGraphFilters,
+  applySavedPositions,
+  buildGraph,
+  buildLocalGraph,
+  graphBounds,
+  isOrphan,
+  neighborhoodIds,
+  nodeRadius,
+  stepLayout,
+  type GraphSource,
+} from "./graphLayout";
 
 function page(id: string, parentId: string | null = null): GraphSource {
   return { id, label: id.toUpperCase(), parentId };
@@ -110,5 +121,77 @@ describe("stepLayout", () => {
 describe("graphBounds", () => {
   it("returns a usable box for an empty graph", () => {
     expect(graphBounds([])).toEqual({ minX: -1, minY: -1, maxX: 1, maxY: 1 });
+  });
+});
+
+describe("neighborhoodIds", () => {
+  const edges = [
+    { from: "a", to: "b" },
+    { from: "b", to: "c" },
+  ];
+
+  it("includes only the center at depth zero hops treated as depth 1", () => {
+    expect(neighborhoodIds("a", edges, 1)).toEqual(new Set(["a", "b"]));
+  });
+
+  it("expands two hops from the center", () => {
+    expect(neighborhoodIds("a", edges, 2)).toEqual(new Set(["a", "b", "c"]));
+  });
+});
+
+describe("buildLocalGraph", () => {
+  it("limits the graph to the neighborhood around the active page", () => {
+    const pages = [page("a"), page("b"), page("c"), page("d")];
+    const links = [{ from: "a", to: "b" }, { from: "c", to: "d" }];
+    const graph = buildLocalGraph(pages, links, "a", 1);
+
+    expect(graph.nodes.map((n) => n.id).sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("isOrphan", () => {
+  it("treats pages with no incoming links and no parent as orphans", () => {
+    expect(isOrphan("a", [{ from: "a", to: "b" }], [page("a"), page("b")])).toBe(true);
+    expect(isOrphan("b", [{ from: "a", to: "b" }], [page("a"), page("b")])).toBe(false);
+    expect(isOrphan("c", [], [page("c", "a")])).toBe(false);
+  });
+});
+
+describe("applyGraphFilters", () => {
+  it("can hide nodes with no connections", () => {
+    const graph = buildGraph([page("a"), page("b"), page("c")], [{ from: "a", to: "b" }]);
+    const filtered = applyGraphFilters(
+      graph,
+      [page("a"), page("b"), page("c")],
+      { hideUnlinked: true, orphansOnly: false, tag: null },
+      new Map(),
+      [{ from: "a", to: "b" }],
+    );
+    expect(filtered.nodes.map((n) => n.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("filters nodes by tag", () => {
+    const graph = buildGraph([page("a"), page("b")], []);
+    const tags = new Map([
+      ["a", ["research"]],
+      ["b", ["personal"]],
+    ]);
+    const filtered = applyGraphFilters(
+      graph,
+      [page("a"), page("b")],
+      { hideUnlinked: false, orphansOnly: false, tag: "research" },
+      tags,
+      [],
+    );
+    expect(filtered.nodes.map((n) => n.id)).toEqual(["a"]);
+  });
+});
+
+describe("applySavedPositions", () => {
+  it("restores coordinates for nodes that were saved before", () => {
+    const graph = buildGraph([page("a"), page("b")], []);
+    const restored = applySavedPositions(graph.nodes, { a: { x: 10, y: 20 } });
+    expect(restored).toBe(1);
+    expect(graph.nodes.find((n) => n.id === "a")).toMatchObject({ x: 10, y: 20, vx: 0, vy: 0 });
   });
 });

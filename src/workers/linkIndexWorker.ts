@@ -10,16 +10,18 @@ import type { JSONContent } from "@tiptap/core";
 export interface LinkIndexRequest {
   entryId: string;
   doc: JSONContent;
+  markdown?: string;
 }
 
 export interface LinkIndexResponse {
   entryId: string;
   outgoing: string[];
   unresolved: string[];
+  tags: string[];
 }
 
 self.onmessage = ({ data }: MessageEvent<LinkIndexRequest>) => {
-  const { outgoing, unresolved } = extractLinks(data.doc);
-  const response: LinkIndexResponse = { entryId: data.entryId, outgoing, unresolved };
+  const { outgoing, unresolved, tags } = extractLinks(data.doc, data.markdown);
+  const response: LinkIndexResponse = { entryId: data.entryId, outgoing, unresolved, tags };
   self.postMessage(response);
 };

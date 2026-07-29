@@ -1,23 +1,15 @@
 import { Entry } from "@/lib/journal";
 import { createEntry } from "@/lib/journal";
+import { serializeVaultMarkdown, titleFromContent, slug } from "@/lib/vault/frontmatter";
 
 export function exportSingleEntry(entry: Entry): void {
-  const title = titleOf(entry);
-  download(entry.content, `${slug(title)}.md`, "text/markdown");
+  const title = titleFromContent(entry.content);
+  download(serializeVaultMarkdown(entry), `${slug(title)}.md`, "text/markdown");
 }
 
 export function exportAllEntries(entries: Entry[]): void {
   const sorted = [...entries].sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const content = sorted
-    .map((e) => {
-      const date = new Date(e.created_at).toLocaleDateString("default", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
-      return `---\ndate: ${date}\ntitle: ${titleOf(e)}\n---\n\n${e.content}`;
-    })
-    .join("\n\n---\n\n");
+  const content = sorted.map((e) => serializeVaultMarkdown(e)).join("\n\n---\n\n");
   download(content, "wings-export.md", "text/markdown");
 }
 
@@ -131,10 +123,6 @@ export async function importFile(file: File, userId: string): Promise<Entry[]> {
 
 function titleOf(entry: Entry): string {
   return entry.content.split("\n")[0].replace(/^#+\s*/, "").trim() || "untitled";
-}
-
-function slug(s: string): string {
-  return s.slice(0, 60).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
 }
 
 function download(content: string, filename: string, mime: string) {

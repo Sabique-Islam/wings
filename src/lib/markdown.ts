@@ -10,7 +10,7 @@ const turndown = new TurndownService({
   emDelimiter: "_",
 });
 
-const CUSTOM_BLOCK_TYPES = new Set(["callout", "toggle", "column-list", "bookmark", "embed", "excalidraw"]);
+const CUSTOM_BLOCK_TYPES = new Set(["callout", "toggle", "column-list", "bookmark", "embed", "page-embed", "excalidraw"]);
 turndown.keep((node) => {
   if (node.nodeType !== 1) return false;
   const type = (node as HTMLElement).getAttribute("data-type");
@@ -52,6 +52,19 @@ passthroughRule("toggle", (el) => el.getAttribute("data-type") === "toggle");
 passthroughRule("columnList", (el) => el.getAttribute("data-type") === "column-list");
 passthroughRule("bookmark", (el) => el.getAttribute("data-type") === "bookmark");
 passthroughRule("embed", (el) => el.getAttribute("data-type") === "embed");
+passthroughRule("pageEmbed", (el) => el.getAttribute("data-type") === "page-embed");
+
+turndown.addRule("pageEmbedMarkdown", {
+  filter: (node) =>
+    node.nodeType === 1 && (node as HTMLElement).getAttribute("data-type") === "page-embed",
+  replacement: (_content, node) => {
+    const title =
+      (node as HTMLElement).getAttribute("data-title") ||
+      (node as HTMLElement).getAttribute("data-page-title") ||
+      "Untitled";
+    return `\n\n![[${title}]]\n\n`;
+  },
+});
 
 turndown.addRule("inlineMath", {
   filter: (node) =>
@@ -137,7 +150,18 @@ function preprocessMath(md: string): string {
     .join("");
 }
 
+function preprocessPageEmbeds(md: string): string {
+  if (!md.includes("![[")) return md;
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return md.replace(/!\[\[([^[\]|]+)(?:\|([^[\]]*))?\]\]/g, (_match, rawTitle, alias) => {
+    const title = String(rawTitle).trim();
+    const display = String(alias ?? title).trim();
+    return `\n\n<div data-type="page-embed" data-title="${esc(title)}" data-page-title="${esc(display)}"></div>\n\n`;
+  });
+}
+
 export function markdownToHtml(md: string): string {
   if (!md) return "";
-  return marked.parse(preprocessMath(md), { async: false }) as string;
+  return marked.parse(preprocessPageEmbeds(preprocessMath(md)), { async: false }) as string;
 }

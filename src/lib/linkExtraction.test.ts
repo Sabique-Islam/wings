@@ -74,7 +74,37 @@ describe("extractLinks", () => {
   });
 
   it("treats an empty document as having no links", () => {
-    expect(extractLinks(null)).toEqual({ outgoing: [], unresolved: [] });
-    expect(extractLinks({ type: "doc", content: [] })).toEqual({ outgoing: [], unresolved: [] });
+    expect(extractLinks(null)).toEqual({ outgoing: [], unresolved: [], tags: [] });
+    expect(extractLinks({ type: "doc", content: [] })).toEqual({
+      outgoing: [],
+      unresolved: [],
+      tags: [],
+    });
+  });
+
+  it("collects hashtags from text", () => {
+    const doc: JSONContent = {
+      type: "doc",
+      content: [paragraph({ type: "text", text: "notes on #research and #ideas/nested" })],
+    };
+    expect(extractLinks(doc).tags).toEqual(["ideas/nested", "research"]);
+  });
+
+  it("collects tags from frontmatter when markdown is provided", () => {
+    const md = "---\ntags: [Alpha, beta]\n---\n\n# Hello";
+    expect(extractLinks({ type: "doc", content: [] }, md).tags).toEqual(["alpha", "beta"]);
+  });
+
+  it("counts page embed nodes as outgoing links", () => {
+    const doc: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "pageEmbed",
+          attrs: { pageId: "page-x", title: "Notes" },
+        },
+      ],
+    };
+    expect(extractLinks(doc).outgoing).toEqual(["page-x"]);
   });
 });

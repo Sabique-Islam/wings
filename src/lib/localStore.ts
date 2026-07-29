@@ -49,7 +49,28 @@ export interface LinkIndexRow {
   outgoing: string[];
   /** Wikilink titles that don't resolve to an existing page yet. */
   unresolved: string[];
+  /** Hashtags found in this page's content. */
+  tags: string[];
   updatedAt: number;
+}
+
+export interface GraphStateRow {
+  userId: string;
+  mode: "global" | "local";
+  depth: 1 | 2 | 3;
+  filters: { hideUnlinked: boolean; orphansOnly: boolean; tag: string | null };
+  positions: Record<string, { x: number; y: number }>;
+  viewport: { scale: number; offsetX: number; offsetY: number } | null;
+  updatedAt: number;
+}
+
+export interface VaultMetaRow {
+  userId: string;
+  folderName: string;
+  connectedAt: number;
+  handle: FileSystemDirectoryHandle | null;
+  lastWrittenAt: Record<string, number>;
+  lastWrittenHash: Record<string, string>;
 }
 
 class WingsDatabase extends Dexie {
@@ -58,6 +79,8 @@ class WingsDatabase extends Dexie {
   drafts!: Table<DraftRow, string>;
   pendingWrites!: Table<PendingWriteRow, string>;
   linkIndex!: Table<LinkIndexRow, string>;
+  graphState!: Table<GraphStateRow, string>;
+  vaultMeta!: Table<VaultMetaRow, string>;
 
   constructor() {
     super("wings");
@@ -68,6 +91,24 @@ class WingsDatabase extends Dexie {
       pendingWrites: "entryId",
       linkIndex: "entryId, *outgoing",
     });
+    this.version(2)
+      .stores({
+        entries: "id, cacheOwnerId",
+        meta: "userId",
+        drafts: "entryId",
+        pendingWrites: "entryId",
+        linkIndex: "entryId, *outgoing",
+        graphState: "userId",
+        vaultMeta: "userId",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table("linkIndex")
+          .toCollection()
+          .modify((row: LinkIndexRow) => {
+            if (!row.tags) row.tags = [];
+          });
+      });
   }
 }
 
@@ -200,5 +241,31 @@ export function putLinkIndexRow(row: LinkIndexRow): Promise<void> {
 export function deleteLinkIndexRow(entryId: string): Promise<void> {
   return guard(async (instance) => {
     await instance.linkIndex.delete(entryId);
+  }, undefined);
+}
+
+export function readGraphState(userId: string): Promise<GraphStateRow | null> {
+  return guard(async (instance) => (await instance.graphState.get(userId)) ?? null, null);
+}
+
+export function putGraphState(row: GraphStateRow): Promise<void> {
+  return guard(async (instance) => {
+    await instance.graphState.put(row);
+  }, undefined);
+}
+
+export function readVaultMeta(userId: string): Promise<VaultMetaRow | null> {
+  return guard(async (instance) => (await instance.vaultMeta.get(userId)) ?? null, null);
+}
+
+export function putVaultMeta(row: VaultMetaRow): Promise<void> {
+  return guard(async (instance) => {
+    await instance.vaultMeta.put(row);
+  }, undefined);
+}
+
+export function deleteVaultMeta(userId: string): Promise<void> {
+  return guard(async (instance) => {
+    await instance.vaultMeta.delete(userId);
   }, undefined);
 }

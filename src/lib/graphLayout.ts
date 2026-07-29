@@ -181,3 +181,137 @@ export function graphBounds(nodes: GraphNode[]): GraphBounds {
 export function nodeRadius(node: GraphNode): number {
   return 4 + Math.min(9, node.degree * 1.4);
 }
+
+export interface GraphFilters {
+  hideUnlinked: boolean;
+  orphansOnly: boolean;
+  tag: string | null;
+}
+
+/** BFS over undirected link edges up to `depth` hops from `centerId`. */
+export function neighborhoodIds(
+  centerId: string,
+  edges: Array<{ from: string; to: string }>,
+  depth: number,
+): Set<string> {
+  const adj = new Map<string, Set<string>>();
+  for (const { from, to } of edges) {
+    if (!adj.has(from)) adj.set(from, new Set());
+    if (!adj.has(to)) adj.set(to, new Set());
+    adj.get(from)!.add(to);
+    adj.get(to)!.add(from);
+  }
+
+  const result = new Set<string>([centerId]);
+  let frontier = new Set<string>([centerId]);
+  for (let hop = 0; hop < depth; hop++) {
+    const next = new Set<string>();
+    for (const id of frontier) {
+      for (const neighbor of adj.get(id) ?? []) {
+        if (!result.has(neighbor)) {
+          result.add(neighbor);
+          next.add(neighbor);
+        }
+      }
+    }
+    frontier = next;
+    if (frontier.size === 0) break;
+  }
+  return result;
+}
+
+/** Subgraph around the active page, always including the center node. */
+export function buildLocalGraph(
+  pages: GraphSource[],
+  links: Array<{ from: string; to: string }>,
+  centerId: string,
+  depth: number,
+  maxNodes = 150,
+): Graph {
+  const ids = neighborhoodIds(centerId, links, depth);
+  const subset = pages.filter((p) => ids.has(p.id));
+  if (!subset.some((p) => p.id === centerId)) {
+    const center = pages.find((p) => p.id === centerId);
+    if (center) subset.push(center);
+  }
+  const filteredLinks = links.filter((l) => ids.has(l.from) && ids.has(l.to));
+  return buildGraph(subset, filteredLinks, maxNodes);
+}
+
+/** No incoming link edges and not nested under another page. */
+export function isOrphan(
+  pageId: string,
+  linkEdges: Array<{ from: string; to: string }>,
+  pages: GraphSource[],
+): boolean {
+  const page = pages.find((p) => p.id === pageId);
+  if (page?.parentId) return false;
+  return !linkEdges.some((e) => e.to === pageId);
+}
+
+export function applyGraphFilters(
+  graph: Graph,
+  pages: GraphSource[],
+  filters: GraphFilters,
+  tagsByEntryId: Map<string, string[]>,
+  linkEdges: Array<{ from: string; to: string }>,
+): Graph {
+  let keep = new Set(graph.nodes.map((n) => n.id));
+
+  if (filters.orphansOnly) {
+    keep = new Set([...keep].filter((id) => isOrphan(id, linkEdges, pages)));
+  }
+
+  if (filters.hideUnlinked) {
+    keep = new Set(
+      [...keep].filter((id) => {
+        const node = graph.nodes.find((n) => n.id === id);
+        return node != null && node.degree > 0;
+      }),
+    );
+  }
+
+  if (filters.tag) {
+    const wanted = filters.tag.toLowerCase();
+    keep = new Set(
+      [...keep].filter((id) =>
+        (tagsByEntryId.get(id) ?? []).some((t) => t.toLowerCase() === wanted),
+      ),
+    );
+  }
+
+  const nodes = graph.nodes.filter((n) => keep.has(n.id));
+  const keptIds = new Set(nodes.map((n) => n.id));
+  return {
+    nodes,
+    edges: graph.edges.filter((e) => keptIds.has(e.from) && keptIds.has(e.to)),
+  };
+}
+
+/** Seed coordinates from a persisted map; returns how many nodes were restored. */
+export function applySavedPositions(
+  nodes: GraphNode[],
+  saved: Record<string, { x: number; y: number }>,
+): number {
+  let restored = 0;
+  for (const node of nodes) {
+    const pos = saved[node.id];
+    if (!pos) continue;
+    node.x = pos.x;
+    node.y = pos.y;
+    node.vx = 0;
+    node.vy = 0;
+    restored += 1;
+  }
+  return restored;
+}
+
+export function positionsToRecord(
+  nodes: GraphNode[],
+): Record<string, { x: number; y: number }> {
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const node of nodes) {
+    out[node.id] = { x: node.x, y: node.y };
+  }
+  return out;
+}

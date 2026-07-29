@@ -33,9 +33,10 @@ function commit(result: LinkIndexResponse): void {
   const unchanged =
     previous != null &&
     previous.outgoing.join("\u0000") === result.outgoing.join("\u0000") &&
-    previous.unresolved.join("\u0000") === result.unresolved.join("\u0000");
+    previous.unresolved.join("\u0000") === result.unresolved.join("\u0000") &&
+    (previous.tags ?? []).join("\u0000") === result.tags.join("\u0000");
   if (unchanged) return;
-  const row: LinkIndexRow = { ...result, updatedAt: Date.now() };
+  const row: LinkIndexRow = { ...result, tags: result.tags, updatedAt: Date.now() };
   rows.set(row.entryId, row);
   void putLinkIndexRow(row);
   notify();
@@ -65,25 +66,27 @@ function indexWorker(): Worker | null {
 
 /** Load the persisted index. Await before rendering backlinks or the graph. */
 export async function hydrateLinkIndex(): Promise<void> {
-  for (const row of await readLinkIndex()) rows.set(row.entryId, row);
+  for (const row of await readLinkIndex()) {
+    rows.set(row.entryId, { ...row, tags: row.tags ?? [] });
+  }
   notify();
 }
 
 /** Queue a rebuild for one page. Safe to call on every editor emit. */
-export function scheduleLinkIndex(entryId: string, doc: JSONContent): void {
+export function scheduleLinkIndex(entryId: string, doc: JSONContent, markdown?: string): void {
   const existing = timers.get(entryId);
   if (existing) clearTimeout(existing);
   timers.set(
     entryId,
     setTimeout(() => {
       timers.delete(entryId);
-      const request: LinkIndexRequest = { entryId, doc };
+      const request: LinkIndexRequest = { entryId, doc, markdown };
       const instance = indexWorker();
       if (instance) {
         instance.postMessage(request);
         return;
       }
-      commit({ entryId, ...extractLinks(doc) });
+      commit({ entryId, ...extractLinks(doc, markdown) });
     }, INDEX_DEBOUNCE_MS),
   );
 }
@@ -135,4 +138,22 @@ export function subscribeLinkIndex(listener: () => void): () => void {
 
 export function getLinkIndexVersion(): number {
   return version;
+}
+
+export function getTagsForEntry(entryId: string): string[] {
+  return rows.get(entryId)?.tags ?? [];
+}
+
+export function getAllTags(): string[] {
+  const tags = new Set<string>();
+  for (const row of rows.values()) {
+    for (const tag of row.tags ?? []) tags.add(tag);
+  }
+  return Array.from(tags).sort();
+}
+
+export function getTagsByEntryId(): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const row of rows.values()) map.set(row.entryId, row.tags ?? []);
+  return map;
 }

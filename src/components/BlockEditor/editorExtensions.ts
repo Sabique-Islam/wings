@@ -31,6 +31,9 @@ import { Bookmark } from "./BookmarkExtension";
 import { Embed } from "./EmbedExtension";
 import { createPageMentionExtension, type PageOption } from "./PageMentionExtension";
 import { createWikiLinkExtension } from "./WikiLinkExtension";
+import { createWikiEmbedExtension } from "./WikiEmbedExtension";
+import { createPageEmbedExtension } from "./PageEmbedExtension";
+import type { PagePreview } from "./PageEmbedExtension";
 import type { Extensions } from "@tiptap/core";
 
 interface BlockEditorExtensionHandlers {
@@ -39,6 +42,7 @@ interface BlockEditorExtensionHandlers {
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
   getPages?: () => PageOption[];
+  getPagePreview?: (pageId: string) => PagePreview | null;
 }
 
 interface BlockEditorExtensionOptions extends BlockEditorExtensionHandlers {
@@ -69,8 +73,15 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
             () => handlers.getPages?.() ?? [],
             handlers.onNewPage ? (title) => handlers.onNewPage?.(title) : undefined,
           ),
+          createWikiEmbedExtension(
+            () => handlers.getPages?.() ?? [],
+            handlers.onNewPage ? (title) => handlers.onNewPage?.(title) : undefined,
+          ),
         ]
       : [];
+  const pageEmbedExtension = createPageEmbedExtension(
+    (pageId) => handlers.getPagePreview?.(pageId) ?? null,
+  );
 
   return [
     WritingExperience,
@@ -81,7 +92,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
       types: [
         "paragraph", "heading", "blockquote", "codeBlock", "horizontalRule",
         "bulletList", "orderedList", "taskList", "listItem", "taskItem",
-        "callout", "toggleBlock", "columnList", "column", "bookmark", "embed",
+        "callout", "toggleBlock", "columnList", "column", "bookmark", "embed", "pageEmbed",
         "blockMath", "excalidraw",
       ],
       attributeName: "id",
@@ -148,6 +159,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
     ToggleBlock,
     Bookmark,
     Embed,
+    pageEmbedExtension,
     BlockMath,
     InlineMath,
     ExcalidrawNode,
