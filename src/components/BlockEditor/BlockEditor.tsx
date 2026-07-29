@@ -1,7 +1,7 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { markdownToHtml, htmlToMarkdown } from "@/lib/markdown";
-import { insertBookmark, insertEmbed, looksLikeMarkdown } from "./blockCommands";
+import { insertBookmark, insertEmbed, looksLikeMarkdown, pasteExternalUrl, updateBookmarkMeta, extractSingleLinkFromHtml } from "./blockCommands";
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { createBlockEditorExtensions } from "./editorExtensions";
 import { BlockMenu } from "./BlockMenu";
@@ -92,6 +92,7 @@ export const BlockEditor = memo(function BlockEditor({
   const markdownVersion = useRef(-1);
   const loadedEntryId = useRef(entryId);
   const serializeTimer = useRef<ReturnType<typeof setTimeout>>();
+  const editorRef = useRef<MountedEditor | null>(null);
   const onChangeRef = useRef(onChange);
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
@@ -199,13 +200,25 @@ export const BlockEditor = memo(function BlockEditor({
         const html = event.clipboardData?.getData("text/html")?.trim() ?? "";
         const text = event.clipboardData?.getData("text/plain")?.trim() ?? "";
 
-        if (text && URL_ONLY.test(text) && isSafeHttpUrl(text)) {
+        const urlFromText = text && URL_ONLY.test(text) && isSafeHttpUrl(text) ? text : null;
+        const urlFromHtml = extractSingleLinkFromHtml(html);
+        const externalUrl = urlFromText ?? urlFromHtml;
+
+        if (externalUrl) {
           event.preventDefault();
-          void (async () => {
-            const meta = await fetchLinkPreview(text);
-            const ed = (window as any).__nw_editor;
-            if (ed) insertBookmark(ed, text, meta ?? undefined);
-          })();
+          event.stopPropagation();
+          const ed = editorRef.current;
+          if (ed) {
+            const bookmarkPos = pasteExternalUrl(ed, externalUrl);
+            if (bookmarkPos != null) {
+              void fetchLinkPreview(externalUrl).then((meta) => {
+                if (meta && editorRef.current) {
+                  updateBookmarkMeta(editorRef.current, bookmarkPos, meta);
+                }
+              });
+              return true;
+            }
+          }
           return true;
         }
 
@@ -334,6 +347,7 @@ export const BlockEditor = memo(function BlockEditor({
 
   useEffect(() => {
     if (!editor) return;
+    editorRef.current = editor;
     (window as any).__nw_insertImage = insertImage;
     (window as any).__nw_editor = editor;
     (window as any).__nw_getMarkdown = () => htmlToMarkdown(editor.getHTML());
@@ -375,6 +389,7 @@ export const BlockEditor = memo(function BlockEditor({
     window.addEventListener("nw:slashPrompt", onSlashPrompt);
 
     return () => {
+      editorRef.current = null;
       delete (window as any).__nw_insertImage;
       delete (window as any).__nw_editor;
       delete (window as any).__nw_getMarkdown;

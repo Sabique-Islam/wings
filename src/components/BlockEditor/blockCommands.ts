@@ -1,6 +1,54 @@
 import type { Editor } from "@tiptap/core";
 import { markdownToHtml } from "@/lib/markdown";
 import { isAllowedEmbedUrl, isSafeHttpUrl } from "@/lib/safeUrl";
+import { getTopLevelBlockPos, type BlockPos } from "./blockUtils";
+
+export interface BookmarkMeta {
+  title?: string;
+  description?: string;
+  favicon?: string;
+}
+
+function bookmarkTitle(url: string, meta?: BookmarkMeta): string {
+  if (meta?.title) return meta.title;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function bookmarkAttrs(url: string, meta?: BookmarkMeta) {
+  return {
+    url,
+    title: bookmarkTitle(url, meta),
+    description: meta?.description ?? "",
+    favicon: meta?.favicon ?? "",
+  };
+}
+
+/**
+ * Clipboard HTML from GitHub, YouTube, etc. is often a wrapper meta tag plus a
+ * single anchor. Treat that as a bare URL paste so we don't also inline-link it.
+ */
+export function extractSingleLinkFromHtml(html: string): string | null {
+  if (!html.includes("<")) return null;
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const body = doc.body.cloneNode(true) as HTMLElement;
+    body.querySelectorAll("meta, link, style").forEach((el) => el.remove());
+    const anchors = Array.from(body.querySelectorAll("a[href]"));
+    if (anchors.length !== 1) return null;
+    const href = anchors[0]!.getAttribute("href")?.trim() ?? "";
+    if (!isSafeHttpUrl(href)) return null;
+    const text = body.textContent?.trim() ?? "";
+    const linkText = anchors[0]!.textContent?.trim() ?? "";
+    if (text === linkText || text === href || linkText === href) return href;
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export const TEXT_COLORS = [
   { label: "Default", value: "" },
@@ -94,30 +142,78 @@ export function insertColumns(editor: Editor, count: 2 | 3): void {
   editor.chain().focus().insertContent({ type: "columnList", content: cols }).run();
 }
 
-export function insertBookmark(
-  editor: Editor,
-  url: string,
-  meta?: { title?: string; description?: string; favicon?: string },
-): boolean {
+export function insertBookmark(editor: Editor, url: string, meta?: BookmarkMeta): boolean {
   if (!isSafeHttpUrl(url)) return false;
-  let title = meta?.title || url;
-  if (!meta?.title) {
-    try {
-      title = new URL(url).hostname;
-    } catch {
-      /* keep url */
-    }
-  }
   return editor
     .chain()
     .focus()
-    .insertBookmark({
-      url,
-      title,
-      description: meta?.description ?? "",
-      favicon: meta?.favicon ?? "",
-    })
+    .setMeta("preventAutolink", true)
+    .insertBookmark(bookmarkAttrs(url, meta))
     .run();
+}
+
+/**
+ * Paste a bare external URL as a single bookmark block, synchronously, so the
+ * default paste path cannot also leave the raw URL in the paragraph.
+ * Returns the bookmark's document position for a later metadata patch.
+ */
+export function pasteExternalUrl(editor: Editor, url: string): number | null {
+  if (!isSafeHttpUrl(url)) return null;
+  const attrs = bookmarkAttrs(url);
+  const { state } = editor;
+  const { $from } = state.selection;
+  const blockPos = getTopLevelBlockPos($from as BlockPos);
+  if (blockPos == null) return null;
+
+  const block = state.doc.nodeAt(blockPos);
+  if (!block) return null;
+
+  const blockText = block.textContent.trim();
+  const replaceBlock = blockText === "" || blockText === url.trim();
+
+  if (replaceBlock) {
+    const bookmark = state.schema.nodes.bookmark.create(attrs);
+    const tr = state.tr
+      .replaceWith(blockPos, blockPos + block.nodeSize, bookmark)
+      .setMeta("preventAutolink", true)
+      .scrollIntoView();
+    editor.view.dispatch(tr);
+    return blockPos;
+  }
+
+  const ok = editor
+    .chain()
+    .focus()
+    .setMeta("preventAutolink", true)
+    .insertContent({ type: "bookmark", attrs })
+    .run();
+  if (!ok) return null;
+
+  let found: number | null = null;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name === "bookmark" && node.attrs.url === url && found == null) {
+      found = pos;
+    }
+  });
+  return found;
+}
+
+/** Patch preview metadata onto a bookmark that was inserted by pasteExternalUrl. */
+export function updateBookmarkMeta(editor: Editor, pos: number, meta: BookmarkMeta): boolean {
+  let node = editor.state.doc.nodeAt(pos);
+  if (!node || node.type.name !== "bookmark") return false;
+
+  const url = node.attrs.url as string;
+  const tr = editor.state.tr
+    .setNodeMarkup(pos, undefined, {
+      ...node.attrs,
+      title: meta.title ?? bookmarkTitle(url, meta),
+      description: meta.description ?? node.attrs.description ?? "",
+      favicon: meta.favicon ?? node.attrs.favicon ?? "",
+    })
+    .setMeta("preventAutolink", true);
+  editor.view.dispatch(tr);
+  return true;
 }
 
 export function insertEmbed(editor: Editor, url: string): boolean {

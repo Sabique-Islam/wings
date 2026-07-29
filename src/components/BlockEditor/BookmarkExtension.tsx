@@ -32,6 +32,10 @@ function BookmarkView({ node }: NodeViewProps) {
     }
   })();
 
+  const displayTitle = title || host;
+  const showHostLine =
+    Boolean(host) && displayTitle.toLowerCase() !== host.toLowerCase() && title.toLowerCase() !== host.toLowerCase();
+
   return (
     <NodeViewWrapper className="bookmark-block" data-type="bookmark">
       <a
@@ -45,9 +49,9 @@ function BookmarkView({ node }: NodeViewProps) {
           {favicon ? (
             <img src={favicon} alt="" className="bookmark-favicon w-4 h-4 rounded-sm object-cover" />
           ) : null}
-          <p className="bookmark-title">{title || host}</p>
+          <p className="bookmark-title">{displayTitle}</p>
           {description ? <p className="bookmark-desc">{description}</p> : null}
-          <p className="bookmark-url">{host}</p>
+          {showHostLine ? <p className="bookmark-url">{host}</p> : null}
         </div>
         <ExternalLink className="bookmark-icon h-4 w-4 shrink-0" />
       </a>
