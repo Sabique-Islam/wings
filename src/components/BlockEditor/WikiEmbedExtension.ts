@@ -33,7 +33,6 @@ export function createWikiEmbedExtension(
                 type: "pageEmbed",
                 attrs: { pageId: page.id, title: page.title || "Untitled" },
               })
-              .insertContent(" ")
               .run();
           },
           items: ({ query }: { query: string }) => matchPages(getPages(), wikiLinkQuery(query)),

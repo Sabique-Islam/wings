@@ -1,6 +1,8 @@
 import { readGraphState, putGraphState, type GraphStateRow } from "./localStore";
 import type { GraphFilters } from "./graphLayout";
 
+export type { GraphStateRow };
+
 const DEBOUNCE_MS = 300;
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;

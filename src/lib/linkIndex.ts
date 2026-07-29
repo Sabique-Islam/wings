@@ -5,14 +5,13 @@
 // in IndexedDB, keeping both the parse and the write off the typing path.
 
 import type { JSONContent } from "@tiptap/core";
-import { extractLinks } from "./linkExtraction";
 import {
   deleteLinkIndexRow,
-  putLinkIndexRow,
+  putLinkIndexRows,
   readLinkIndex,
   type LinkIndexRow,
 } from "./localStore";
-import type { LinkIndexRequest, LinkIndexResponse } from "@/workers/linkIndexWorker";
+import { runLinkIndexJobs, type LinkIndexJob, type LinkIndexResult } from "./linkIndexJobs";
 
 const INDEX_DEBOUNCE_MS = 500;
 
@@ -22,23 +21,49 @@ const listeners = new Set<() => void>();
 /** Bumped on every change so `useSyncExternalStore` sees a new snapshot. */
 let version = 0;
 let worker: Worker | null | undefined;
+/** Newest job issued per page, so a slower reply cannot undo a newer edit. */
+const latestSeq = new Map<string, number>();
+let nextSeq = 1;
 
 function notify(): void {
   version += 1;
   for (const listener of listeners) listener();
 }
 
-function commit(result: LinkIndexResponse): void {
-  const previous = rows.get(result.entryId);
-  const unchanged =
-    previous != null &&
-    previous.outgoing.join("\u0000") === result.outgoing.join("\u0000") &&
-    previous.unresolved.join("\u0000") === result.unresolved.join("\u0000") &&
-    (previous.tags ?? []).join("\u0000") === result.tags.join("\u0000");
-  if (unchanged) return;
-  const row: LinkIndexRow = { ...result, tags: result.tags, updatedAt: Date.now() };
-  rows.set(row.entryId, row);
-  void putLinkIndexRow(row);
+function issueJob(entryId: string, doc: JSONContent | null, markdown?: string): LinkIndexJob {
+  const seq = nextSeq++;
+  latestSeq.set(entryId, seq);
+  return { entryId, seq, doc, markdown };
+}
+
+function sameLinks(previous: LinkIndexRow | undefined, result: LinkIndexResult): boolean {
+  if (!previous) return false;
+  const key = (values: string[]) => values.join("\u0000");
+  return (
+    key(previous.outgoing) === key(result.outgoing) &&
+    key(previous.unresolved) === key(result.unresolved) &&
+    key(previous.tags ?? []) === key(result.tags)
+  );
+}
+
+function commit(results: LinkIndexResult[]): void {
+  const changed: LinkIndexRow[] = [];
+  for (const result of results) {
+    // A reply the user has already typed past would reintroduce stale links.
+    if (result.seq < (latestSeq.get(result.entryId) ?? 0)) continue;
+    if (sameLinks(rows.get(result.entryId), result)) continue;
+    const row: LinkIndexRow = {
+      entryId: result.entryId,
+      outgoing: result.outgoing,
+      unresolved: result.unresolved,
+      tags: result.tags,
+      updatedAt: Date.now(),
+    };
+    rows.set(row.entryId, row);
+    changed.push(row);
+  }
+  if (changed.length === 0) return;
+  void putLinkIndexRows(changed);
   notify();
 }
 
@@ -52,7 +77,7 @@ function indexWorker(): Worker | null {
     const instance = new Worker(new URL("../workers/linkIndexWorker.ts", import.meta.url), {
       type: "module",
     });
-    instance.onmessage = ({ data }: MessageEvent<LinkIndexResponse>) => commit(data);
+    instance.onmessage = ({ data }: MessageEvent<LinkIndexResult[]>) => commit(data);
     instance.onerror = () => {
       // Fall back to the main thread rather than silently stopping indexing.
       worker = null;
@@ -62,6 +87,16 @@ function indexWorker(): Worker | null {
     worker = null;
   }
   return worker;
+}
+
+function runJobs(jobs: LinkIndexJob[]): void {
+  if (jobs.length === 0) return;
+  const instance = indexWorker();
+  if (instance) {
+    instance.postMessage(jobs);
+    return;
+  }
+  commit(runLinkIndexJobs(jobs));
 }
 
 /** Load the persisted index. Await before rendering backlinks or the graph. */
@@ -80,15 +115,23 @@ export function scheduleLinkIndex(entryId: string, doc: JSONContent, markdown?: 
     entryId,
     setTimeout(() => {
       timers.delete(entryId);
-      const request: LinkIndexRequest = { entryId, doc, markdown };
-      const instance = indexWorker();
-      if (instance) {
-        instance.postMessage(request);
-        return;
-      }
-      commit({ entryId, ...extractLinks(doc, markdown) });
+      runJobs([issueJob(entryId, doc, markdown)]);
     }, INDEX_DEBOUNCE_MS),
   );
+}
+
+/**
+ * Rebuild the index for a whole workspace.
+ *
+ * The editor only indexes pages as they are edited, so a fresh browser, an
+ * import, or a vault sync would otherwise leave backlinks and the graph blank
+ * until every page had been opened. Rows that come back identical are dropped
+ * before any write, which keeps the common "nothing changed" reload cheap.
+ */
+export function reindexEntries(
+  entries: Array<{ id: string; content: string; content_json?: JSONContent | null }>,
+): void {
+  runJobs(entries.map((entry) => issueJob(entry.id, entry.content_json ?? null, entry.content)));
 }
 
 export function forgetLinkIndex(entryId: string): void {

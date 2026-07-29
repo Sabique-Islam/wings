@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import type { EditorState } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
 import { wikiLinkSuggestionKey } from "./suggestionPluginKeys";
 import { renderPageSuggestions } from "./PageSuggestionList";
@@ -29,6 +30,10 @@ export function createWikiLinkExtension(
           // `[[` reads as a link opener wherever it appears, including straight
           // after a word, so don't require a leading space.
           allowedPrefixes: null,
+          // `![[` is the embed trigger and contains this one. Without this both
+          // pickers open on top of each other.
+          allow: ({ state, range }: { state: EditorState; range: { from: number } }) =>
+            state.doc.textBetween(Math.max(0, range.from - 1), range.from) !== "!",
           command: ({ editor, range, props }: any) => {
             const page = props as PageOption;
             editor

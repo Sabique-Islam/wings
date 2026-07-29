@@ -57,6 +57,18 @@ export function parseVaultMarkdown(raw: string): VaultFrontmatter {
   return { wingsId, title, date, tags, body };
 }
 
+/**
+ * The vault path of the page a file should hang under.
+ *
+ * A page with children is written as `<slug>.md` beside a `<slug>/` folder
+ * holding them, so a file's parent is its directory with `.md` appended.
+ */
+export function parentPathForFile(relativePath: string): string | null {
+  const lastSlash = relativePath.lastIndexOf("/");
+  if (lastSlash < 0) return null;
+  return `${relativePath.slice(0, lastSlash)}.md`;
+}
+
 export function entryToRelativePath(entry: Entry, entriesById: Map<string, Entry>): string {
   const chain: Entry[] = [entry];
   let current = entry;

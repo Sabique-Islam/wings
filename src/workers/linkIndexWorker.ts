@@ -1,27 +1,11 @@
-// Rebuilds one page's link row off the main thread.
+// Rebuilds link rows off the main thread.
 //
 // TipTap JSON is structured-cloneable and the extraction needs no DOM, so this
-// work leaves the UI thread entirely. Requests are keyed by entry so a stale
-// reply can be discarded by the client.
+// work leaves the UI thread entirely. Jobs arrive in batches: one page while
+// typing, every page on a full reindex.
 
-import { extractLinks } from "@/lib/linkExtraction";
-import type { JSONContent } from "@tiptap/core";
+import { runLinkIndexJobs, type LinkIndexJob } from "@/lib/linkIndexJobs";
 
-export interface LinkIndexRequest {
-  entryId: string;
-  doc: JSONContent;
-  markdown?: string;
-}
-
-export interface LinkIndexResponse {
-  entryId: string;
-  outgoing: string[];
-  unresolved: string[];
-  tags: string[];
-}
-
-self.onmessage = ({ data }: MessageEvent<LinkIndexRequest>) => {
-  const { outgoing, unresolved, tags } = extractLinks(data.doc, data.markdown);
-  const response: LinkIndexResponse = { entryId: data.entryId, outgoing, unresolved, tags };
-  self.postMessage(response);
+self.onmessage = ({ data }: MessageEvent<LinkIndexJob[]>) => {
+  self.postMessage(runLinkIndexJobs(data));
 };

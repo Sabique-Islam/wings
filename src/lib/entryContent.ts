@@ -10,12 +10,15 @@ import { markdownToHtml } from "./markdown";
 import { createBlockEditorExtensions } from "@/components/BlockEditor/editorExtensions";
 import type { FullEditorChangePayload } from "./editorPayload";
 
-export function payloadFromMarkdown(markdown: string): FullEditorChangePayload {
+export function payloadFromMarkdown(
+  markdown: string,
+  resolvePageId?: (title: string) => string | null,
+): FullEditorChangePayload {
   const trimmed = markdown.trim();
   if (!trimmed) return { markdown: "", json: { type: "doc", content: [] } };
   return {
     markdown: trimmed,
-    json: generateJSON(markdownToHtml(trimmed), createBlockEditorExtensions()),
+    json: generateJSON(markdownToHtml(trimmed, resolvePageId), createBlockEditorExtensions()),
   };
 }
 

@@ -39,6 +39,7 @@ import type { Extensions } from "@tiptap/core";
 interface BlockEditorExtensionHandlers {
   onImageUpload?: (file?: File) => void;
   onLinkPage?: () => void;
+  onEmbedPage?: () => void;
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
   getPages?: () => PageOption[];
@@ -171,6 +172,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
     createSlashCommandExtension({
       onImageUpload: () => handlers.onImageUpload?.(),
       onLinkPage: () => handlers.onLinkPage?.(),
+      onEmbedPage: () => handlers.onEmbedPage?.(),
       onNewPage: (title: string) => handlers.onNewPage?.(title),
       onAskAI: () => handlers.onAskAI?.(),
     }),

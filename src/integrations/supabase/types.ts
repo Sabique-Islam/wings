@@ -24,7 +24,9 @@ export type Database = {
           layout: Json
           parent_id: string | null
           pinned: boolean
+          properties: Json
           search_tsv: unknown
+          sort_order: number | null
           share_token: string | null
           title: string
           updated_at: string
@@ -39,7 +41,9 @@ export type Database = {
           layout?: Json
           parent_id?: string | null
           pinned?: boolean
+          properties?: Json
           search_tsv?: unknown
+          sort_order?: number | null
           share_token?: string | null
           title?: string
           updated_at?: string
@@ -54,7 +58,9 @@ export type Database = {
           layout?: Json
           parent_id?: string | null
           pinned?: boolean
+          properties?: Json
           search_tsv?: unknown
+          sort_order?: number | null
           share_token?: string | null
           title?: string
           updated_at?: string

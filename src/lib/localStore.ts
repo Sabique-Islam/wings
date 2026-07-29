@@ -10,6 +10,7 @@
 import Dexie, { type Table } from "dexie";
 import type { JSONContent } from "@tiptap/core";
 import type { Entry, ShareRole } from "./journal";
+import { normalizeProperties } from "./entryProperties";
 
 /** Cached server row, tagged with the account whose fetch produced it. */
 export interface CachedEntry extends Entry {
@@ -51,6 +52,8 @@ export interface LinkIndexRow {
   unresolved: string[];
   /** Hashtags found in this page's content. */
   tags: string[];
+  /** Target page id to the sentence it was linked from, shown as a backlink snippet. */
+  contexts?: Record<string, string>;
   updatedAt: number;
 }
 
@@ -71,6 +74,10 @@ export interface VaultMetaRow {
   handle: FileSystemDirectoryHandle | null;
   lastWrittenAt: Record<string, number>;
   lastWrittenHash: Record<string, string>;
+  /** Where each page was last written, so renames can clean up the old file. */
+  lastWrittenPath?: Record<string, string>;
+  /** Why the last automatic mirror failed, so the folder can't look in sync when it isn't. */
+  lastError?: { message: string; at: number } | null;
 }
 
 class WingsDatabase extends Dexie {
@@ -146,7 +153,8 @@ function toCached(entry: Entry, cacheOwnerId: string): CachedEntry {
 }
 
 function toEntry({ cacheOwnerId: _owner, cachedAt: _at, ...entry }: CachedEntry): Entry {
-  return entry;
+  // Rows cached before page properties shipped have no `properties` field.
+  return { ...entry, properties: normalizeProperties(entry.properties) };
 }
 
 /** Entries last mirrored for this account, newest first. */
@@ -232,9 +240,9 @@ export function readLinkIndex(): Promise<LinkIndexRow[]> {
   return guard((instance) => instance.linkIndex.toArray(), []);
 }
 
-export function putLinkIndexRow(row: LinkIndexRow): Promise<void> {
+export function putLinkIndexRows(rows: LinkIndexRow[]): Promise<void> {
   return guard(async (instance) => {
-    await instance.linkIndex.put(row);
+    await instance.linkIndex.bulkPut(rows);
   }, undefined);
 }
 

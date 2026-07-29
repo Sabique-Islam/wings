@@ -1,10 +1,10 @@
-import DOMPurify from "dompurify";
+import DOMPurify, { type Config } from "dompurify";
 
 // Central HTML sanitizer for any place we render model- or user-derived HTML.
 // DOMPurify strips <script>, event-handler attributes, and javascript:/data:
 // URLs by default; we further restrict to a safe display allowlist.
 
-const BASE_CONFIG: DOMPurify.Config = {
+const BASE_CONFIG: Config = {
   ALLOWED_TAGS: [
     "a", "b", "i", "em", "strong", "u", "s", "del", "code", "pre",
     "blockquote", "p", "br", "hr", "span", "div",

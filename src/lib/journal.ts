@@ -2,6 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 import type { JSONContent } from "@tiptap/core";
 import { EntryLayoutMap, normalizeLayout } from "./layout";
 import { logError } from "./logger";
+import { normalizeProperties, type EntryProperties } from "./entryProperties";
+import { sortSiblings } from "./pageOrder";
 import type { FullEditorChangePayload } from "./editorPayload";
 
 export interface Entry {
@@ -15,6 +17,9 @@ export interface Entry {
   title: string;
   share_token: string | null;
   layout: EntryLayoutMap;
+  properties: EntryProperties;
+  /** Manual sidebar position among siblings; null until the page is dragged. */
+  sort_order: number | null;
   deleted_at: string | null;
 }
 
@@ -28,8 +33,7 @@ export interface MonthGroup {
 
 export function groupByMonth(entries: Entry[]): MonthGroup[] {
   const map = new Map<string, Entry[]>();
-  const unpinned = entries.filter((e) => !e.pinned);
-  const sorted = [...unpinned].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const sorted = sortSiblings(entries.filter((e) => !e.pinned));
 
   for (const e of sorted) {
     const d = new Date(e.created_at);
@@ -46,7 +50,7 @@ export function groupByMonth(entries: Entry[]): MonthGroup[] {
 }
 
 export function getPinnedEntries(entries: Entry[]): Entry[] {
-  return entries.filter((e) => e.pinned).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return sortSiblings(entries.filter((e) => e.pinned));
 }
 
 export function getRootEntries(entries: Entry[]): Entry[] {
@@ -54,7 +58,7 @@ export function getRootEntries(entries: Entry[]): Entry[] {
 }
 
 export function getChildEntries(entries: Entry[], parentId: string): Entry[] {
-  return entries.filter((e) => e.parent_id === parentId).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return sortSiblings(entries.filter((e) => e.parent_id === parentId));
 }
 
 export function getBreadcrumbTrail(entries: Entry[], entryId: string): Entry[] {
@@ -71,7 +75,7 @@ export function getEntryTitle(entry: Entry): string {
   return entry.title || entry.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 40) || "Untitled";
 }
 
-const ENTRY_COLS = "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
+const ENTRY_COLS = "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, properties, sort_order, deleted_at";
 
 export interface FetchedEntries {
   entries: Entry[];
@@ -140,6 +144,8 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
     title: d.title ?? "",
     share_token: d.share_token ?? null,
     layout: normalizeLayout(d.layout),
+    properties: normalizeProperties(d.properties),
+    sort_order: d.sort_order ?? null,
     deleted_at: d.deleted_at ?? null,
   }));
 
@@ -161,6 +167,8 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
     title: d.title ?? "",
     share_token: d.share_token ?? null,
     layout: normalizeLayout(d.layout),
+    properties: normalizeProperties(d.properties),
+    sort_order: d.sort_order ?? null,
     deleted_at: d.deleted_at ?? null,
   }));
 }
@@ -181,6 +189,8 @@ export async function createEntry(userId: string, content: string, parentId?: st
     title: data.title ?? "",
     share_token: data.share_token ?? null,
     layout: normalizeLayout(data.layout),
+    properties: normalizeProperties(data.properties),
+    sort_order: data.sort_order ?? null,
     deleted_at: data.deleted_at ?? null,
   };
 }
@@ -207,6 +217,33 @@ export async function updateEntryTitle(id: string, title: string): Promise<void>
   const { error } = await supabase
     .from("entries")
     .update({ title: title.slice(0, 100) })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateEntryProperties(id: string, properties: EntryProperties): Promise<void> {
+  const { error } = await supabase
+    .from("entries")
+    .update({ properties })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Persist a dragged sidebar arrangement. Lists are short, so one call per row. */
+export async function saveEntryOrder(order: Array<{ id: string; sort_order: number }>): Promise<void> {
+  await Promise.all(
+    order.map(async ({ id, sort_order }) => {
+      const { error } = await supabase.from("entries").update({ sort_order }).eq("id", id);
+      if (error) throw error;
+    }),
+  );
+}
+
+/** Re-parent a page. `parentId` of null moves it back to the top level. */
+export async function moveEntry(id: string, parentId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from("entries")
+    .update({ parent_id: parentId })
     .eq("id", id);
   if (error) throw error;
 }
@@ -263,6 +300,8 @@ export async function searchEntries(userId: string, q: string, limit = 20): Prom
     title: d.title ?? "",
     share_token: d.share_token ?? null,
     layout: normalizeLayout(d.layout),
+    properties: normalizeProperties(d.properties),
+    sort_order: d.sort_order ?? null,
     deleted_at: d.deleted_at ?? null,
   }));
 }
