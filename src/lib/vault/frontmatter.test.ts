@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   entryToRelativePath,
+  parentPathForFile,
   parseVaultMarkdown,
   serializeVaultMarkdown,
   slug,
@@ -19,6 +20,8 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     title: "Hello",
     share_token: null,
     layout: {},
+    properties: { status: null, date: null, tags: [] },
+    sort_order: null,
     deleted_at: null,
     ...overrides,
   };
@@ -53,6 +56,28 @@ describe("entryToRelativePath", () => {
       ["c1", child],
     ]);
     expect(entryToRelativePath(child, map)).toBe("Projects/Notes.md");
+  });
+});
+
+describe("parentPathForFile", () => {
+  it("points a nested file at the page its folder was named after", () => {
+    expect(parentPathForFile("Projects/Notes.md")).toBe("Projects.md");
+    expect(parentPathForFile("Projects/Alpha/Notes.md")).toBe("Projects/Alpha.md");
+  });
+
+  it("returns null for a file at the top of the vault", () => {
+    expect(parentPathForFile("Notes.md")).toBeNull();
+  });
+
+  it("round-trips with the path a nested page is written to", () => {
+    const parent = entry({ id: "p1", title: "Projects", parent_id: null });
+    const child = entry({ id: "c1", title: "Notes", parent_id: "p1" });
+    const map = new Map([
+      ["p1", parent],
+      ["c1", child],
+    ]);
+    const childPath = entryToRelativePath(child, map);
+    expect(parentPathForFile(childPath)).toBe(entryToRelativePath(parent, map));
   });
 });
 

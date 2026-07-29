@@ -74,11 +74,12 @@ describe("extractLinks", () => {
   });
 
   it("treats an empty document as having no links", () => {
-    expect(extractLinks(null)).toEqual({ outgoing: [], unresolved: [], tags: [] });
+    expect(extractLinks(null)).toEqual({ outgoing: [], unresolved: [], tags: [], contexts: {} });
     expect(extractLinks({ type: "doc", content: [] })).toEqual({
       outgoing: [],
       unresolved: [],
       tags: [],
+      contexts: {},
     });
   });
 
@@ -106,5 +107,29 @@ describe("extractLinks", () => {
       ],
     };
     expect(extractLinks(doc).outgoing).toEqual(["page-x"]);
+  });
+
+  it("keeps the sentence a link was written in, for backlink snippets", () => {
+    const doc: JSONContent = {
+      type: "doc",
+      content: [
+        paragraph(
+          { type: "text", text: "Picked up from " },
+          pageLink("Reading List", "page-a"),
+          { type: "text", text: " last week." },
+        ),
+      ],
+    };
+
+    expect(extractLinks(doc).contexts).toEqual({
+      "page-a": "Picked up from Reading List last week.",
+    });
+  });
+
+  it("takes the snippet from markdown when a page has no saved editor json", () => {
+    const md = "# Notes\n\n- follow up on [Roadmap](#page:page-a) tomorrow\n";
+    expect(extractLinks(null, md).contexts).toEqual({
+      "page-a": "follow up on Roadmap tomorrow",
+    });
   });
 });

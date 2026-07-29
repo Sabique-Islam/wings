@@ -90,18 +90,118 @@ describe("markdown <-> html conversion", () => {
     const blob = '<div data-type="callout" data-emoji="💡" class="callout-block"><p>note</p></div>';
     const md = htmlToMarkdown(blob);
     expect(md).toContain('data-type="callout"');
-    expect(markdownToHtml(md)).toContain("callout");
+    expect(markdownToHtml(md)).toContain('<div data-type="callout"');
   });
 
   it("preserves toggle HTML round-trip", () => {
     const blob = '<div data-type="toggle" data-summary="Fold" data-open="true"><p>hidden</p></div>';
     const md = htmlToMarkdown(blob);
     expect(md).toContain('data-type="toggle"');
+    expect(markdownToHtml(md)).toContain('<div data-type="toggle"');
   });
 
   it("preserves embed HTML round-trip", () => {
     const blob = '<div data-type="embed" data-url="https://youtube.com" data-embed-url="https://youtube.com/embed/x"><iframe src="https://youtube.com/embed/x"></iframe></div>';
     const md = htmlToMarkdown(blob);
     expect(md).toContain('data-type="embed"');
+    expect(markdownToHtml(md)).toContain('<div data-type="embed"');
+  });
+});
+
+// Custom blocks are stored as HTML because markdown cannot express them. An
+// over-eager HTML guard used to escape them back into literal text, so every
+// callout, toggle, bookmark and formula was lost whenever a page loaded from
+// markdown (vault sync, import, or an empty content_json).
+describe("custom block markup survives the html guard", () => {
+  it("renders a block formula as a node, not escaped text", () => {
+    const html = markdownToHtml("$$\na^2 + b^2\n$$");
+    expect(html).toContain('data-type="block-math"');
+    expect(html).not.toContain("&lt;div");
+  });
+
+  it("renders an inline formula as a node, not escaped text", () => {
+    const html = markdownToHtml("an $x^2$ token");
+    expect(html).toContain('<span data-type="inline-math"');
+    expect(html).not.toContain("&lt;/span&gt;");
+  });
+
+  it("still escapes html that is not a known block", () => {
+    const html = markdownToHtml('<div onclick="steal()">hi</div>');
+    expect(html).toContain("&lt;div");
+    expect(html).not.toContain("<div onclick");
+  });
+
+  it("still escapes script tags", () => {
+    expect(markdownToHtml("<script>alert(1)</script>")).not.toContain("<script>");
+  });
+});
+
+// Bookmarks, formulas and page embeds hold everything in attributes, so the
+// element is empty. Turndown drops blank nodes before any rule runs, which
+// erased these blocks from a page's markdown whenever they stood alone.
+describe("attribute-only blocks survive serialization", () => {
+  it("keeps a bookmark that is the only block on the page", () => {
+    const md = htmlToMarkdown('<div data-type="bookmark" data-url="https://a.com"></div>');
+    expect(md).toContain('data-type="bookmark"');
+  });
+
+  it("keeps a block formula that is the only block on the page", () => {
+    expect(htmlToMarkdown('<div data-type="block-math" data-latex="a^2"></div>')).toBe("$$\na^2\n$$");
+  });
+
+  it("keeps an inline formula", () => {
+    const md = htmlToMarkdown('<p>x <span data-type="inline-math" data-latex="a^2"></span></p>');
+    expect(md).toContain("$a^2$");
+  });
+
+  it("round-trips a page that is only a formula", () => {
+    const md = htmlToMarkdown('<div data-type="block-math" data-latex="a^2"></div>');
+    expect(markdownToHtml(md)).toContain('data-latex="a^2"');
+  });
+});
+
+describe("page embed round trip", () => {
+  const embedHtml = (attrs: string) => `<div data-type="page-embed" ${attrs}></div>`;
+
+  it("keeps the page id when serializing an embed", () => {
+    const md = htmlToMarkdown(embedHtml('data-page-id="page-x" data-title="Roadmap"'));
+    expect(md).toBe("![Roadmap](#page:page-x)");
+  });
+
+  it("restores the page id after a full round trip", () => {
+    const md = htmlToMarkdown(embedHtml('data-page-id="page-x" data-title="Roadmap"'));
+    const html = markdownToHtml(md);
+    expect(html).toContain('data-type="page-embed"');
+    expect(html).toContain('data-page-id="page-x"');
+    expect(html).toContain('data-title="Roadmap"');
+  });
+
+  it("falls back to wikilink syntax when the embed has no page id", () => {
+    expect(htmlToMarkdown(embedHtml('data-title="Roadmap"'))).toBe("![[Roadmap]]");
+  });
+
+  it("resolves a hand-written wikilink embed to a page id by title", () => {
+    const html = markdownToHtml("![[Reading List]]", (title) =>
+      title === "Reading List" ? "page-reading" : null,
+    );
+    expect(html).toContain('data-page-id="page-reading"');
+  });
+
+  it("leaves an unmatched wikilink embed without a page id", () => {
+    const html = markdownToHtml("![[Nowhere]]", () => null);
+    expect(html).toContain('data-type="page-embed"');
+    expect(html).not.toContain("data-page-id");
+  });
+
+  it("keeps the alias as the display title", () => {
+    const html = markdownToHtml("![[Reading List|Books]]");
+    expect(html).toContain('data-title="Reading List"');
+    expect(html).toContain('data-page-title="Books"');
+  });
+
+  it("leaves ordinary images alone", () => {
+    const html = markdownToHtml("![alt text](https://example.com/a.png)");
+    expect(html).not.toContain("page-embed");
+    expect(html).toContain("<img");
   });
 });
