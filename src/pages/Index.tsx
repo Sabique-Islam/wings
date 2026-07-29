@@ -5,6 +5,7 @@ import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, 
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
 import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
 import { forgetLinkIndex, hydrateLinkIndex, scheduleLinkIndex } from "@/lib/linkIndex";
+import { mirrorEntryToVault } from "@/lib/vault/write";
 import { appendMarkdown, payloadFromMarkdown } from "@/lib/entryContent";
 import { deleteBlocksAtPositions } from "@/components/BlockEditor/blockUtils";
 import { isFullPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
@@ -176,6 +177,15 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, [user, loading, entries, roleMap, sharedEntryIds]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const updated = (event as CustomEvent<Entry[]>).detail;
+      if (Array.isArray(updated)) setEntries(updated);
+    };
+    window.addEventListener("nw:vault-synced", handler);
+    return () => window.removeEventListener("nw:vault-synced", handler);
+  }, []);
+
   const activeEntry = entries.find((e) => e.id === activeId) ?? null;
   const breadcrumbTrail = activeId ? getBreadcrumbTrail(entries, activeId) : [];
   // Known before the editor mounts: TipTap cannot switch into collaborative
@@ -253,7 +263,7 @@ export default function Index() {
 
   const handleChange = useCallback((entryId: string, payload: EditorChangePayload) => {
     saveDraftThrottled(entryId, { markdown: payload.markdown, json: payload.json });
-    scheduleLinkIndex(entryId, payload.json);
+    scheduleLinkIndex(entryId, payload.json, payload.markdown);
     // Stale serialize from a note we already left — draft only, no autosave / pending ref.
     if (entryId !== activeId) return;
 
@@ -298,6 +308,13 @@ export default function Index() {
           content_json: toSave.json,
         });
         setSaveStatus("saved");
+        if (userId && existing) {
+          void mirrorEntryToVault(
+            userId,
+            { ...existing, content: toSave.markdown, content_json: toSave.json },
+            entriesRef.current,
+          );
+        }
         if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
         savedFlashRef.current = setTimeout(() => setSaveStatus("idle"), 1500);
       } catch {
@@ -671,7 +688,7 @@ export default function Index() {
         onToggleSidebar={() => setSidebarOpen((s) => !s)}
       />
       <KeyboardPalette />
-      <GraphView entries={entries} activeId={activeId} onNavigate={setActiveId} />
+      <GraphView entries={entries} activeId={activeId} userId={userId} onNavigate={setActiveId} />
       <SettingsPanel />
       <AIAssistant
         open={aiOpen}

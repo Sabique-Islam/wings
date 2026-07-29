@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { Entry, ShareRole } from "@/lib/journal";
+import { getEntryTitle } from "@/lib/journal";
+import { buildPagePreview } from "@/components/BlockEditor/PageEmbedExtension";
 import type { EditorChangePayload } from "@/lib/editorPayload";
 import { useCollabProvider } from "@/lib/collab/useCollabProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -196,6 +198,15 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
 
   const pages = useMemo(
     () => allEntries.map((e) => ({ id: e.id, title: e.title || "Untitled" })),
+    [allEntries],
+  );
+
+  const getPagePreview = useCallback(
+    (pageId: string) => {
+      const entry = allEntries.find((e) => e.id === pageId);
+      if (!entry) return null;
+      return buildPagePreview(entry.content, getEntryTitle(entry));
+    },
     [allEntries],
   );
 
@@ -405,6 +416,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 onNewPage={canEdit ? handleNewPage : undefined}
                 onAskAI={canEdit ? onOpenAI : undefined}
                 pages={pages}
+                getPagePreview={getPagePreview}
                 editable={canEdit}
                 collabSession={collabSession}
               />

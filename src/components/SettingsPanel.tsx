@@ -14,6 +14,7 @@ import {
 } from "@/lib/ai/storage";
 import { setUsername as saveUsername, updateUserPreferences, type UserPreferencesPatch } from "@/lib/profile";
 import { SOCIAL } from "@/config/navigation";
+import { VaultSettings } from "@/components/VaultSettings";
 import { SITE } from "@/config/site";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -333,13 +334,7 @@ export function SettingsPanel() {
             )}
 
             {tab === "data" && (
-              <div className="space-y-3">
-                <p className="text-sm text-ink-1 font-sans">export happens per-page from the editor toolbar, or export everything from the sidebar.</p>
-                <div className="rounded-lg border border-border-subtle p-3 text-xs font-mono text-ink-2">
-                  export formats: markdown (.md), json (.json)
-                </div>
-                <p className="text-xs text-ink-2 font-sans">import: use the editor toolbar → import file(s) to bring markdown/json into a page.</p>
-              </div>
+              <VaultSettings userId={user?.id ?? null} />
             )}
 
             {tab === "billing" && (

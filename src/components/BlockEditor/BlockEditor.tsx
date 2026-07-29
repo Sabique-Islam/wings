@@ -17,6 +17,7 @@ import { resolveInitialEditorContent } from "@/lib/editorContent";
 import { createCollabExtensions } from "@/lib/collab/collabExtensions";
 import type { CollabSession } from "@/lib/collab/useCollabProvider";
 import type { PageOption } from "./PageMentionExtension";
+import type { PagePreview } from "./PageEmbedExtension";
 import { toast } from "sonner";
 import { Fragment, Slice } from "@tiptap/pm/model";
 
@@ -33,6 +34,7 @@ interface Props {
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
   pages?: PageOption[];
+  getPagePreview?: (pageId: string) => PagePreview | null;
   editable?: boolean;
   collabSession?: CollabSession | null;
 }
@@ -71,6 +73,7 @@ export const BlockEditor = memo(function BlockEditor({
   onNewPage,
   onAskAI,
   pages = [],
+  getPagePreview,
   editable = true,
   collabSession = null,
 }: Props) {
@@ -96,6 +99,8 @@ export const BlockEditor = memo(function BlockEditor({
   const onChangeRef = useRef(onChange);
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
+  const getPagePreviewRef = useRef(getPagePreview);
+  getPagePreviewRef.current = getPagePreview;
   onChangeRef.current = onChange;
 
   const extraExtensions = useMemo(
@@ -114,6 +119,7 @@ export const BlockEditor = memo(function BlockEditor({
         onNewPage,
         onAskAI,
         getPages: pages.length > 0 ? () => pagesRef.current : undefined,
+        getPagePreview: (pageId) => getPagePreviewRef.current?.(pageId) ?? null,
         collab: !!collabSession,
         extraExtensions,
       }),
@@ -125,6 +131,7 @@ export const BlockEditor = memo(function BlockEditor({
       onLinkPage,
       onNewPage,
       pages.length,
+      getPagePreview,
     ],
   );
 
