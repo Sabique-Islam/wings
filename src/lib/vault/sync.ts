@@ -1,15 +1,14 @@
-import { createEntry, getEntryTitle, moveEntry, updateEntry, updateEntryProperties, type Entry } from "@/lib/journal";
+import { createEntry, getEntryTitle, moveEntry, updateEntry, type Entry } from "@/lib/journal";
 import { payloadFromMarkdown } from "@/lib/entryContent";
 import { shouldBlockEmptySave } from "@/lib/editorContent";
 import { contentHash, normalizeVaultContent, type VaultConflict, type VaultSyncResult } from "./types";
 import { entryToRelativePath } from "./frontmatter";
-import { parentIdChangeForFile, propertiesWithVaultTags, resolveParentIdFromPath } from "./hierarchy";
+import { parentIdChangeForFile, resolveParentIdFromPath } from "./hierarchy";
 import { planVaultFileSync } from "./syncPlan";
 import { scanVaultFolder } from "./read";
 import { putVaultMeta, type VaultMetaRow } from "@/lib/localStore";
 import { writeEntryToVault } from "./write";
 
-/** Records that a page and its file now agree, so the next sync skips them. */
 function markWritten(meta: VaultMetaRow, entryId: string, content: string): VaultMetaRow {
   return {
     ...meta,
@@ -18,27 +17,15 @@ function markWritten(meta: VaultMetaRow, entryId: string, content: string): Vaul
   };
 }
 
-async function applyVaultMetadata(
+async function applyVaultParent(
   entry: Entry,
   relativePath: string,
-  tags: string[],
   idByPath: Map<string, string>,
 ): Promise<Entry> {
-  let next = entry;
-
-  const parentChange = parentIdChangeForFile(relativePath, next, idByPath);
-  if (parentChange !== undefined) {
-    await moveEntry(next.id, parentChange);
-    next = { ...next, parent_id: parentChange };
-  }
-
-  const properties = propertiesWithVaultTags(next.properties, tags);
-  if (properties) {
-    await updateEntryProperties(next.id, properties);
-    next = { ...next, properties };
-  }
-
-  return next;
+  const parentChange = parentIdChangeForFile(relativePath, entry, idByPath);
+  if (parentChange === undefined) return entry;
+  await moveEntry(entry.id, parentChange);
+  return { ...entry, parent_id: parentChange };
 }
 
 export async function syncFromVault(
@@ -54,9 +41,6 @@ export async function syncFromVault(
   let nextEntries = [...existingEntries];
   let nextMeta = { ...meta };
 
-  // Folder layout carries the page hierarchy, so a file in `projects/alpha/`
-  // belongs under the page written as `projects/alpha.md`. Shallow files come
-  // first so a parent exists before anything tries to nest beneath it.
   const idByPath = new Map(existingEntries.map((e) => [entryToRelativePath(e, byId), e.id]));
   const depth = (path: string) => path.split("/").length;
   files.sort((a, b) => depth(a.relativePath) - depth(b.relativePath));
@@ -66,13 +50,12 @@ export async function syncFromVault(
     const action = planVaultFileSync(file, existing, meta);
 
     if (action.kind === "skip") {
-      // Path or tags can still change when the body is unchanged.
       if (existing) {
-        const withMeta = await applyVaultMetadata(existing, file.relativePath, file.tags, idByPath);
-        if (withMeta !== existing) {
-          nextEntries = nextEntries.map((e) => (e.id === withMeta.id ? withMeta : e));
-          byId.set(withMeta.id, withMeta);
-          idByPath.set(file.relativePath, withMeta.id);
+        const withParent = await applyVaultParent(existing, file.relativePath, idByPath);
+        if (withParent !== existing) {
+          nextEntries = nextEntries.map((e) => (e.id === withParent.id ? withParent : e));
+          byId.set(withParent.id, withParent);
+          idByPath.set(file.relativePath, withParent.id);
           result.updated += 1;
           continue;
         }
@@ -94,13 +77,12 @@ export async function syncFromVault(
     if (action.kind === "create") {
       const parentId = resolveParentIdFromPath(file.relativePath, idByPath);
       const created = await createEntry(userId, action.body, parentId ?? undefined);
-      const withMeta = await applyVaultMetadata(created, file.relativePath, file.tags, idByPath);
-      nextEntries = [withMeta, ...nextEntries];
-      byId.set(withMeta.id, withMeta);
-      idByPath.set(file.relativePath, withMeta.id);
+      const withParent = await applyVaultParent(created, file.relativePath, idByPath);
+      nextEntries = [withParent, ...nextEntries];
+      byId.set(withParent.id, withParent);
+      idByPath.set(file.relativePath, withParent.id);
       result.created += 1;
-      // Stamp the new page's id into the file so the next sync recognises it.
-      nextMeta = await writeEntryToVault(handle, withMeta, nextEntries, nextMeta);
+      nextMeta = await writeEntryToVault(handle, withParent, nextEntries, nextMeta);
       continue;
     }
 
@@ -108,7 +90,7 @@ export async function syncFromVault(
     const payload = payloadFromMarkdown(action.body);
     await updateEntry(target.id, payload);
     let updated: Entry = { ...target, content: payload.markdown, content_json: payload.json };
-    updated = await applyVaultMetadata(updated, file.relativePath, file.tags, idByPath);
+    updated = await applyVaultParent(updated, file.relativePath, idByPath);
     nextEntries = nextEntries.map((e) => (e.id === updated.id ? updated : e));
     byId.set(updated.id, updated);
     idByPath.set(file.relativePath, updated.id);
@@ -121,13 +103,6 @@ export async function syncFromVault(
   return { result, meta: nextMeta };
 }
 
-/**
- * Settle one conflict by declaring a winner.
- *
- * `"page"` rewrites the file from what Wings holds; `"file"` replaces the page
- * with what is on disk. Either way both sides end up recorded as agreeing, so
- * the conflict does not come back on the next sync.
- */
 export async function resolveVaultConflict(
   handle: FileSystemDirectoryHandle,
   conflict: VaultConflict,

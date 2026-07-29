@@ -10,7 +10,6 @@
 import Dexie, { type Table } from "dexie";
 import type { JSONContent } from "@tiptap/core";
 import type { Entry, ShareRole } from "./journal";
-import { normalizeProperties } from "./entryProperties";
 
 /** Cached server row, tagged with the account whose fetch produced it. */
 export interface CachedEntry extends Entry {
@@ -153,8 +152,7 @@ function toCached(entry: Entry, cacheOwnerId: string): CachedEntry {
 }
 
 function toEntry({ cacheOwnerId: _owner, cachedAt: _at, ...entry }: CachedEntry): Entry {
-  // Rows cached before page properties shipped have no `properties` field.
-  return { ...entry, properties: normalizeProperties(entry.properties) };
+  return { ...entry, sort_order: entry.sort_order ?? null };
 }
 
 /** Entries last mirrored for this account, newest first. */

@@ -13,7 +13,6 @@ import type { Entry } from "@/lib/journal";
 const createEntry = vi.fn();
 const updateEntry = vi.fn();
 const moveEntry = vi.fn();
-const updateEntryProperties = vi.fn();
 const putVaultMeta = vi.fn();
 const writeEntryToVault = vi.fn();
 const scanVaultFolder = vi.fn();
@@ -25,7 +24,6 @@ vi.mock("@/lib/journal", async () => {
     createEntry: (...args: unknown[]) => createEntry(...args),
     updateEntry: (...args: unknown[]) => updateEntry(...args),
     moveEntry: (...args: unknown[]) => moveEntry(...args),
-    updateEntryProperties: (...args: unknown[]) => updateEntryProperties(...args),
   };
 });
 
@@ -60,7 +58,6 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     title: "Hello",
     share_token: null,
     layout: {},
-    properties: { date: null, tags: [] },
     sort_order: null,
     deleted_at: null,
     ...overrides,
@@ -95,7 +92,6 @@ describe("vault sync integration", () => {
     putVaultMeta.mockResolvedValue(undefined);
     updateEntry.mockResolvedValue(undefined);
     moveEntry.mockResolvedValue(undefined);
-    updateEntryProperties.mockResolvedValue(undefined);
   });
 
   it("hashes the same body whether the file used CRLF or trailing spaces", () => {
@@ -134,10 +130,6 @@ describe("vault sync integration", () => {
     );
 
     expect(createEntry).toHaveBeenCalledWith("u1", "# Notes\n\nnested body", "p1");
-    expect(updateEntryProperties).toHaveBeenCalledWith(
-      "c1",
-      expect.objectContaining({ tags: ["research"] }),
-    );
     expect(result.created).toBe(1);
     expect(writeEntryToVault).toHaveBeenCalled();
   });
@@ -166,10 +158,6 @@ describe("vault sync integration", () => {
 
     expect(updateEntry).toHaveBeenCalled();
     expect(moveEntry).toHaveBeenCalledWith("c1", "p1");
-    expect(updateEntryProperties).toHaveBeenCalledWith(
-      "c1",
-      expect.objectContaining({ tags: ["moved"] }),
-    );
     expect(result.updated).toBe(1);
   });
 

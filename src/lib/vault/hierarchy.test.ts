@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  parentIdChangeForFile,
-  propertiesWithVaultTags,
-  resolveParentIdFromPath,
-} from "./hierarchy";
+import { parentIdChangeForFile, resolveParentIdFromPath } from "./hierarchy";
 import type { Entry } from "@/lib/journal";
-import { EMPTY_PROPERTIES } from "@/lib/entryProperties";
 
 function entry(overrides: Partial<Entry> = {}): Entry {
   return {
@@ -19,7 +14,6 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     title: "Hello",
     share_token: null,
     layout: {},
-    properties: EMPTY_PROPERTIES,
     sort_order: null,
     deleted_at: null,
     ...overrides,
@@ -57,21 +51,5 @@ describe("parentIdChangeForFile", () => {
   it("refuses to parent a page under itself", () => {
     const idByPath = new Map([["Hello.md", "e1"]]);
     expect(parentIdChangeForFile("Hello/Child.md", entry(), idByPath)).toBeUndefined();
-  });
-});
-
-describe("propertiesWithVaultTags", () => {
-  it("returns null when the file has no tags", () => {
-    expect(propertiesWithVaultTags(EMPTY_PROPERTIES, [])).toBeNull();
-  });
-
-  it("merges frontmatter tags into existing properties", () => {
-    expect(
-      propertiesWithVaultTags({ date: "2026-07-01", tags: ["old"] }, ["New Tag", "old"]),
-    ).toEqual({ date: "2026-07-01", tags: ["old", "new-tag"] });
-  });
-
-  it("returns null when tags are already present", () => {
-    expect(propertiesWithVaultTags({ date: null, tags: ["a"] }, ["a"])).toBeNull();
   });
 });

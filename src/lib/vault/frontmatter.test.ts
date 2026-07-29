@@ -20,7 +20,6 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     title: "Hello",
     share_token: null,
     layout: {},
-    properties: { date: null, tags: [] },
     sort_order: null,
     deleted_at: null,
     ...overrides,

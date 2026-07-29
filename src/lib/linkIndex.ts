@@ -145,17 +145,10 @@ export function scheduleLinkIndex(
  * before any write, which keeps the common "nothing changed" reload cheap.
  */
 export function reindexEntries(
-  entries: Array<{
-    id: string;
-    content: string;
-    content_json?: JSONContent | null;
-    properties?: { tags: string[] };
-  }>,
+  entries: Array<{ id: string; content: string; content_json?: JSONContent | null }>,
 ): void {
   runJobs(
-    entries.map((entry) =>
-      issueJob(entry.id, entry.content_json ?? null, entry.content, entry.properties?.tags),
-    ),
+    entries.map((entry) => issueJob(entry.id, entry.content_json ?? null, entry.content)),
   );
 }
 

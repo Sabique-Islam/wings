@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, createEntry, updateEntry, updateEntryTitle, updateEntryProperties, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
-import type { EntryProperties } from "@/lib/entryProperties";
+import { fetchEntries, createEntry, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
 import { reorderSiblings, type DropPlacement } from "@/lib/pageOrder";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
 import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
@@ -296,12 +295,7 @@ export default function Index() {
 
   const handleChange = useCallback((entryId: string, payload: EditorChangePayload) => {
     saveDraftThrottled(entryId, { markdown: payload.markdown, json: payload.json });
-    scheduleLinkIndex(
-      entryId,
-      payload.json,
-      payload.markdown,
-      entriesRef.current.find((e) => e.id === entryId)?.properties.tags,
-    );
+    scheduleLinkIndex(entryId, payload.json, payload.markdown);
     // Stale serialize from a note we already left — draft only, no autosave / pending ref.
     if (entryId !== activeId) return;
 
@@ -491,22 +485,6 @@ export default function Index() {
       }
     }, 500);
   }, [activeId]);
-
-  const handlePropertiesChange = useCallback(
-    (properties: EntryProperties) => {
-      if (!activeId) return;
-      setEntries((prev) => prev.map((e) => (e.id === activeId ? { ...e, properties } : e)));
-      // Tags share a namespace with in-text hashtags, so the graph and tag filter
-      // only see this edit once the page is reindexed.
-      const entry = entriesRef.current.find((e) => e.id === activeId);
-      if (entry) reindexEntries([{ ...entry, properties }]);
-      void updateEntryProperties(activeId, properties).catch((err) => {
-        console.error("Failed to save properties:", err);
-        toast.error("Couldn't save page properties", { description: entryErrorMessage(err) });
-      });
-    },
-    [activeId],
-  );
 
   const handleMovePage = useCallback((draggedId: string, parentId: string | null) => {
     const current = entriesRef.current.find((e) => e.id === draggedId);
@@ -764,7 +742,6 @@ export default function Index() {
         userId={user?.id || ""}
         onChange={handleChange}
         onTitleChange={handleTitleChange}
-        onPropertiesChange={handlePropertiesChange}
         onDelete={handleDelete}
         onTogglePin={handleTogglePin}
         sidebarOpen={sidebarOpen}

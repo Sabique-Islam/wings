@@ -2,7 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 import type { JSONContent } from "@tiptap/core";
 import { EntryLayoutMap, normalizeLayout } from "./layout";
 import { logError } from "./logger";
-import { normalizeProperties, type EntryProperties } from "./entryProperties";
 import { sortSiblings } from "./pageOrder";
 import type { FullEditorChangePayload } from "./editorPayload";
 
@@ -17,8 +16,7 @@ export interface Entry {
   title: string;
   share_token: string | null;
   layout: EntryLayoutMap;
-  properties: EntryProperties;
-  /** Manual sidebar position among siblings; null until the page is dragged. */
+  /** Client-side sidebar order; persisted only when the DB column exists. */
   sort_order: number | null;
   deleted_at: string | null;
 }
@@ -75,7 +73,26 @@ export function getEntryTitle(entry: Entry): string {
   return entry.title || entry.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 40) || "Untitled";
 }
 
-const ENTRY_COLS = "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, properties, sort_order, deleted_at";
+/** Columns that exist on every deployed `entries` table — no optional migrations. */
+const ENTRY_COLS =
+  "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
+
+function mapEntryRow(d: Record<string, unknown>): Entry {
+  return {
+    id: String(d.id),
+    content: String(d.content ?? ""),
+    content_json: (d.content_json as JSONContent | null) ?? null,
+    created_at: String(d.created_at),
+    user_id: String(d.user_id),
+    pinned: Boolean(d.pinned),
+    parent_id: (d.parent_id as string | null) ?? null,
+    title: String(d.title ?? ""),
+    share_token: (d.share_token as string | null) ?? null,
+    layout: normalizeLayout(d.layout),
+    sort_order: null,
+    deleted_at: (d.deleted_at as string | null) ?? null,
+  };
+}
 
 export interface FetchedEntries {
   entries: Entry[];
@@ -85,7 +102,6 @@ export interface FetchedEntries {
 }
 
 export async function fetchEntries(userId: string, opts: { includeTrash?: boolean } = {}): Promise<FetchedEntries> {
-  // Fetch own entries
   let query = supabase
     .from("entries")
     .select(ENTRY_COLS)
@@ -99,31 +115,31 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
   }
 
   const roleMap: Record<string, ShareRole> = {};
-  (ownData ?? []).forEach((e: any) => { roleMap[e.id] = "owner"; });
+  (ownData ?? []).forEach((e: { id: string }) => {
+    roleMap[e.id] = "owner";
+  });
 
-  // One pass over entry_shares (non-critical — don't break if it fails). RLS
-  // returns shares on entries the user owns plus shares made to them, which is
-  // exactly the set of pages that should open in collaborative mode.
   const sharedEntryIds = new Set<string>();
-  let sharedEntries: any[] = [];
+  let sharedEntries: Record<string, unknown>[] = [];
   try {
     const { data: shareRows } = await supabase
       .from("entry_shares")
       .select("entry_id, role, shared_with_user_id");
 
-    (shareRows ?? []).forEach((s: any) => sharedEntryIds.add(s.entry_id));
+    (shareRows ?? []).forEach((s: { entry_id: string }) => sharedEntryIds.add(s.entry_id));
 
-    const sharedWithUser = (shareRows ?? []).filter((s: any) => s.shared_with_user_id === userId);
+    const sharedWithUser = (shareRows ?? []).filter(
+      (s: { shared_with_user_id: string | null }) => s.shared_with_user_id === userId,
+    );
     if (sharedWithUser.length > 0) {
-      sharedWithUser.forEach((s: any) => { roleMap[s.entry_id] = s.role as ShareRole; });
-      const sharedIds = sharedWithUser.map((s: any) => s.entry_id);
-      let sharedQuery = supabase
-        .from("entries")
-        .select(ENTRY_COLS)
-        .in("id", sharedIds);
+      sharedWithUser.forEach((s: { entry_id: string; role: string }) => {
+        roleMap[s.entry_id] = s.role as ShareRole;
+      });
+      const sharedIds = sharedWithUser.map((s: { entry_id: string }) => s.entry_id);
+      let sharedQuery = supabase.from("entries").select(ENTRY_COLS).in("id", sharedIds);
       if (!opts.includeTrash) sharedQuery = sharedQuery.is("deleted_at", null);
       const { data: entries } = await sharedQuery;
-      if (entries) sharedEntries = entries as any[];
+      if (entries) sharedEntries = entries as Record<string, unknown>[];
     }
   } catch (err) {
     logError("Failed to fetch shared entries", err);
@@ -132,24 +148,13 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
   const all = [...(ownData ?? []), ...sharedEntries];
   const seen = new Set<string>();
   const unique = all.filter((e) => {
-    if (seen.has(e.id)) return false;
-    seen.add(e.id);
+    const id = String((e as { id: string }).id);
+    if (seen.has(id)) return false;
+    seen.add(id);
     return true;
   });
 
-  const mapped: Entry[] = unique.map((d: any) => ({
-    ...d,
-    content_json: (d.content_json as JSONContent | null) ?? null,
-    parent_id: d.parent_id ?? null,
-    title: d.title ?? "",
-    share_token: d.share_token ?? null,
-    layout: normalizeLayout(d.layout),
-    properties: normalizeProperties(d.properties),
-    sort_order: d.sort_order ?? null,
-    deleted_at: d.deleted_at ?? null,
-  }));
-
-  return { entries: mapped, roleMap, sharedEntryIds };
+  return { entries: unique.map((d) => mapEntryRow(d as Record<string, unknown>)), roleMap, sharedEntryIds };
 }
 
 export async function fetchTrash(userId: string): Promise<Entry[]> {
@@ -159,40 +164,19 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
     .eq("user_id", userId)
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false });
-  if (error) { logError("Failed to fetch trash", error); return []; }
-  return (data ?? []).map((d: any) => ({
-    ...d,
-    content_json: (d.content_json as JSONContent | null) ?? null,
-    parent_id: d.parent_id ?? null,
-    title: d.title ?? "",
-    share_token: d.share_token ?? null,
-    layout: normalizeLayout(d.layout),
-    properties: normalizeProperties(d.properties),
-    sort_order: d.sort_order ?? null,
-    deleted_at: d.deleted_at ?? null,
-  }));
+  if (error) {
+    logError("Failed to fetch trash", error);
+    return [];
+  }
+  return (data ?? []).map((d) => mapEntryRow(d as Record<string, unknown>));
 }
 
 export async function createEntry(userId: string, content: string, parentId?: string): Promise<Entry> {
   const insert = { user_id: userId, content, ...(parentId ? { parent_id: parentId } : {}) };
-  const { data, error } = await supabase
-    .from("entries")
-    .insert(insert)
-    .select(ENTRY_COLS)
-    .single();
+  const { data, error } = await supabase.from("entries").insert(insert).select(ENTRY_COLS).single();
   if (error) throw error;
   if (!data) throw new Error("Failed to create page");
-  return {
-    ...data,
-    content_json: (data.content_json as JSONContent | null) ?? null,
-    parent_id: data.parent_id ?? null,
-    title: data.title ?? "",
-    share_token: data.share_token ?? null,
-    layout: normalizeLayout(data.layout),
-    properties: normalizeProperties(data.properties),
-    sort_order: data.sort_order ?? null,
-    deleted_at: data.deleted_at ?? null,
-  };
+  return mapEntryRow(data as Record<string, unknown>);
 }
 
 export async function updateEntry(id: string, payload: FullEditorChangePayload): Promise<void> {
@@ -203,7 +187,6 @@ export async function updateEntry(id: string, payload: FullEditorChangePayload):
   if (error) throw error;
 }
 
-/** True when an entry has at least one share row (enables realtime collab). */
 export async function entryHasShares(entryId: string): Promise<boolean> {
   const { count, error } = await supabase
     .from("entry_shares")
@@ -221,42 +204,21 @@ export async function updateEntryTitle(id: string, title: string): Promise<void>
   if (error) throw error;
 }
 
-export async function updateEntryProperties(id: string, properties: EntryProperties): Promise<void> {
-  const { error } = await supabase
-    .from("entries")
-    .update({ properties })
-    .eq("id", id);
-  if (error) throw error;
+/** No-op until `sort_order` migration is applied in Supabase. */
+export async function saveEntryOrder(_order: Array<{ id: string; sort_order: number }>): Promise<void> {
+  return;
 }
 
-/** Persist a dragged sidebar arrangement. Lists are short, so one call per row. */
-export async function saveEntryOrder(order: Array<{ id: string; sort_order: number }>): Promise<void> {
-  await Promise.all(
-    order.map(async ({ id, sort_order }) => {
-      const { error } = await supabase.from("entries").update({ sort_order }).eq("id", id);
-      if (error) throw error;
-    }),
-  );
-}
-
-/** Re-parent a page. `parentId` of null moves it back to the top level. */
 export async function moveEntry(id: string, parentId: string | null): Promise<void> {
-  const { error } = await supabase
-    .from("entries")
-    .update({ parent_id: parentId })
-    .eq("id", id);
+  const { error } = await supabase.from("entries").update({ parent_id: parentId }).eq("id", id);
   if (error) throw error;
 }
 
 export async function togglePin(id: string, pinned: boolean): Promise<void> {
-  const { error } = await supabase
-    .from("entries")
-    .update({ pinned })
-    .eq("id", id);
+  const { error } = await supabase.from("entries").update({ pinned }).eq("id", id);
   if (error) throw error;
 }
 
-/** Soft-delete: move to trash (recoverable). Use permanentlyDeleteEntry to hard-delete. */
 export async function deleteEntry(id: string): Promise<void> {
   const { error } = await supabase
     .from("entries")
@@ -266,22 +228,15 @@ export async function deleteEntry(id: string): Promise<void> {
 }
 
 export async function restoreEntry(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("entries")
-    .update({ deleted_at: null })
-    .eq("id", id);
+  const { error } = await supabase.from("entries").update({ deleted_at: null }).eq("id", id);
   if (error) throw error;
 }
 
 export async function permanentlyDeleteEntry(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("entries")
-    .delete()
-    .eq("id", id);
+  const { error } = await supabase.from("entries").delete().eq("id", id);
   if (error) throw error;
 }
 
-/** Full-text search over the current user's non-trashed entries. */
 export async function searchEntries(userId: string, q: string, limit = 20): Promise<Entry[]> {
   const query = q.trim();
   if (!query) return [];
@@ -292,16 +247,9 @@ export async function searchEntries(userId: string, q: string, limit = 20): Prom
     .is("deleted_at", null)
     .textSearch("search_tsv", query, { type: "websearch", config: "english" })
     .limit(limit);
-  if (error) { logError("Search failed", error); return []; }
-  return (data ?? []).map((d: any) => ({
-    ...d,
-    content_json: (d.content_json as JSONContent | null) ?? null,
-    parent_id: d.parent_id ?? null,
-    title: d.title ?? "",
-    share_token: d.share_token ?? null,
-    layout: normalizeLayout(d.layout),
-    properties: normalizeProperties(d.properties),
-    sort_order: d.sort_order ?? null,
-    deleted_at: d.deleted_at ?? null,
-  }));
+  if (error) {
+    logError("Search failed", error);
+    return [];
+  }
+  return (data ?? []).map((d) => mapEntryRow(d as Record<string, unknown>));
 }

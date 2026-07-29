@@ -2,8 +2,6 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { Entry, ShareRole } from "@/lib/journal";
 import { getEntryTitle } from "@/lib/journal";
 import { buildPagePreview, refreshPageEmbeds } from "@/components/BlockEditor/PageEmbedExtension";
-import { PageProperties } from "@/components/PageProperties";
-import type { EntryProperties } from "@/lib/entryProperties";
 import type { EditorChangePayload } from "@/lib/editorPayload";
 import { useCollabProvider } from "@/lib/collab/useCollabProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +36,6 @@ interface Props {
   userId: string;
   onChange: (entryId: string, payload: EditorChangePayload) => void;
   onTitleChange?: (title: string) => void;
-  onPropertiesChange?: (properties: EntryProperties) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   sidebarOpen: boolean;
@@ -63,7 +60,7 @@ function canEditRole(role: ShareRole): boolean {
   return role === "owner" || role === "admin" || role === "editor";
 }
 
-export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onPropertiesChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
+export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
   const { user } = useAuth();
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -418,11 +415,6 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 t.style.height = "auto";
                 t.style.height = `${t.scrollHeight}px`;
               }}
-            />
-            <PageProperties
-              properties={entry.properties}
-              editable={canEdit}
-              onChange={(properties) => onPropertiesChange?.(properties)}
             />
             {/* A shared page waits for its Yjs session: the editor cannot adopt
                 collaboration extensions once it exists, so mounting early would
