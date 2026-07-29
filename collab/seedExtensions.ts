@@ -61,6 +61,9 @@ export function getSeedExtensions(): Extensions {
     stubBlock("columnList", "column+"),
     stubBlock("blockMath"),
     stubBlock("excalidrawDrawing"),
+    stubBlock("database"),
+    stubBlock("syncedBlock", "block+"),
+    stubBlock("pageEmbed"),
     stubInline("inlineMath"),
     // codeBlockLowlight name on client
     Node.create({

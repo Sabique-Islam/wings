@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { Entry, ShareRole } from "@/lib/journal";
 import { getEntryTitle } from "@/lib/journal";
-import { buildPagePreview } from "@/components/BlockEditor/PageEmbedExtension";
+import { buildPagePreview, refreshPageEmbeds } from "@/components/BlockEditor/PageEmbedExtension";
+import { PageProperties } from "@/components/PageProperties";
+import type { EntryProperties } from "@/lib/entryProperties";
 import type { EditorChangePayload } from "@/lib/editorPayload";
 import { useCollabProvider } from "@/lib/collab/useCollabProvider";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,9 +13,11 @@ import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BacklinksPanel } from "@/components/BacklinksPanel";
+import { CommentsPanel } from "@/components/CommentsPanel";
 import { VersionHistory } from "@/components/VersionHistory";
 import { ShareMenu } from "@/components/ShareMenu";
 import { exportSingleEntry, exportSingleAsJson, importFile } from "@/lib/export";
+import { importNotionFiles } from "@/lib/notionImport";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/imageUpload";
 import { InlineAIMenu } from "@/components/InlineAIMenu";
@@ -35,6 +39,7 @@ interface Props {
   userId: string;
   onChange: (entryId: string, payload: EditorChangePayload) => void;
   onTitleChange?: (title: string) => void;
+  onPropertiesChange?: (properties: EntryProperties) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string, pinned: boolean) => void;
   sidebarOpen: boolean;
@@ -59,7 +64,7 @@ function canEditRole(role: ShareRole): boolean {
   return role === "owner" || role === "admin" || role === "editor";
 }
 
-export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
+export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onPropertiesChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
   const { user } = useAuth();
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,10 +72,18 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     try {
+      const looksLikeNotion =
+        files.length > 1 ||
+        files.some((f) => /\.csv$/i.test(f.name) || /\s[a-f0-9]{32}\.(md|markdown)$/i.test(f.name));
       let total = 0;
-      for (const f of files) {
-        const created = await importFile(f, userId);
-        total += created.length;
+      if (looksLikeNotion) {
+        const created = await importNotionFiles(files, userId);
+        total = created.length;
+      } else {
+        for (const f of files) {
+          const created = await importFile(f, userId);
+          total += created.length;
+        }
       }
       toast.success(`imported ${total} entr${total === 1 ? "y" : "ies"}`);
       onImported?.();
@@ -192,6 +205,10 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
     window.dispatchEvent(new CustomEvent("nw:linkpage"));
   }, []);
 
+  const handleEmbedPage = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("nw:embedpage"));
+  }, []);
+
   const handleNewPage = useCallback((title: string) => {
     if (editorEntryId) void onNewSubpageWithTitle(editorEntryId, title);
   }, [editorEntryId, onNewSubpageWithTitle]);
@@ -209,6 +226,8 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
     },
     [allEntries],
   );
+
+  useEffect(() => refreshPageEmbeds(), [allEntries]);
 
   return (
     <div className="flex-1 flex flex-col h-screen min-w-0 w-full">
@@ -332,7 +351,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               <input
                 ref={importInputRef}
                 type="file"
-                accept=".md,.markdown,.json,text/markdown,application/json"
+                accept=".md,.markdown,.json,.csv,text/markdown,application/json,text/csv"
                 multiple
                 className="hidden"
                 onChange={handleImport}
@@ -401,6 +420,11 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 t.style.height = `${t.scrollHeight}px`;
               }}
             />
+            <PageProperties
+              properties={entry.properties}
+              editable={canEdit}
+              onChange={(properties) => onPropertiesChange?.(properties)}
+            />
             {/* A shared page waits for its Yjs session: the editor cannot adopt
                 collaboration extensions once it exists, so mounting early would
                 throw away the instance a moment later. */}
@@ -413,6 +437,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 onChange={handleEditorChange}
                 onImageUpload={canEdit ? handleImageUpload : undefined}
                 onLinkPage={canEdit ? handleLinkPage : undefined}
+                onEmbedPage={canEdit ? handleEmbedPage : undefined}
                 onNewPage={canEdit ? handleNewPage : undefined}
                 onAskAI={canEdit ? onOpenAI : undefined}
                 pages={pages}
@@ -422,6 +447,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               />
             )}
             <BacklinksPanel entryId={entry.id} entries={allEntries} onNavigate={onNavigate} />
+            <CommentsPanel entryId={entry.id} userId={userId} editable={canEdit} />
             <InlineAIMenu />
             <input
               ref={fileInputRef}

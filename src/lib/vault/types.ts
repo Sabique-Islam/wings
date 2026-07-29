@@ -18,6 +18,8 @@ export interface VaultFileEntry {
   wingsId: string | null;
   title: string | null;
   content: string;
+  /** Frontmatter tags, already lowercased by the parser. */
+  tags: string[];
   relativePath: string;
   lastModified: number;
 }

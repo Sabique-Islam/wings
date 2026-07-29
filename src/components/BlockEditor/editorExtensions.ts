@@ -34,6 +34,8 @@ import { createWikiLinkExtension } from "./WikiLinkExtension";
 import { createWikiEmbedExtension } from "./WikiEmbedExtension";
 import { createPageEmbedExtension } from "./PageEmbedExtension";
 import type { PagePreview } from "./PageEmbedExtension";
+import { Database } from "./DatabaseExtension";
+import { SyncedBlock } from "./SyncedBlockExtension";
 import type { Extensions } from "@tiptap/core";
 
 interface BlockEditorExtensionHandlers {
@@ -94,7 +96,7 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
         "paragraph", "heading", "blockquote", "codeBlock", "horizontalRule",
         "bulletList", "orderedList", "taskList", "listItem", "taskItem",
         "callout", "toggleBlock", "columnList", "column", "bookmark", "embed", "pageEmbed",
-        "blockMath", "excalidraw",
+        "blockMath", "excalidraw", "database", "syncedBlock",
       ],
       attributeName: "id",
     }),
@@ -161,6 +163,8 @@ export function createBlockEditorExtensions(handlers: BlockEditorExtensionOption
     Bookmark,
     Embed,
     pageEmbedExtension,
+    Database,
+    SyncedBlock,
     BlockMath,
     InlineMath,
     ExcalidrawNode,

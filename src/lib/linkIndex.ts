@@ -30,19 +30,29 @@ function notify(): void {
   for (const listener of listeners) listener();
 }
 
-function issueJob(entryId: string, doc: JSONContent | null, markdown?: string): LinkIndexJob {
+function issueJob(
+  entryId: string,
+  doc: JSONContent | null,
+  markdown?: string,
+  tags?: string[],
+): LinkIndexJob {
   const seq = nextSeq++;
   latestSeq.set(entryId, seq);
-  return { entryId, seq, doc, markdown };
+  return { entryId, seq, doc, markdown, tags };
 }
 
 function sameLinks(previous: LinkIndexRow | undefined, result: LinkIndexResult): boolean {
   if (!previous) return false;
   const key = (values: string[]) => values.join("\u0000");
+  const contextKey = (contexts: Record<string, string> | undefined) =>
+    Object.entries(contexts ?? {})
+      .sort(([a], [b]) => a.localeCompare(b))
+      .join("\u0000");
   return (
     key(previous.outgoing) === key(result.outgoing) &&
     key(previous.unresolved) === key(result.unresolved) &&
-    key(previous.tags ?? []) === key(result.tags)
+    key(previous.tags ?? []) === key(result.tags) &&
+    contextKey(previous.contexts) === contextKey(result.contexts)
   );
 }
 
@@ -57,6 +67,7 @@ function commit(results: LinkIndexResult[]): void {
       outgoing: result.outgoing,
       unresolved: result.unresolved,
       tags: result.tags,
+      contexts: result.contexts,
       updatedAt: Date.now(),
     };
     rows.set(row.entryId, row);
@@ -108,14 +119,19 @@ export async function hydrateLinkIndex(): Promise<void> {
 }
 
 /** Queue a rebuild for one page. Safe to call on every editor emit. */
-export function scheduleLinkIndex(entryId: string, doc: JSONContent, markdown?: string): void {
+export function scheduleLinkIndex(
+  entryId: string,
+  doc: JSONContent,
+  markdown?: string,
+  tags?: string[],
+): void {
   const existing = timers.get(entryId);
   if (existing) clearTimeout(existing);
   timers.set(
     entryId,
     setTimeout(() => {
       timers.delete(entryId);
-      runJobs([issueJob(entryId, doc, markdown)]);
+      runJobs([issueJob(entryId, doc, markdown, tags)]);
     }, INDEX_DEBOUNCE_MS),
   );
 }
@@ -129,9 +145,18 @@ export function scheduleLinkIndex(entryId: string, doc: JSONContent, markdown?: 
  * before any write, which keeps the common "nothing changed" reload cheap.
  */
 export function reindexEntries(
-  entries: Array<{ id: string; content: string; content_json?: JSONContent | null }>,
+  entries: Array<{
+    id: string;
+    content: string;
+    content_json?: JSONContent | null;
+    properties?: { tags: string[] };
+  }>,
 ): void {
-  runJobs(entries.map((entry) => issueJob(entry.id, entry.content_json ?? null, entry.content)));
+  runJobs(
+    entries.map((entry) =>
+      issueJob(entry.id, entry.content_json ?? null, entry.content, entry.properties?.tags),
+    ),
+  );
 }
 
 export function forgetLinkIndex(entryId: string): void {
@@ -145,11 +170,12 @@ export function forgetLinkIndex(entryId: string): void {
   notify();
 }
 
-/** Pages that link to `entryId`. */
-export function getBacklinks(entryId: string): string[] {
-  const sources: string[] = [];
+/** Pages that link to `entryId`, each with the sentence the link sits in. */
+export function getBacklinks(entryId: string): Array<{ entryId: string; context: string }> {
+  const sources: Array<{ entryId: string; context: string }> = [];
   for (const row of rows.values()) {
-    if (row.entryId !== entryId && row.outgoing.includes(entryId)) sources.push(row.entryId);
+    if (row.entryId === entryId || !row.outgoing.includes(entryId)) continue;
+    sources.push({ entryId: row.entryId, context: row.contexts?.[entryId] ?? "" });
   }
   return sources;
 }

@@ -9,6 +9,7 @@ import {
   Entry, ShareRole, getEntryTitle, getChildEntries, getRootEntries, groupByMonth,
   getPinnedEntries, fetchTrash, restoreEntry, permanentlyDeleteEntry,
 } from "@/lib/journal";
+import { isDescendantOf, type DropPlacement } from "@/lib/pageOrder";
 import { useResizable } from "@/hooks/useResizable";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -24,6 +25,24 @@ interface Props {
   onToggle: () => void;
   onRefetch: () => void;
   onHome?: () => void;
+  /** Drop a page next to `targetId`, keeping them siblings. */
+  onReorder?: (draggedId: string, targetId: string, placement: DropPlacement) => void;
+  /** Drop a page onto another to nest it, or onto nothing to un-nest it. */
+  onMove?: (draggedId: string, parentId: string | null) => void;
+}
+
+/** Where a drop lands: the outer edges reorder, the middle nests. */
+type DropZone = DropPlacement | "inside";
+
+/** Stands in for "no page" so the pages header can act as an un-nest target. */
+const ROOT_TARGET = "";
+
+function dropZoneAt(event: React.DragEvent<HTMLElement>): DropZone {
+  const { top, height } = event.currentTarget.getBoundingClientRect();
+  const offset = (event.clientY - top) / height;
+  if (offset < 0.25) return "before";
+  if (offset > 0.75) return "after";
+  return "inside";
 }
 
 function SectionHeader({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
@@ -37,7 +56,10 @@ function SectionHeader({ children, action }: { children: React.ReactNode; action
 
 export const JournalSidebar = memo(function JournalSidebar({
   allEntries, roleMap, userId, activeId, onSelect, onNew, sidebarOpen, onToggle, onRefetch, onHome,
+  onReorder, onMove,
 }: Props) {
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; zone: DropZone } | null>(null);
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -132,16 +154,60 @@ export const JournalSidebar = memo(function JournalSidebar({
   const filteredPinned = q ? pinned.filter(match) : pinned;
   const filteredShared = q ? sharedRoots.filter(match) : sharedRoots;
 
+  // Reordering only makes sense against the real list, and a page can never be
+  // dropped inside its own subtree.
+  const canDrop = (entry: Entry) =>
+    dragging != null && !q && dragging !== entry.id && !isDescendantOf(allEntries, dragging, entry.id);
+
+  const handleDrop = (entry: Entry, zone: DropZone) => {
+    if (!dragging || !canDrop(entry)) return;
+    if (zone === "inside") onMove?.(dragging, entry.id);
+    else onReorder?.(dragging, entry.id, zone);
+  };
+
   const renderEntry = (entry: Entry, depth = 0) => {
     const preview = getEntryTitle(entry);
     const isActive = entry.id === activeId;
     const children = getChildEntries(allEntries, entry.id);
     const hasChildren = children.length > 0;
     const isExpanded = expanded.has(entry.id);
+    const drop = dropTarget?.id === entry.id ? dropTarget.zone : null;
 
     return (
       <li key={entry.id}>
-        <div className="flex items-center group">
+        <div
+          className={cn(
+            "flex items-center group relative",
+            drop === "before" && "before:absolute before:inset-x-0 before:-top-px before:h-0.5 before:bg-accent-strong before:rounded-full",
+            drop === "after" && "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-accent-strong after:rounded-full",
+            drop === "inside" && "ring-1 ring-accent-strong/60 rounded-lg",
+            dragging === entry.id && "opacity-40",
+          )}
+          draggable={!isShared(entry) && !q}
+          onDragStart={(event) => {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", entry.id);
+            setDragging(entry.id);
+          }}
+          onDragEnd={() => {
+            setDragging(null);
+            setDropTarget(null);
+          }}
+          onDragOver={(event) => {
+            if (!canDrop(entry)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+            setDropTarget({ id: entry.id, zone: dropZoneAt(event) });
+          }}
+          onDragLeave={() => setDropTarget((prev) => (prev?.id === entry.id ? null : prev))}
+          onDrop={(event) => {
+            event.preventDefault();
+            const zone = dropZoneAt(event);
+            setDropTarget(null);
+            handleDrop(entry, zone);
+            setDragging(null);
+          }}
+        >
           {hasChildren ? (
             <button
               onClick={() => toggleExpand(entry.id)}
@@ -243,7 +309,28 @@ export const JournalSidebar = memo(function JournalSidebar({
           )}
 
           <div>
-            <SectionHeader>pages</SectionHeader>
+            <div
+              className={cn(
+                "rounded",
+                dropTarget?.id === ROOT_TARGET && "ring-1 ring-accent-strong/60",
+              )}
+              onDragOver={(event) => {
+                if (!dragging || q) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDropTarget({ id: ROOT_TARGET, zone: "inside" });
+              }}
+              onDragLeave={() => setDropTarget((prev) => (prev?.id === ROOT_TARGET ? null : prev))}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDropTarget(null);
+                if (dragging) onMove?.(dragging, null);
+                setDragging(null);
+              }}
+              title={dragging ? "Drop here to move to the top level" : undefined}
+            >
+              <SectionHeader>pages</SectionHeader>
+            </div>
             {filteredMonths.length === 0 ? (
               <p className="text-xs text-ink-2 px-2 py-1">{q ? "no matches" : "no pages yet"}</p>
             ) : (

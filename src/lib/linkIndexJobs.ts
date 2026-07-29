@@ -12,6 +12,8 @@ export interface LinkIndexJob {
   seq: number;
   doc: JSONContent | null;
   markdown?: string;
+  /** Page-property tags, which live outside the content the parser sees. */
+  tags?: string[];
 }
 
 export interface LinkIndexResult {
@@ -20,12 +22,17 @@ export interface LinkIndexResult {
   outgoing: string[];
   unresolved: string[];
   tags: string[];
+  contexts: Record<string, string>;
 }
 
 export function runLinkIndexJobs(jobs: LinkIndexJob[]): LinkIndexResult[] {
-  return jobs.map((job) => ({
-    entryId: job.entryId,
-    seq: job.seq,
-    ...extractLinks(job.doc, job.markdown),
-  }));
+  return jobs.map((job) => {
+    const links = extractLinks(job.doc, job.markdown);
+    return {
+      entryId: job.entryId,
+      seq: job.seq,
+      ...links,
+      tags: Array.from(new Set([...links.tags, ...(job.tags ?? [])])).sort(),
+    };
+  });
 }

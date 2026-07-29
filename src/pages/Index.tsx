@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, createEntry, updateEntry, updateEntryTitle, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
+import { fetchEntries, createEntry, updateEntry, updateEntryTitle, updateEntryProperties, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
+import type { EntryProperties } from "@/lib/entryProperties";
+import { reorderSiblings, type DropPlacement } from "@/lib/pageOrder";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
 import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
-import { forgetLinkIndex, hydrateLinkIndex, scheduleLinkIndex } from "@/lib/linkIndex";
+import { forgetLinkIndex, hydrateLinkIndex, reindexEntries, scheduleLinkIndex } from "@/lib/linkIndex";
 import { mirrorEntryToVault } from "@/lib/vault/write";
 import { appendMarkdown, payloadFromMarkdown } from "@/lib/entryContent";
 import { deleteBlocksAtPositions } from "@/components/BlockEditor/blockUtils";
@@ -37,12 +39,26 @@ function resolveEntryOwnerId(
   return userId;
 }
 
+type MountedEditor = {
+  chain: () => { focus: () => { insertContent: (content: unknown) => { run: () => void } } };
+};
+
+function mountedEditor(): MountedEditor | undefined {
+  return (window as { __nw_editor?: MountedEditor }).__nw_editor;
+}
+
 /** Insert a link to `entryId` at the editor's cursor, if an editor is mounted. */
 function insertPageLink(entryId: string, title: string): void {
-  const editor = (window as {
-    __nw_editor?: { chain: () => { focus: () => { insertContent: (html: string) => { run: () => void } } } };
-  }).__nw_editor;
-  editor?.chain().focus().insertContent(`<a href="#page:${entryId}">${title}</a>`).run();
+  mountedEditor()?.chain().focus().insertContent(`<a href="#page:${entryId}">${title}</a>`).run();
+}
+
+/** Insert a live preview card for `entryId`, the block form of a page link. */
+function insertPageEmbed(entryId: string, title: string): void {
+  mountedEditor()
+    ?.chain()
+    .focus()
+    .insertContent({ type: "pageEmbed", attrs: { pageId: entryId, title } })
+    .run();
 }
 
 function entryErrorMessage(err: unknown): string {
@@ -124,6 +140,9 @@ export default function Index() {
     setEntries(data);
     setRoleMap(roles);
     setSharedEntryIds(shared);
+    // Backlinks and the graph read a local index that only the editor keeps up
+    // to date, so pages edited elsewhere need a rebuild once they arrive.
+    reindexEntries(data);
   }, [user]);
 
   // Paint from the IndexedDB mirror before the network answers, then reconcile.
@@ -180,10 +199,24 @@ export default function Index() {
   useEffect(() => {
     const handler = (event: Event) => {
       const updated = (event as CustomEvent<Entry[]>).detail;
-      if (Array.isArray(updated)) setEntries(updated);
+      if (!Array.isArray(updated)) return;
+      setEntries(updated);
+      reindexEntries(updated);
     };
     window.addEventListener("nw:vault-synced", handler);
     return () => window.removeEventListener("nw:vault-synced", handler);
+  }, []);
+
+  // Saves reach Supabase even when the folder mirror fails, but a folder that
+  // has quietly stopped updating is worse than one that never existed.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      toast.error("Vault folder is out of date", {
+        description: (event as CustomEvent<string>).detail,
+      });
+    };
+    window.addEventListener("nw:vault-error", handler);
+    return () => window.removeEventListener("nw:vault-error", handler);
   }, []);
 
   const activeEntry = entries.find((e) => e.id === activeId) ?? null;
@@ -263,7 +296,12 @@ export default function Index() {
 
   const handleChange = useCallback((entryId: string, payload: EditorChangePayload) => {
     saveDraftThrottled(entryId, { markdown: payload.markdown, json: payload.json });
-    scheduleLinkIndex(entryId, payload.json, payload.markdown);
+    scheduleLinkIndex(
+      entryId,
+      payload.json,
+      payload.markdown,
+      entriesRef.current.find((e) => e.id === entryId)?.properties.tags,
+    );
     // Stale serialize from a note we already left — draft only, no autosave / pending ref.
     if (entryId !== activeId) return;
 
@@ -453,6 +491,72 @@ export default function Index() {
       }
     }, 500);
   }, [activeId]);
+
+  const handlePropertiesChange = useCallback(
+    (properties: EntryProperties) => {
+      if (!activeId) return;
+      setEntries((prev) => prev.map((e) => (e.id === activeId ? { ...e, properties } : e)));
+      // Tags share a namespace with in-text hashtags, so the graph and tag filter
+      // only see this edit once the page is reindexed.
+      const entry = entriesRef.current.find((e) => e.id === activeId);
+      if (entry) reindexEntries([{ ...entry, properties }]);
+      void updateEntryProperties(activeId, properties).catch((err) => {
+        console.error("Failed to save properties:", err);
+        toast.error("Couldn't save page properties", { description: entryErrorMessage(err) });
+      });
+    },
+    [activeId],
+  );
+
+  const handleMovePage = useCallback((draggedId: string, parentId: string | null) => {
+    const current = entriesRef.current.find((e) => e.id === draggedId);
+    if (!current || current.parent_id === parentId) return;
+    setEntries((prev) => prev.map((e) => (e.id === draggedId ? { ...e, parent_id: parentId } : e)));
+    void moveEntry(draggedId, parentId).catch((err) => {
+      console.error("Failed to move page:", err);
+      toast.error("Couldn't move that page", { description: entryErrorMessage(err) });
+      setEntries((prev) => prev.map((e) => (e.id === draggedId ? current : e)));
+    });
+  }, []);
+
+  const handleReorderPages = useCallback(
+    (draggedId: string, targetId: string, placement: DropPlacement) => {
+      const entries = entriesRef.current;
+      const target = entries.find((e) => e.id === targetId);
+      const dragged = entries.find((e) => e.id === draggedId);
+      // Favorites and pages are separate lists; moving between them is what the
+      // pin button is for.
+      if (!target || !dragged || target.pinned !== dragged.pinned) return;
+
+      // Dropping beside a page in another branch adopts that page's parent too,
+      // otherwise the row would jump straight back to where it came from.
+      const parentId = target.parent_id;
+      const siblings = entries.filter(
+        (e) => e.id === draggedId || (e.parent_id === parentId && e.pinned === target.pinned),
+      );
+      const order = reorderSiblings(siblings, draggedId, targetId, placement);
+      if (order.length === 0) return;
+
+      const byId = new Map(order.map((row) => [row.id, row.sort_order]));
+      setEntries((prev) =>
+        prev.map((e) => {
+          if (e.id === draggedId) return { ...e, parent_id: parentId, sort_order: byId.get(e.id) ?? e.sort_order };
+          return byId.has(e.id) ? { ...e, sort_order: byId.get(e.id)! } : e;
+        }),
+      );
+
+      const persist = async () => {
+        if (dragged.parent_id !== parentId) await moveEntry(draggedId, parentId);
+        await saveEntryOrder(order);
+      };
+      void persist().catch((err) => {
+        console.error("Failed to reorder pages:", err);
+        toast.error("Couldn't save the new order", { description: entryErrorMessage(err) });
+        void loadEntries();
+      });
+    },
+    [loadEntries],
+  );
 
   // Runs again once loading clears: on a cold start the entries list is still
   // empty when `activeId` first arrives, so a draft written just before the tab
@@ -650,6 +754,8 @@ export default function Index() {
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onRefetch={() => void loadEntries().catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
         onHome={() => setActiveId(null)}
+        onReorder={handleReorderPages}
+        onMove={handleMovePage}
       />
       <JournalEditor
         entry={activeEntry}
@@ -658,6 +764,7 @@ export default function Index() {
         userId={user?.id || ""}
         onChange={handleChange}
         onTitleChange={handleTitleChange}
+        onPropertiesChange={handlePropertiesChange}
         onDelete={handleDelete}
         onTogglePin={handleTogglePin}
         sidebarOpen={sidebarOpen}
@@ -677,8 +784,10 @@ export default function Index() {
       />
       <QuickSwitcher
         entries={entries}
+        userId={userId}
         onSelect={setActiveId}
         onLinkPage={(entry) => insertPageLink(entry.id, getEntryTitle(entry))}
+        onEmbedPage={(entry) => insertPageEmbed(entry.id, getEntryTitle(entry))}
         onMoveBlocks={handleMoveBlocksToPage}
       />
       <CommandPalette

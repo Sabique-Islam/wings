@@ -14,7 +14,7 @@ import {
   Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Quote, Minus,
   Code2, Image, Type, AlertCircle, ChevronRight, FileText, Table,
   Link as LinkIcon, ExternalLink, Columns, Sigma, Calculator, Calendar,
-  Sparkles, FilePlus2, Layout,
+  Sparkles, FilePlus2, Layout, PenLine, BookOpen, Table2, RefreshCw,
 } from "lucide-react";
 import { TEMPLATES } from "@/lib/templates";
 import { fuzzyMatch, insertTemplateMarkdown } from "./blockCommands";
@@ -31,6 +31,7 @@ export interface CommandItem {
 interface SlashHandlers {
   onImageUpload?: () => void;
   onLinkPage?: () => void;
+  onEmbedPage?: () => void;
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
 }
@@ -112,6 +113,26 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     aliases: ["todo", "task", "checkbox", "check"],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).toggleTaskList().run();
+    },
+  },
+  {
+    title: "Database",
+    description: "Simple table with rows and columns",
+    icon: Table2,
+    category: "Advanced",
+    aliases: ["db", "board", "table db"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertDatabase().run();
+    },
+  },
+  {
+    title: "Synced block",
+    description: "Content that stays in sync when duplicated",
+    icon: RefreshCw,
+    category: "Advanced",
+    aliases: ["sync", "synced", "linked block"],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertSyncedBlock().run();
     },
   },
   {
@@ -248,6 +269,34 @@ const getSuggestionItems = (h: SlashHandlers = {}): CommandItem[] => [
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).run();
       h.onLinkPage?.();
+    },
+  },
+  {
+    title: "Embed Page",
+    description: "Show another page inline",
+    icon: BookOpen,
+    category: "Pages",
+    aliases: ["transclude", "embed page", "![["],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      h.onEmbedPage?.();
+    },
+  },
+  {
+    title: "Drawing",
+    description: "Sketch on an Excalidraw canvas",
+    icon: PenLine,
+    category: "Media",
+    aliases: ["excalidraw", "sketch", "canvas", "draw"],
+    command: ({ editor, range }) => {
+      const sceneId = `scene-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({ type: "excalidrawDrawing", attrs: { sceneId } })
+        .run();
+      window.dispatchEvent(new CustomEvent("nw:editDrawing", { detail: { sceneId } }));
     },
   },
   {

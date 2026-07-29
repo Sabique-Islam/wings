@@ -21,8 +21,8 @@ export function BacklinksPanel({ entryId, entries, onNavigate }: Props) {
     const byId = new Map(entries.map((e) => [e.id, e]));
     return {
       linked: getBacklinks(entryId)
-        .map((id) => byId.get(id))
-        .filter((e): e is Entry => e != null),
+        .map((source) => ({ entry: byId.get(source.entryId), context: source.context }))
+        .filter((source): source is { entry: Entry; context: string } => source.entry != null),
       unresolved: getUnresolvedLinks(entryId),
     };
   }, [entryId, entries, version]);
@@ -37,15 +37,22 @@ export function BacklinksPanel({ entryId, entries, onNavigate }: Props) {
             {linked.length} linked mention{linked.length === 1 ? "" : "s"}
           </h2>
           <ul className="space-y-0.5">
-            {linked.map((source) => (
-              <li key={source.id}>
+            {linked.map(({ entry, context }) => (
+              <li key={entry.id}>
                 <button
                   type="button"
-                  onClick={() => onNavigate(source.id)}
-                  className="flex items-center gap-2 w-full text-left text-xs px-2 py-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  onClick={() => onNavigate(entry.id)}
+                  className="block w-full text-left px-2 py-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 >
-                  <ArrowUpLeft className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                  <span className="truncate">{getEntryTitle(source)}</span>
+                  <span className="flex items-center gap-2 text-xs">
+                    <ArrowUpLeft className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                    <span className="truncate">{getEntryTitle(entry)}</span>
+                  </span>
+                  {context && (
+                    <span className="block pl-[22px] text-[11px] leading-relaxed text-muted-foreground/60 line-clamp-2">
+                      {context}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

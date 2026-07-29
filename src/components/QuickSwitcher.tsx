@@ -1,38 +1,46 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Entry } from "@/lib/journal";
-import { searchLocalEntries } from "@/lib/localSearch";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Entry, searchEntries } from "@/lib/journal";
+import { searchLocalEntries, type SearchHit } from "@/lib/localSearch";
 
 interface Props {
   entries: Entry[];
+  userId?: string;
   onSelect: (id: string) => void;
   onLinkPage?: (entry: Entry) => void;
+  onEmbedPage?: (entry: Entry) => void;
   /** Destination for blocks the user chose to move out of the current page. */
   onMoveBlocks?: (entry: Entry) => void;
 }
 
+const SERVER_SEARCH_DEBOUNCE_MS = 250;
+const MIN_SERVER_QUERY = 2;
+
 const PLACEHOLDER: Record<Mode, string> = {
   jump: "Jump to entry…",
   link: "Link to page…",
+  embed: "Embed a page…",
   move: "Move blocks to page…",
 };
 
 const ENTER_HINT: Record<Mode, string> = {
   jump: "select",
   link: "insert link",
+  embed: "embed page",
   move: "move here",
 };
 
-type Mode = "jump" | "link" | "move";
+type Mode = "jump" | "link" | "embed" | "move";
 
 function getTitle(entry: Entry): string {
   return entry.title || entry.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 60) || "Untitled";
 }
 
-export function QuickSwitcher({ entries, onSelect, onLinkPage, onMoveBlocks }: Props) {
+export function QuickSwitcher({ entries, userId, onSelect, onLinkPage, onEmbedPage, onMoveBlocks }: Props) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("jump");
   const [query, setQuery] = useState("");
   const [idx, setIdx] = useState(0);
+  const [serverHits, setServerHits] = useState<Entry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -57,11 +65,14 @@ export function QuickSwitcher({ entries, onSelect, onLinkPage, onMoveBlocks }: P
       setIdx(0);
     };
     const onLink = openIn("link");
+    const onEmbed = openIn("embed");
     const onMove = openIn("move");
     window.addEventListener("nw:linkpage", onLink);
+    window.addEventListener("nw:embedpage", onEmbed);
     window.addEventListener("nw:moveBlocksToPage", onMove);
     return () => {
       window.removeEventListener("nw:linkpage", onLink);
+      window.removeEventListener("nw:embedpage", onEmbed);
       window.removeEventListener("nw:moveBlocksToPage", onMove);
     };
   }, []);
@@ -70,14 +81,43 @@ export function QuickSwitcher({ entries, onSelect, onLinkPage, onMoveBlocks }: P
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  const hits = searchLocalEntries(entries, query);
+  // Local matching is substring-only, so Postgres full-text search is what finds
+  // "running" from "runs". It answers after the list is already on screen, and
+  // only contributes pages the local pass missed.
+  useEffect(() => {
+    if (!open || !userId) return;
+    const needle = query.trim();
+    if (needle.length < MIN_SERVER_QUERY) {
+      setServerHits([]);
+      return;
+    }
+    let current = true;
+    const timer = setTimeout(() => {
+      void searchEntries(userId, needle).then((found) => {
+        if (current) setServerHits(found);
+      });
+    }, SERVER_SEARCH_DEBOUNCE_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [open, userId, query]);
+
+  const hits = useMemo<SearchHit[]>(() => {
+    const local = searchLocalEntries(entries, query);
+    if (serverHits.length === 0 || !query.trim()) return local;
+    const seen = new Set(local.map((hit) => hit.entry.id));
+    const extra = serverHits.filter((entry) => !seen.has(entry.id)).map((entry) => ({ entry, snippet: null }));
+    return [...local, ...extra];
+  }, [entries, query, serverHits]);
 
   const pick = useCallback((entry: Entry) => {
     if (mode === "link" && onLinkPage) onLinkPage(entry);
+    else if (mode === "embed" && onEmbedPage) onEmbedPage(entry);
     else if (mode === "move" && onMoveBlocks) onMoveBlocks(entry);
     else onSelect(entry.id);
     setOpen(false);
-  }, [mode, onSelect, onLinkPage, onMoveBlocks]);
+  }, [mode, onSelect, onLinkPage, onEmbedPage, onMoveBlocks]);
 
   if (!open) return null;
 

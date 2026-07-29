@@ -1,8 +1,9 @@
-import { createEntry, getEntryTitle, updateEntry, type Entry } from "@/lib/journal";
+import { createEntry, getEntryTitle, moveEntry, updateEntry, updateEntryProperties, type Entry } from "@/lib/journal";
 import { payloadFromMarkdown } from "@/lib/entryContent";
 import { shouldBlockEmptySave } from "@/lib/editorContent";
 import { contentHash, normalizeVaultContent, type VaultConflict, type VaultSyncResult } from "./types";
-import { entryToRelativePath, parentPathForFile } from "./frontmatter";
+import { entryToRelativePath } from "./frontmatter";
+import { parentIdChangeForFile, propertiesWithVaultTags, resolveParentIdFromPath } from "./hierarchy";
 import { planVaultFileSync } from "./syncPlan";
 import { scanVaultFolder } from "./read";
 import { putVaultMeta, type VaultMetaRow } from "@/lib/localStore";
@@ -15,6 +16,29 @@ function markWritten(meta: VaultMetaRow, entryId: string, content: string): Vaul
     lastWrittenAt: { ...meta.lastWrittenAt, [entryId]: Date.now() },
     lastWrittenHash: { ...meta.lastWrittenHash, [entryId]: contentHash(content) },
   };
+}
+
+async function applyVaultMetadata(
+  entry: Entry,
+  relativePath: string,
+  tags: string[],
+  idByPath: Map<string, string>,
+): Promise<Entry> {
+  let next = entry;
+
+  const parentChange = parentIdChangeForFile(relativePath, next, idByPath);
+  if (parentChange !== undefined) {
+    await moveEntry(next.id, parentChange);
+    next = { ...next, parent_id: parentChange };
+  }
+
+  const properties = propertiesWithVaultTags(next.properties, tags);
+  if (properties) {
+    await updateEntryProperties(next.id, properties);
+    next = { ...next, properties };
+  }
+
+  return next;
 }
 
 export async function syncFromVault(
@@ -42,6 +66,17 @@ export async function syncFromVault(
     const action = planVaultFileSync(file, existing, meta);
 
     if (action.kind === "skip") {
+      // Path or tags can still change when the body is unchanged.
+      if (existing) {
+        const withMeta = await applyVaultMetadata(existing, file.relativePath, file.tags, idByPath);
+        if (withMeta !== existing) {
+          nextEntries = nextEntries.map((e) => (e.id === withMeta.id ? withMeta : e));
+          byId.set(withMeta.id, withMeta);
+          idByPath.set(file.relativePath, withMeta.id);
+          result.updated += 1;
+          continue;
+        }
+      }
       result.skipped += 1;
       continue;
     }
@@ -57,23 +92,26 @@ export async function syncFromVault(
     }
 
     if (action.kind === "create") {
-      const parentPath = parentPathForFile(file.relativePath);
-      const created = await createEntry(userId, action.body, parentPath ? idByPath.get(parentPath) : undefined);
-      nextEntries = [created, ...nextEntries];
-      byId.set(created.id, created);
-      idByPath.set(file.relativePath, created.id);
+      const parentId = resolveParentIdFromPath(file.relativePath, idByPath);
+      const created = await createEntry(userId, action.body, parentId ?? undefined);
+      const withMeta = await applyVaultMetadata(created, file.relativePath, file.tags, idByPath);
+      nextEntries = [withMeta, ...nextEntries];
+      byId.set(withMeta.id, withMeta);
+      idByPath.set(file.relativePath, withMeta.id);
       result.created += 1;
       // Stamp the new page's id into the file so the next sync recognises it.
-      nextMeta = await writeEntryToVault(handle, created, nextEntries, nextMeta);
+      nextMeta = await writeEntryToVault(handle, withMeta, nextEntries, nextMeta);
       continue;
     }
 
     const target = existing!;
     const payload = payloadFromMarkdown(action.body);
     await updateEntry(target.id, payload);
-    const updated: Entry = { ...target, content: payload.markdown, content_json: payload.json };
+    let updated: Entry = { ...target, content: payload.markdown, content_json: payload.json };
+    updated = await applyVaultMetadata(updated, file.relativePath, file.tags, idByPath);
     nextEntries = nextEntries.map((e) => (e.id === updated.id ? updated : e));
     byId.set(updated.id, updated);
+    idByPath.set(file.relativePath, updated.id);
     result.updated += 1;
     nextMeta = markWritten(nextMeta, updated.id, payload.markdown);
   }

@@ -20,6 +20,7 @@ async function scanDirectory(
       wingsId: parsed.wingsId,
       title: parsed.title,
       content: parsed.body,
+      tags: parsed.tags,
       relativePath: path,
       lastModified: file.lastModified,
     });

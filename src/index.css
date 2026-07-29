@@ -408,6 +408,53 @@
   object-fit: contain;
 }
 
+.editor-image-block {
+  @apply my-4 flex flex-col;
+}
+.editor-image-block[data-align="left"] {
+  @apply items-start;
+}
+.editor-image-block[data-align="center"] {
+  @apply items-center;
+}
+.editor-image-block[data-align="right"] {
+  @apply items-end;
+}
+.editor-image-figure {
+  @apply relative inline-block max-w-full;
+}
+.editor-image-block .editor-image-figure img {
+  @apply my-0 mx-0;
+}
+.editor-image-block[data-selected="true"] .editor-image-figure img {
+  @apply ring-2 ring-ring;
+}
+/* Wide enough to grab, narrow enough to stay out of the way. */
+.editor-image-resize {
+  @apply absolute right-0 top-0 h-full w-2 cursor-ew-resize opacity-0 transition-opacity;
+}
+.editor-image-figure:hover .editor-image-resize {
+  @apply opacity-100 bg-accent-strong/30 rounded-r-md;
+}
+.editor-image-toolbar {
+  @apply absolute top-2 right-2 flex items-center gap-0.5 rounded-md border border-border bg-card/95 p-0.5 shadow-lg;
+}
+.editor-image-toolbar button {
+  @apply rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground;
+}
+.editor-image-toolbar button.is-active {
+  @apply bg-accent text-foreground;
+}
+.editor-image-caption {
+  @apply mt-1.5 w-full max-w-full bg-transparent text-center text-xs text-muted-foreground focus:outline-none;
+}
+.editor-image-block[data-align="left"] .editor-image-caption {
+  @apply text-left;
+}
+.editor-image-block[data-align="right"] .editor-image-caption {
+  @apply text-right;
+}
+
 /* Strong / emphasis */
 .block-editor-content strong {
   @apply text-foreground font-semibold;
@@ -446,6 +493,24 @@
 }
 .toggle-content {
   @apply pl-6 pt-1;
+}
+
+/* Inline database */
+.database-block {
+  @apply my-2;
+}
+.database-block table input,
+.database-block table select {
+  @apply min-w-[4rem];
+}
+
+/* Synced block */
+.synced-block {
+  @apply my-2;
+}
+.synced-block-content > .ProseMirror,
+.synced-block .synced-block-content {
+  @apply min-h-[1.5em];
 }
 
 /* Bubble menu */

@@ -1,9 +1,32 @@
+import { useSyncExternalStore } from "react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
 
 export interface PagePreview {
   title: string;
   preview: string;
+}
+
+// An embed card shows another page's text, so nothing about its own node tells
+// React when to repaint it. Cards subscribe here and the app announces whenever
+// page content changes.
+let previewRevision = 0;
+const previewSubscribers = new Set<() => void>();
+
+export function refreshPageEmbeds(): void {
+  previewRevision += 1;
+  for (const notify of previewSubscribers) notify();
+}
+
+function subscribePageEmbeds(notify: () => void): () => void {
+  previewSubscribers.add(notify);
+  return () => {
+    previewSubscribers.delete(notify);
+  };
+}
+
+function readPreviewRevision(): number {
+  return previewRevision;
 }
 
 declare module "@tiptap/core" {
@@ -35,6 +58,7 @@ function PageEmbedView({
   node,
   getPagePreview,
 }: NodeViewProps & { getPagePreview: (pageId: string) => PagePreview | null }) {
+  useSyncExternalStore(subscribePageEmbeds, readPreviewRevision, readPreviewRevision);
   const { pageId, title } = node.attrs as { pageId: string; title: string };
   const resolved = pageId ? getPagePreview(pageId) : null;
   const displayTitle = resolved?.title || title || "Untitled";

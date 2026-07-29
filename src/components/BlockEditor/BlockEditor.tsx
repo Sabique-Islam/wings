@@ -31,6 +31,7 @@ interface Props {
   onChange: (payload: EditorChangePayload) => void;
   onImageUpload?: (file?: File) => void;
   onLinkPage?: () => void;
+  onEmbedPage?: () => void;
   onNewPage?: (title: string) => void;
   onAskAI?: () => void;
   pages?: PageOption[];
@@ -74,6 +75,7 @@ export const BlockEditor = memo(function BlockEditor({
   onChange,
   onImageUpload,
   onLinkPage,
+  onEmbedPage,
   onNewPage,
   onAskAI,
   pages = [],
@@ -125,6 +127,7 @@ export const BlockEditor = memo(function BlockEditor({
       createBlockEditorExtensions({
         onImageUpload,
         onLinkPage,
+        onEmbedPage,
         onNewPage,
         onAskAI,
         getPages: pages.length > 0 ? () => pagesRef.current : undefined,
@@ -138,9 +141,11 @@ export const BlockEditor = memo(function BlockEditor({
       onAskAI,
       onImageUpload,
       onLinkPage,
+      onEmbedPage,
       onNewPage,
       pages.length,
-      getPagePreview,
+      // getPagePreview is read through a ref so identity churn from the parent
+      // cannot rebuild the suggestion plugins mid-session.
     ],
   );
 

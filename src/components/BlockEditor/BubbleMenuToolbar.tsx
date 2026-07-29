@@ -1,13 +1,35 @@
 import { useEditorState } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import { BubbleMenu } from "@tiptap/react/menus";
-import { Bold, Italic, Strikethrough, Underline, Code, Link as LinkIcon, Sparkles } from "lucide-react";
+import {
+  Bold, Italic, Strikethrough, Underline, Code, Link as LinkIcon, Sparkles,
+  AlignLeft, AlignCenter, AlignRight, Type,
+} from "lucide-react";
 import { TurnIntoDropdown, ColorDropdown } from "./ColorMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Props {
   editor: Editor;
   onSetLink: () => void;
 }
+
+const ALIGNMENTS = [
+  { value: "left", label: "Left", icon: AlignLeft },
+  { value: "center", label: "Center", icon: AlignCenter },
+  { value: "right", label: "Right", icon: AlignRight },
+] as const;
+
+/** Matches the three faces Notion offers, resolved through the theme's stacks. */
+const FONTS = [
+  { label: "Default", value: null },
+  { label: "Serif", value: "Georgia, 'Times New Roman', serif" },
+  { label: "Mono", value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
+] as const;
 
 /** Bubble toolbar — subscribes only to mark state, not every transaction. */
 export function BubbleMenuToolbar({ editor, onSetLink }: Props) {
@@ -20,6 +42,7 @@ export function BubbleMenuToolbar({ editor, onSetLink }: Props) {
       strike: ed.isActive("strike"),
       code: ed.isActive("code"),
       link: ed.isActive("link"),
+      align: ALIGNMENTS.find((a) => ed.isActive({ textAlign: a.value }))?.value ?? "left",
     }),
   });
 
@@ -86,6 +109,39 @@ export function BubbleMenuToolbar({ editor, onSetLink }: Props) {
         <LinkIcon className="h-3.5 w-3.5" />
       </button>
       <ColorDropdown editor={editor} />
+      <div className="w-px h-4 bg-border mx-0.5" />
+      {ALIGNMENTS.map(({ value, label, icon: Icon }) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => editor.chain().focus().setTextAlign(value).run()}
+          className={`bubble-btn ${marks.align === value ? "is-active" : ""}`}
+          title={`Align ${label.toLowerCase()}`}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </button>
+      ))}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" className="bubble-btn" title="Font">
+            <Type className="h-3.5 w-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[120px]">
+          {FONTS.map((font) => (
+            <DropdownMenuItem
+              key={font.label}
+              style={font.value ? { fontFamily: font.value } : undefined}
+              onClick={() => {
+                if (font.value) editor.chain().focus().setFontFamily(font.value).run();
+                else editor.chain().focus().unsetFontFamily().run();
+              }}
+            >
+              {font.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </BubbleMenu>
   );
 }
