@@ -17,6 +17,7 @@ export function isEmptyDoc(json: JSONContent | null | undefined): boolean {
 export function resolveInitialEditorContent(
   content: string,
   contentJson?: JSONContent | null,
+  resolvePageId?: (title: string) => string | null,
 ): string | JSONContent {
   const markdown = content ?? "";
   const hasMarkdown = markdown.trim().length > 0;
@@ -26,14 +27,14 @@ export function resolveInitialEditorContent(
   }
 
   if (hasMarkdown) {
-    return markdownToHtml(markdown);
+    return markdownToHtml(markdown, resolvePageId);
   }
 
   if (contentJson && contentJson.type === "doc") {
     return contentJson;
   }
 
-  return markdownToHtml(markdown);
+  return markdownToHtml(markdown, resolvePageId);
 }
 
 /**
