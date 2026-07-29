@@ -13,7 +13,6 @@ import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BacklinksPanel } from "@/components/BacklinksPanel";
-import { CommentsPanel } from "@/components/CommentsPanel";
 import { VersionHistory } from "@/components/VersionHistory";
 import { ShareMenu } from "@/components/ShareMenu";
 import { exportSingleEntry, exportSingleAsJson, importFile } from "@/lib/export";
@@ -447,7 +446,6 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               />
             )}
             <BacklinksPanel entryId={entry.id} entries={allEntries} onNavigate={onNavigate} />
-            <CommentsPanel entryId={entry.id} userId={userId} editable={canEdit} />
             <InlineAIMenu />
             <input
               ref={fileInputRef}

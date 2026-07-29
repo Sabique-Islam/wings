@@ -34,7 +34,7 @@ export function parentIdChangeForFile(
   return nextParent;
 }
 
-/** Merge frontmatter tags into page properties without dropping status/date. */
+/** Merge frontmatter tags into page properties without dropping date. */
 export function propertiesWithVaultTags(
   existing: EntryProperties | undefined,
   vaultTags: string[],

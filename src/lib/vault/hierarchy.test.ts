@@ -67,11 +67,11 @@ describe("propertiesWithVaultTags", () => {
 
   it("merges frontmatter tags into existing properties", () => {
     expect(
-      propertiesWithVaultTags({ status: "Done", date: null, tags: ["old"] }, ["New Tag", "old"]),
-    ).toEqual({ status: "Done", date: null, tags: ["old", "new-tag"] });
+      propertiesWithVaultTags({ date: "2026-07-01", tags: ["old"] }, ["New Tag", "old"]),
+    ).toEqual({ date: "2026-07-01", tags: ["old", "new-tag"] });
   });
 
   it("returns null when tags are already present", () => {
-    expect(propertiesWithVaultTags({ status: null, date: null, tags: ["a"] }, ["a"])).toBeNull();
+    expect(propertiesWithVaultTags({ date: null, tags: ["a"] }, ["a"])).toBeNull();
   });
 });

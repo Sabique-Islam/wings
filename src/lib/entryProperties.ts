@@ -4,16 +4,12 @@
 // written before the column existed and with hand-edited JSON.
 
 export interface EntryProperties {
-  /** One of STATUS_OPTIONS, or null when unset. */
-  status: string | null;
   /** ISO `yyyy-mm-dd`, or null when unset. */
   date: string | null;
   tags: string[];
 }
 
-export const STATUS_OPTIONS = ["Not started", "In progress", "Blocked", "Done"] as const;
-
-export const EMPTY_PROPERTIES: EntryProperties = { status: null, date: null, tags: [] };
+export const EMPTY_PROPERTIES: EntryProperties = { date: null, tags: [] };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -26,19 +22,17 @@ export function normalizeProperties(value: unknown): EntryProperties {
   if (value == null || typeof value !== "object") return EMPTY_PROPERTIES;
   const raw = value as Record<string, unknown>;
 
-  const status = typeof raw.status === "string" ? raw.status.trim() : "";
   const date = typeof raw.date === "string" ? raw.date.trim() : "";
   const tags = Array.isArray(raw.tags)
     ? raw.tags.filter((tag): tag is string => typeof tag === "string").map(normalizeTag)
     : [];
 
   return {
-    status: STATUS_OPTIONS.includes(status as (typeof STATUS_OPTIONS)[number]) ? status : null,
     date: ISO_DATE.test(date) ? date : null,
     tags: Array.from(new Set(tags.filter(Boolean))),
   };
 }
 
 export function isEmptyProperties(properties: EntryProperties): boolean {
-  return !properties.status && !properties.date && properties.tags.length === 0;
+  return !properties.date && properties.tags.length === 0;
 }

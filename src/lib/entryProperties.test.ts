@@ -3,8 +3,7 @@ import { EMPTY_PROPERTIES, isEmptyProperties, normalizeProperties, normalizeTag 
 
 describe("normalizeProperties", () => {
   it("reads a well-formed value back unchanged", () => {
-    expect(normalizeProperties({ status: "Done", date: "2026-07-29", tags: ["infra"] })).toEqual({
-      status: "Done",
+    expect(normalizeProperties({ date: "2026-07-29", tags: ["infra"] })).toEqual({
       date: "2026-07-29",
       tags: ["infra"],
     });
@@ -15,8 +14,11 @@ describe("normalizeProperties", () => {
     expect(normalizeProperties({})).toEqual(EMPTY_PROPERTIES);
   });
 
-  it("drops a status that is not one of the offered options", () => {
-    expect(normalizeProperties({ status: "Shipped" }).status).toBeNull();
+  it("ignores legacy status keys in stored JSON", () => {
+    expect(normalizeProperties({ status: "Done", date: "2026-07-29", tags: [] })).toEqual({
+      date: "2026-07-29",
+      tags: [],
+    });
   });
 
   it("drops a date that is not an ISO day", () => {
@@ -40,6 +42,6 @@ describe("normalizeTag", () => {
 describe("isEmptyProperties", () => {
   it("is true only when nothing is set", () => {
     expect(isEmptyProperties(EMPTY_PROPERTIES)).toBe(true);
-    expect(isEmptyProperties({ status: null, date: null, tags: ["infra"] })).toBe(false);
+    expect(isEmptyProperties({ date: null, tags: ["infra"] })).toBe(false);
   });
 });
