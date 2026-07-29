@@ -39,8 +39,12 @@ interface Props {
   collabSession?: CollabSession | null;
 }
 
-function resolveInitialContent(content: string, contentJson?: JSONContent | null): string | JSONContent {
-  return resolveInitialEditorContent(content, contentJson);
+function resolveInitialContent(
+  content: string,
+  contentJson?: JSONContent | null,
+  resolvePageId?: (title: string) => string | null,
+): string | JSONContent {
+  return resolveInitialEditorContent(content, contentJson, resolvePageId);
 }
 
 type MountedEditor = NonNullable<ReturnType<typeof useEditor>>;
@@ -77,9 +81,16 @@ export const BlockEditor = memo(function BlockEditor({
   editable = true,
   collabSession = null,
 }: Props) {
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
+  /** Recovers the page id for `![[Title]]` embeds authored outside the editor. */
+  const resolvePageIdByTitle = useCallback((title: string) => {
+    const wanted = title.trim().toLowerCase();
+    return pagesRef.current.find((page) => page.title.trim().toLowerCase() === wanted)?.id ?? null;
+  }, []);
   const resolvedContent = useMemo(
-    () => resolveInitialContent(content, contentJson),
-    [entryId, content, contentJson],
+    () => resolveInitialContent(content, contentJson, resolvePageIdByTitle),
+    [entryId, content, contentJson, resolvePageIdByTitle],
   );
   const lastEmittedMarkdown = useRef(content);
   const lastEmittedJson = useRef<JSONContent | null>(contentJson ?? null);
@@ -97,8 +108,6 @@ export const BlockEditor = memo(function BlockEditor({
   const serializeTimer = useRef<ReturnType<typeof setTimeout>>();
   const editorRef = useRef<MountedEditor | null>(null);
   const onChangeRef = useRef(onChange);
-  const pagesRef = useRef(pages);
-  pagesRef.current = pages;
   const getPagePreviewRef = useRef(getPagePreview);
   getPagePreviewRef.current = getPagePreview;
   onChangeRef.current = onChange;
@@ -297,7 +306,7 @@ export const BlockEditor = memo(function BlockEditor({
     if (editor.isFocused) return;
     if (content === lastEmittedMarkdown.current) return;
     if (localVersion.current !== acceptedVersion.current) return;
-    const next = resolveInitialContent(content, contentJson);
+    const next = resolveInitialContent(content, contentJson, resolvePageIdByTitle);
     editor.commands.setContent(next, { emitUpdate: false });
     lastEmittedMarkdown.current = content;
     lastEmittedJson.current = contentJson ?? null;
@@ -305,7 +314,7 @@ export const BlockEditor = memo(function BlockEditor({
     // unchanged and can no longer vouch for the cached markdown.
     markdownVersion.current = -1;
     acceptedVersion.current = localVersion.current;
-  }, [content, contentJson, editor]);
+  }, [content, contentJson, editor, resolvePageIdByTitle]);
 
   const setLink = useCallback(async () => {
     if (!editor) return;
