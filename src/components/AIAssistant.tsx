@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Sparkles, Send, X, Settings, Loader2, Square,
-  PenLine, FilePlus2, Wand2, Eye, EyeOff, Image as ImageIcon,
+  PenLine, FilePlus2, Wand2, Eye, EyeOff, Image as ImageIcon, ImagePlus,
 } from "lucide-react";
 import { useResizable } from "@/hooks/useResizable";
 import { marked } from "marked";
@@ -17,6 +17,7 @@ import {
   getModelFor, setModelFor,
 } from "@/lib/ai/storage";
 import { collectDrawingsFromContent, snapshotsAsAttachments } from "@/lib/ai/excalidrawContext";
+import { filesToImageAttachments, isAllowedImageFile } from "@/lib/ai/imageAttachments";
 import {
   buildPromptContext,
   mentionsDrawing,
@@ -41,7 +42,17 @@ interface UIMessage extends ChatMessage {
   id: string;
   pending?: boolean;
   actions?: { label: string; onClick: () => void }[];
+  /** Object URLs for images the user attached — display only. */
+  imagePreviews?: string[];
 }
+
+interface PendingImage {
+  id: string;
+  file: File;
+  previewUrl: string;
+}
+
+const MAX_PENDING_IMAGES = 5;
 
 const SYSTEM_PROMPT = `You are an embedded writing assistant inside Wings, a Notion-style markdown editor.
 You help the user think, write, organize pages, and can even generate images.
@@ -71,6 +82,7 @@ title: <title>
 Rules:
 - Markdown only: # headings, lists, tables, code, math ($...$ / $$...$$), task lists (- [ ]).
 - If excalidraw drawings from the current page are attached as images, reference them naturally.
+- If the user attaches images, analyze them and respond accordingly.
 - Keep prose tight. No fluff.
 `;
 
@@ -96,9 +108,13 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
   const [apiKey, setApiKeyState] = useState(getApiKeyFor(getActiveProvider()));
   const [model, setModelState] = useState(getModelFor(getActiveProvider()));
   const [showKey, setShowKey] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingImagesRef = useRef(pendingImages);
+  pendingImagesRef.current = pendingImages;
   // What the model has already been told, so we don't pay for it twice.
   const sentContextRef = useRef<SentContext>(NO_CONTEXT_SENT);
 
@@ -120,6 +136,48 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, streaming]);
+
+  useEffect(() => {
+    return () => {
+      for (const img of pendingImagesRef.current) URL.revokeObjectURL(img.previewUrl);
+    };
+  }, []);
+
+  const activeModelSupportsVision = useCallback((): boolean => {
+    const providerObj = getProvider(getActiveProvider());
+    const modelId = getModelFor(getActiveProvider());
+    return providerObj?.models.find((m) => m.id === modelId)?.vision === true;
+  }, []);
+
+  const addPendingImages = useCallback((files: FileList | File[]) => {
+    if (!activeModelSupportsVision()) {
+      toast.error("This model doesn't support images", {
+        description: "Switch to a vision-capable model in AI settings (marked with 👁).",
+      });
+      return;
+    }
+    const next: PendingImage[] = [];
+    for (const file of files) {
+      if (pendingImages.length + next.length >= MAX_PENDING_IMAGES) {
+        toast.error(`At most ${MAX_PENDING_IMAGES} images per message`);
+        break;
+      }
+      if (!isAllowedImageFile(file)) {
+        toast.error("Unsupported image", { description: "Use PNG, JPEG, WebP, GIF, AVIF, or SVG under 10 MB." });
+        continue;
+      }
+      next.push({ id: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+    }
+    if (next.length) setPendingImages((prev) => [...prev, ...next]);
+  }, [activeModelSupportsVision, pendingImages.length]);
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages((prev) => {
+      const target = prev.find((img) => img.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((img) => img.id !== id);
+    });
+  }, []);
 
   const applyTools = useCallback(async (tools: { kind: string; body: string }[]): Promise<{ label: string; onClick: () => void }[]> => {
     const actions: { label: string; onClick: () => void }[] = [];
@@ -198,10 +256,27 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || streaming) return;
+    const hasImages = pendingImages.length > 0;
+    if ((!text && !hasImages) || streaming) return;
     if (!getApiKeyFor(getActiveProvider())) { setShowSettings(true); return; }
+    if (hasImages && !activeModelSupportsVision()) {
+      toast.error("This model doesn't support images", {
+        description: "Switch to a vision-capable model in AI settings (marked with 👁).",
+      });
+      return;
+    }
 
-    const userMsg: UIMessage = { id: crypto.randomUUID(), role: "user", content: text };
+    const sentImages = [...pendingImages];
+    for (const img of sentImages) URL.revokeObjectURL(img.previewUrl);
+    setPendingImages([]);
+
+    const userAttachments = await filesToImageAttachments(sentImages.map((img) => img.file));
+    const userMsg: UIMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text || "_(image attached)_",
+      imagePreviews: userAttachments.map((a) => `data:${a.mimeType};base64,${a.base64}`),
+    };
     const asstMsg: UIMessage = { id: crypto.randomUUID(), role: "model", content: "", pending: true };
     setMessages((prev) => [...prev, userMsg, asstMsg]);
     setInput("");
@@ -221,16 +296,17 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
     // Drawing snapshots are large, so they only go out when the message is
     // about them — the text context always lists what drawings exist.
     let images: { base64: string; mimeType: string }[] | undefined;
+    if (userAttachments.length) images = userAttachments;
     if (page?.drawings.length && mentionsDrawing(text)) {
       const attachments = await snapshotsAsAttachments(
         collectDrawingsFromContent(page.content),
       );
-      if (attachments.length) images = attachments;
+      if (attachments.length) images = [...(images || []), ...attachments];
     }
 
     const history: ChatMessage[] = [
       ...messages.map<ChatMessage>((m) => ({ role: m.role, content: m.content })),
-      { role: "user", content: text },
+      { role: "user", content: text || "_(image attached)_" },
     ];
 
     try {
@@ -261,7 +337,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [input, streaming, messages, allEntries, activePageContext, applyTools]);
+  }, [input, streaming, messages, allEntries, activePageContext, applyTools, pendingImages, activeModelSupportsVision]);
 
   const stop = () => abortRef.current?.abort();
 
@@ -387,7 +463,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
   │  ⌘J  toggle │
   ╰─────────────╯`}
             </pre>
-            <p className="text-[11px]">Ask me to write, edit, create pages, or generate images.</p>
+            <p className="text-[11px]">Ask me to write, edit, create pages, generate images, or attach a photo to analyze.</p>
             <div className="grid gap-1.5 max-w-[300px] mx-auto">
               {[
                 { icon: PenLine, label: "Continue writing this page" },
@@ -406,6 +482,18 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
             <div className={`max-w-[88%] ai-msg-bubble ${m.role === "user" ? "user" : "assistant"}`}>
+              {m.imagePreviews && m.imagePreviews.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {m.imagePreviews.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt=""
+                      className="h-16 w-16 rounded object-cover border border-border/40"
+                    />
+                  ))}
+                </div>
+              )}
               {m.pending && !m.content ? (
                 <div className="flex items-center gap-2 py-0.5">
                   <span className="nw-shimmer text-[11px] font-medium">thinking</span>
@@ -435,23 +523,77 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
       </div>
 
       <div className="p-2.5 border-t border-border shrink-0 bg-card/60">
+        {pendingImages.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2 px-0.5">
+            {pendingImages.map((img) => (
+              <div key={img.id} className="relative group">
+                <img
+                  src={img.previewUrl}
+                  alt=""
+                  className="h-14 w-14 rounded object-cover border border-border/60"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePendingImage(img.id)}
+                  className="absolute -top-1 -right-1 p-0.5 rounded-full bg-background border border-border text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove image"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="relative">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,image/avif"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) addPendingImages(e.target.files);
+              e.target.value = "";
+            }}
+          />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onPaste={(e) => {
+              const files: File[] = [];
+              for (const item of e.clipboardData?.items ?? []) {
+                if (item.type.startsWith("image/")) {
+                  const file = item.getAsFile();
+                  if (file) files.push(file);
+                }
+              }
+              if (files.length) {
+                e.preventDefault();
+                addPendingImages(files);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
             }}
             placeholder="Ask AI to write, edit, create, or generate images…"
             rows={2}
-            className="nw-ai-input"
+            className="nw-ai-input pl-9"
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={streaming || pendingImages.length >= MAX_PENDING_IMAGES}
+            className="absolute left-2 top-2 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30 transition-colors"
+            title="Attach image"
+          >
+            <ImagePlus className="h-3.5 w-3.5" />
+          </button>
           {streaming ? (
             <button onClick={stop} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-destructive hover:bg-accent transition-colors" title="Stop">
               <Square className="h-3.5 w-3.5" />
             </button>
           ) : (
-            <button onClick={send} disabled={!input.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-foreground hover:bg-accent disabled:opacity-30 transition-colors" title="Send (Enter)">
+            <button onClick={send} disabled={!input.trim() && pendingImages.length === 0} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-foreground hover:bg-accent disabled:opacity-30 transition-colors" title="Send (Enter)">
               <Send className="h-3.5 w-3.5" />
             </button>
           )}

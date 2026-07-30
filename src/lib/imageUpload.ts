@@ -11,7 +11,8 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/avif": "avif",
 };
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const ALLOWED_IMAGE_MIMES = new Set(Object.keys(MIME_TO_EXT));
 const SIGNED_URL_TTL = 60 * 60 * 24 * 30; // 30 days (was 1 year — shorter blast radius if a URL leaks)
 
 export async function uploadImage(file: File, userId: string): Promise<string | null> {
