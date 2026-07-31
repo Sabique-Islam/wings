@@ -1,33 +1,11 @@
 /// <reference path="../deno.ns.d.ts" />
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeadersFor } from "../_shared/cors.ts";
+import { fetchHtmlSafe, isPublicUrl } from "../_shared/ssrf.ts";
 
 const MAX_BODY_BYTES = 2048;
 const FETCH_TIMEOUT_MS = 5000;
-
-/** Block private/reserved hosts for SSRF safety. */
-function isPublicUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-    const host = u.hostname.toLowerCase();
-    if (
-      host === "localhost" ||
-      host.endsWith(".local") ||
-      host.startsWith("127.") ||
-      host.startsWith("10.") ||
-      host.startsWith("192.168.") ||
-      host.startsWith("169.254.") ||
-      host === "[::1]" ||
-      host === "0.0.0.0"
-    ) {
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function extractMeta(html: string, property: string): string {
   const re = new RegExp(
@@ -39,7 +17,12 @@ function extractMeta(html: string, property: string): string {
 }
 
 function extractTitle(html: string): string {
-  return extractMeta(html, "og:title") || extractMeta(html, "twitter:title") || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? "";
+  return (
+    extractMeta(html, "og:title") ||
+    extractMeta(html, "twitter:title") ||
+    html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ||
+    ""
+  );
 }
 
 Deno.serve(async (req) => {
@@ -52,6 +35,19 @@ Deno.serve(async (req) => {
 
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ error: "unauthorized" }, 401);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnonKey) return json({ error: "server misconfigured" }, 500);
+
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error: userError } = await userClient.auth.getUser();
+  if (userError || !user) return json({ error: "unauthorized" }, 401);
 
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) return json({ error: "payload too large" }, 413);
@@ -69,13 +65,9 @@ Deno.serve(async (req) => {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "User-Agent": "WingsLinkPreview/1.0", Accept: "text/html" },
-      redirect: "follow",
-    });
+    const res = await fetchHtmlSafe(url, controller.signal);
     clearTimeout(timer);
-    if (!res.ok) return json({ title: new URL(url).hostname }, 200);
+    if (!res || !res.ok) return json({ title: new URL(url).hostname }, 200);
 
     const html = (await res.text()).slice(0, 120_000);
     const title = extractTitle(html) || new URL(url).hostname;

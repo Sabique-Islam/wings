@@ -6,6 +6,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeadersFor } from "../_shared/cors.ts";
+import { isAllowedAppUrl } from "../_shared/origins.ts";
 
 const MAX_BODY_BYTES = 4 * 1024;
 
@@ -14,26 +15,8 @@ interface Body {
   return_url?: string;
 }
 
-function allowedReturnOrigins(): string[] {
-  const site = Deno.env.get("SITE_URL");
-  const extra = (Deno.env.get("CORS_EXTRA_ORIGINS") || "")
-    .split(",").map((s) => s.trim()).filter(Boolean);
-  return [
-    ...(site ? [site] : ["https://wings.nopejs.me"]),
-    "http://localhost:8080",
-    "http://localhost:5173",
-    ...extra,
-  ];
-}
-
 function isAllowedReturnUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return false;
-    return allowedReturnOrigins().includes(u.origin);
-  } catch {
-    return false;
-  }
+  return isAllowedAppUrl(raw);
 }
 
 Deno.serve(async (req) => {

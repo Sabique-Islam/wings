@@ -8,6 +8,7 @@ import {
   siteUrl,
   supabaseUrl,
 } from "../_shared/mail.ts";
+import { isAllowedAppUrl } from "../_shared/origins.ts";
 
 interface HookPayload {
   user: { id: string; email: string; new_email?: string };
@@ -53,17 +54,11 @@ function hookSecret(): string | null {
 
 const MAX_BODY_BYTES = 64 * 1024;
 
-/** Only honor redirect targets on our own site; otherwise fall back to SITE_URL. */
+/** Only honor redirect targets on configured app origins; otherwise fall back to SITE_URL. */
 function safeRedirect(redirectTo: string): string {
   const site = siteUrl().replace(/\/+$/, "");
   if (!redirectTo) return site;
-  try {
-    const u = new URL(redirectTo);
-    const allowed = [site, "http://localhost:8080", "http://localhost:5173"];
-    if (allowed.some((a) => u.origin === new URL(a).origin)) return redirectTo;
-  } catch {
-    /* not an absolute URL */
-  }
+  if (isAllowedAppUrl(redirectTo)) return redirectTo;
   return site;
 }
 
