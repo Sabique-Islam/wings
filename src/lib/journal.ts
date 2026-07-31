@@ -73,9 +73,40 @@ export function getEntryTitle(entry: Entry): string {
   return entry.title || entry.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 40) || "Untitled";
 }
 
-/** Columns that exist on every deployed `entries` table — no optional migrations. */
-const ENTRY_COLS =
+/** Columns for entries the caller owns (includes share_token for ShareMenu / public link). */
+const ENTRY_COLS_OWNER =
   "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
+
+/** Columns for entries shared with the caller — never include share_token. */
+const ENTRY_COLS_SHARED =
+  "id, content, content_json, created_at, user_id, pinned, parent_id, title, layout, deleted_at";
+
+interface ShareBootstrapRow {
+  entry_id: string;
+  role: string;
+  shared_with_user_id: string | null;
+}
+
+async function fetchShareBootstrapRows(userId: string): Promise<ShareBootstrapRow[]> {
+  const { data, error } = await supabase.rpc("list_my_shares");
+  if (!error) return (data ?? []) as ShareBootstrapRow[];
+
+  const rpcMissing =
+    error.code === "PGRST202" || (error.message?.includes("list_my_shares") ?? false);
+  if (!rpcMissing) {
+    logError("Failed to fetch share bootstrap rows", error);
+    return [];
+  }
+
+  const { data: legacy, error: legacyError } = await supabase
+    .from("entry_shares")
+    .select("entry_id, role, shared_with_user_id");
+  if (legacyError) {
+    logError("Failed to fetch share bootstrap rows (legacy)", legacyError);
+    return [];
+  }
+  return (legacy ?? []) as ShareBootstrapRow[];
+}
 
 function mapEntryRow(d: Record<string, unknown>): Entry {
   return {
@@ -104,7 +135,7 @@ export interface FetchedEntries {
 export async function fetchEntries(userId: string, opts: { includeTrash?: boolean } = {}): Promise<FetchedEntries> {
   let query = supabase
     .from("entries")
-    .select(ENTRY_COLS)
+    .select(ENTRY_COLS_OWNER)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (!opts.includeTrash) query = query.is("deleted_at", null);
@@ -122,21 +153,17 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
   const sharedEntryIds = new Set<string>();
   let sharedEntries: Record<string, unknown>[] = [];
   try {
-    const { data: shareRows } = await supabase
-      .from("entry_shares")
-      .select("entry_id, role, shared_with_user_id");
+    const shareRows = await fetchShareBootstrapRows(userId);
 
-    (shareRows ?? []).forEach((s: { entry_id: string }) => sharedEntryIds.add(s.entry_id));
+    shareRows.forEach((s) => sharedEntryIds.add(s.entry_id));
 
-    const sharedWithUser = (shareRows ?? []).filter(
-      (s: { shared_with_user_id: string | null }) => s.shared_with_user_id === userId,
-    );
+    const sharedWithUser = shareRows.filter((s) => s.shared_with_user_id === userId);
     if (sharedWithUser.length > 0) {
-      sharedWithUser.forEach((s: { entry_id: string; role: string }) => {
+      sharedWithUser.forEach((s) => {
         roleMap[s.entry_id] = s.role as ShareRole;
       });
-      const sharedIds = sharedWithUser.map((s: { entry_id: string }) => s.entry_id);
-      let sharedQuery = supabase.from("entries").select(ENTRY_COLS).in("id", sharedIds);
+      const sharedIds = sharedWithUser.map((s) => s.entry_id);
+      let sharedQuery = supabase.from("entries").select(ENTRY_COLS_SHARED).in("id", sharedIds);
       if (!opts.includeTrash) sharedQuery = sharedQuery.is("deleted_at", null);
       const { data: entries } = await sharedQuery;
       if (entries) sharedEntries = entries as Record<string, unknown>[];
@@ -160,7 +187,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
 export async function fetchTrash(userId: string): Promise<Entry[]> {
   const { data, error } = await supabase
     .from("entries")
-    .select(ENTRY_COLS)
+    .select(ENTRY_COLS_OWNER)
     .eq("user_id", userId)
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false });
@@ -173,7 +200,7 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
 
 export async function createEntry(userId: string, content: string, parentId?: string): Promise<Entry> {
   const insert = { user_id: userId, content, ...(parentId ? { parent_id: parentId } : {}) };
-  const { data, error } = await supabase.from("entries").insert(insert).select(ENTRY_COLS).single();
+  const { data, error } = await supabase.from("entries").insert(insert).select(ENTRY_COLS_OWNER).single();
   if (error) throw error;
   if (!data) throw new Error("Failed to create page");
   return mapEntryRow(data as Record<string, unknown>);
@@ -242,7 +269,7 @@ export async function searchEntries(userId: string, q: string, limit = 20): Prom
   if (!query) return [];
   const { data, error } = await supabase
     .from("entries")
-    .select(ENTRY_COLS)
+    .select(ENTRY_COLS_OWNER)
     .eq("user_id", userId)
     .is("deleted_at", null)
     .textSearch("search_tsv", query, { type: "websearch", config: "english" })

@@ -292,10 +292,17 @@ export type Database = {
       get_shared_entry: {
         Args: { _token: string }
         Returns: {
-          id: string
           title: string
           content: string
           created_at: string
+        }[]
+      }
+      list_my_shares: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          entry_id: string
+          role: string
+          shared_with_user_id: string | null
         }[]
       }
       lookup_username: { Args: { _user_id: string }; Returns: string }
