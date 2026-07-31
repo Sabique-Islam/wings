@@ -79,7 +79,35 @@ const ENTRY_COLS_OWNER =
 
 /** Columns for entries shared with the caller — never include share_token. */
 const ENTRY_COLS_SHARED =
-  "id, content, content_json, created_at, user_id, pinned, parent_id, title, layout, deleted_at";
+  "id, content, content_json, created_at, user_id, pinned, parent_id, title, layout, deleted_at, properties, sort_order";
+
+async function fetchCollaboratorEntries(
+  sharedIds: string[],
+  includeTrash: boolean,
+): Promise<Record<string, unknown>[]> {
+  const { data, error } = await supabase.rpc("fetch_collaborator_entries", {
+    _ids: sharedIds,
+    _include_deleted: includeTrash,
+  });
+  if (!error) return (data ?? []) as Record<string, unknown>[];
+
+  const rpcMissing =
+    error.code === "PGRST202" ||
+    (error.message?.includes("fetch_collaborator_entries") ?? false);
+  if (!rpcMissing) {
+    logError("Failed to fetch collaborator entries", error);
+    return [];
+  }
+
+  let sharedQuery = supabase.from("entries").select(ENTRY_COLS_SHARED).in("id", sharedIds);
+  if (!includeTrash) sharedQuery = sharedQuery.is("deleted_at", null);
+  const { data: legacy, error: legacyError } = await sharedQuery;
+  if (legacyError) {
+    logError("Failed to fetch collaborator entries (legacy)", legacyError);
+    return [];
+  }
+  return (legacy ?? []) as Record<string, unknown>[];
+}
 
 interface ShareBootstrapRow {
   entry_id: string;
@@ -163,10 +191,7 @@ export async function fetchEntries(userId: string, opts: { includeTrash?: boolea
         roleMap[s.entry_id] = s.role as ShareRole;
       });
       const sharedIds = sharedWithUser.map((s) => s.entry_id);
-      let sharedQuery = supabase.from("entries").select(ENTRY_COLS_SHARED).in("id", sharedIds);
-      if (!opts.includeTrash) sharedQuery = sharedQuery.is("deleted_at", null);
-      const { data: entries } = await sharedQuery;
-      if (entries) sharedEntries = entries as Record<string, unknown>[];
+      sharedEntries = await fetchCollaboratorEntries(sharedIds, !!opts.includeTrash);
     }
   } catch (err) {
     logError("Failed to fetch shared entries", err);
