@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = true
+
+[functions.fetch-link-preview]
+verify_jwt = true
