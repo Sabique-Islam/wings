@@ -264,7 +264,8 @@ export const BlockEditor = memo(function BlockEditor({
         return false;
       },
     },
-    onUpdate: ({ editor: ed }) => {
+    onUpdate: ({ editor: ed, transaction }) => {
+      if (!transaction.docChanged) return;
       localVersion.current += 1;
       scheduleJsonEmit(ed);
     },

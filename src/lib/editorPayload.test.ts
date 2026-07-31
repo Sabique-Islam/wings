@@ -4,7 +4,7 @@
 // and it never picks up a different page's document.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { isFullPayload, requestEditorSerialize, type EditorChangePayload } from "./editorPayload";
+import { isFullPayload, isSameEditorPayload, requestEditorSerialize, type EditorChangePayload } from "./editorPayload";
 
 type EditorWindow = Window & { __nw_flushEditor?: (id: string) => EditorChangePayload | null };
 
@@ -38,5 +38,21 @@ describe("editorPayload", () => {
 
   it("returns null when no editor is mounted", () => {
     expect(requestEditorSerialize("entry-1")).toBeNull();
+  });
+
+  it("detects unchanged markdown and json", () => {
+    const existing = { content: "hi", content_json: doc };
+    expect(isSameEditorPayload(existing, { markdown: "hi", json: doc })).toBe(true);
+  });
+
+  it("detects markdown changes", () => {
+    const existing = { content: "hi", content_json: doc };
+    expect(isSameEditorPayload(existing, { markdown: "bye", json: doc })).toBe(false);
+  });
+
+  it("detects json changes", () => {
+    const existing = { content: "hi", content_json: doc };
+    const other = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "bye" }] }] };
+    expect(isSameEditorPayload(existing, { markdown: "hi", json: other })).toBe(false);
   });
 });

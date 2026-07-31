@@ -41,3 +41,17 @@ export function requestEditorSerialize(entryId: string): FullEditorChangePayload
 export function emptyEditorPayload(): FullEditorChangePayload {
   return { markdown: "", json: { type: "doc", content: [] } };
 }
+
+export interface PersistedEntryContent {
+  content: string;
+  content_json: JSONContent | null;
+}
+
+/** True when a full serialize matches what is already in memory / on the server. */
+export function isSameEditorPayload(
+  existing: PersistedEntryContent,
+  payload: FullEditorChangePayload,
+): boolean {
+  if (existing.content !== payload.markdown) return false;
+  return JSON.stringify(existing.content_json ?? null) === JSON.stringify(payload.json ?? null);
+}

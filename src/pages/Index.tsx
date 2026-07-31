@@ -9,7 +9,7 @@ import { forgetLinkIndex, hydrateLinkIndex, reindexEntries, scheduleLinkIndex } 
 import { mirrorEntryToVault } from "@/lib/vault/write";
 import { appendMarkdown, payloadFromMarkdown } from "@/lib/entryContent";
 import { deleteBlocksAtPositions } from "@/components/BlockEditor/blockUtils";
-import { isFullPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
+import { isFullPayload, isSameEditorPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
 import { resolveInitialEditorContent, shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
 import { getEntryVersion, recordEntryVersion } from "@/lib/entryVersions";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
@@ -322,6 +322,7 @@ export default function Index() {
         console.warn("[wings] blocked empty autosave over existing content");
         return;
       }
+      if (existing && isSameEditorPayload(existing, toSave)) return;
       setSaveStatus("saving");
       // Durable locally before the network is attempted, so a refresh while the
       // request is in flight still shows what was typed.
