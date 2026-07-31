@@ -9,7 +9,7 @@
  * Run: cd collab && npm install && npm run dev
  */
 
-import { Server } from "@hocuspocus/server";
+import { Hocuspocus, type onAuthenticatePayload } from "@hocuspocus/server";
 import { Database } from "@hocuspocus/extension-database";
 import { createClient } from "@supabase/supabase-js";
 import { seedStateFromEntry } from "./seedDocument.ts";
@@ -23,11 +23,15 @@ if (!supabaseUrl || !serviceKey) {
 
 const admin = createClient(supabaseUrl, serviceKey);
 
-const allowedOrigins = (process.env.COLLAB_ALLOWED_ORIGINS ??
-  "https://wings.nopejs.me,http://localhost:8080,http://localhost:5173")
+const allowedOrigins = (process.env.COLLAB_ALLOWED_ORIGINS ?? process.env.SITE_URL ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+if (allowedOrigins.length === 0) {
+  console.error("collab: set COLLAB_ALLOWED_ORIGINS or SITE_URL");
+  process.exit(1);
+}
 
 function parseEntryId(documentName: string): string | null {
   const m = documentName.match(/^entry:([0-9a-f-]{36})$/i);
@@ -67,12 +71,12 @@ function parseBytea(raw: unknown): Uint8Array | null {
   return new Uint8Array(raw as ArrayBuffer);
 }
 
-const server = new Server({
+const server = new Hocuspocus({
   port: Number(process.env.COLLAB_PORT ?? 1234),
   debounce: 2000,
   maxDebounce: 10000,
 
-  async onAuthenticate({ token, documentName, requestHeaders }) {
+  async onAuthenticate({ token, documentName, requestHeaders }: onAuthenticatePayload) {
     const origin = requestHeaders.origin ?? "";
     if (origin && !allowedOrigins.includes(origin)) {
       throw new Error("origin not allowed");
