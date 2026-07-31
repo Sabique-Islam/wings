@@ -1,0 +1,41 @@
+name: New commit type proposal
+description: Propose a new [type] tag for COMMIT_CONVENTION.md
+title: "[meta] commit type: "
+labels: ["meta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        See [COMMIT_CONVENTION.md](https://github.com/Sabique-Islam/wings/blob/master/.github/COMMIT_CONVENTION.md). If your work needs a tag that does not exist, propose it here or in your PR.
+
+  - type: input
+    id: proposed_tag
+    attributes:
+      label: Proposed tag
+      placeholder: "[a11y]"
+    validations:
+      required: true
+
+  - type: textarea
+    id: when_to_use
+    attributes:
+      label: When should this tag be used?
+      description: How is it different from existing types like feat, fix, chore, docs?
+    validations:
+      required: true
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Example commit messages
+      placeholder: |
+        [a11y] Add focus trap to slash command menu
+        [a11y] Improve screen reader labels on ShareMenu
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Expected PR volume
+      description: Will this be used often enough to justify a new type?

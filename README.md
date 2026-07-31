@@ -18,6 +18,7 @@
         <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS"/></a>
         <a href="https://tiptap.dev"><img src="https://img.shields.io/badge/TipTap-Editor-000" alt="TipTap"/></a>
         <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000?logo=bun&logoColor=white" alt="Bun"/></a>
+        <a href="https://github.com/Sabique-Islam/wings/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License: AGPL-3.0"/></a>
     </p>
 </div>
 
@@ -45,3 +46,9 @@ npm run dev
 ```
 
 and yeah the env keys pls
+
+---
+
+## License
+
+[GNU Affero General Public License v3.0 or later (AGPL-3.0)](https://github.com/Sabique-Islam/wings/blob/master/LICENSE). Strong copyleft — network use (SaaS) triggers source-offer obligations. See [CONTRIBUTING.md](https://github.com/Sabique-Islam/wings/blob/master/.github/CONTRIBUTING.md).

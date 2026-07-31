@@ -1,0 +1,85 @@
+name: Data loss / missing content
+description: Urgent — page blank, content disappeared, or overwrite suspected
+title: "[data] "
+labels: ["bug", "data-safety", "priority"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Stop editing the affected page in production** until we confirm it is safe — further saves may overwrite recoverable content.
+
+        Do **not** paste entry contents publicly if they are private. We may ask for entry ID and timestamps via a private channel.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What did you observe?
+      placeholder: My page "Project notes" was full yesterday; today it opens blank but title remains.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: when
+    attributes:
+      label: When did you notice?
+      options:
+        - Within the last hour
+        - Today
+        - This week
+        - Longer ago
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: symptoms
+    attributes:
+      label: Symptoms
+      options:
+        - label: Page opens completely blank in editor
+        - label: Partial content missing
+        - label: Content reverted to an older version
+        - label: Content missing after refresh or re-login
+        - label: Content missing after sharing / collab session
+        - label: Only affects one page
+        - label: Affects multiple pages
+
+  - type: textarea
+    id: timeline
+    attributes:
+      label: Timeline / actions before incident
+      description: Deploy, browser update, shared edit session, import, etc.
+      placeholder: |
+        - Last successful edit: approx time/timezone
+        - Devices/browsers used
+        - Anyone else editing the page?
+
+  - type: input
+    id: entry_id
+    attributes:
+      label: Entry ID or URL path (if comfortable sharing)
+      placeholder: UUID or /username/page-slug — no private page body text
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Production (wings.nopejs.me)
+        - Local dev
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: urgent
+    attributes:
+      label: Immediate actions taken
+      options:
+        - label: I stopped editing the affected page(s)
+        - label: I checked another page — it still has content
+        - label: I exported or copied content elsewhere before it disappeared
+
+  - type: textarea
+    id: contact
+    attributes:
+      label: Best way to follow up (optional)
+      description: GitHub username is fine; email only if you prefer private follow-up

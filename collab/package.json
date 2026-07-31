@@ -1,6 +1,7 @@
 {
   "name": "wings-collab",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types server.ts",

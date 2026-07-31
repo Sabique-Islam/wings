@@ -1,0 +1,91 @@
+name: Bug report
+description: Something is broken or behaves incorrectly
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please search [existing issues](https://github.com/Sabique-Islam/wings/issues) first.
+        For **missing or blank journal content**, use the **Data loss / missing content** template instead.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug
+      placeholder: When I click Save, the page shows...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps so we can reproduce locally
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor / BlockEditor
+        - Save / load / sync
+        - Auth / login
+        - Sharing / collaboration
+        - Sidebar / navigation
+        - AI assistant
+        - Import / export
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Commit or deploy version (if known)
+      placeholder: main @ abc1234 or production as of 2026-07-31
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Production (wings.nopejs.me)
+        - Local dev
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: browser
+    attributes:
+      label: Browser / OS
+      placeholder: Chrome 131 on macOS 15, etc.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console errors or screenshots
+      description: Paste red errors from DevTools console, or attach screenshots
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have redacted personal content and tokens from logs/screenshots
+          required: true

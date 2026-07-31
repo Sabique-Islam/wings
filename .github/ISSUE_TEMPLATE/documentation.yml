@@ -1,0 +1,32 @@
+name: Documentation
+description: Missing, wrong, or unclear docs
+title: "[docs] "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Which doc or area?
+      placeholder: README, LOCAL_SETUP.md, inline comment in BlockEditor, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong or missing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: Optional — how you think it should read
+
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contribution
+      options:
+        - label: I can open a PR to fix this

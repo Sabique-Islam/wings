@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & discussions
+    url: https://github.com/Sabique-Islam/wings/discussions
+    about: Ask questions, share ideas, or get help (not for bug reports)
+  - name: Security vulnerability
+    url: https://github.com/Sabique-Islam/wings/blob/master/.github/SECURITY.md
+    about: Report security issues privately — do not open a public issue

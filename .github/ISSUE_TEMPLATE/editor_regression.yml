@@ -1,0 +1,71 @@
+name: Editor regression
+description: Keyboard, blocks, slash menu, or markdown round-trip regression
+title: "[editor] "
+labels: ["bug", "editor"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Editor regressions are high priority. Include exact keys pressed and block types involved.
+        Maintainers will expect Playwright coverage for fixes — see the [editor PR template](https://github.com/Sabique-Islam/wings/blob/master/.github/PULL_REQUEST_TEMPLATE/editor.md).
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Incorrect behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior (Notion-like or prior Wings behavior)
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Exact steps (include keyboard input)
+      placeholder: |
+        1. Open /__editor-e2e or any entry
+        2. Type "hello"
+        3. Press Enter
+        4. ...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: categories
+    attributes:
+      label: Category
+      options:
+        - label: Enter / Shift+Enter / Backspace
+        - label: Slash command (/)
+        - label: Page mention (@)
+        - label: Markdown paste or export
+        - label: Code block / math / Excalidraw
+        - label: Tables / tasks / callouts
+        - label: Link / wikilink
+
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Reproducible on /__editor-e2e ?
+      options:
+        - "Yes"
+        - "No — only on full journal page"
+        - "Not tried"
+    validations:
+      required: true
+
+  - type: textarea
+    id: browser
+    attributes:
+      label: Browser / OS
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Related PR or commit (if known)
+      placeholder: Broke after #123 merged
