@@ -75,10 +75,6 @@ export function ShareMenu({ entry, onUpdate }: Props) {
   }, [entry.id]);
 
   useEffect(() => {
-    loadShares();
-  }, [loadShares]);
-
-  useEffect(() => {
     if (!open) return;
     loadShares();
   }, [open, loadShares]);

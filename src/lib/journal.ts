@@ -160,53 +160,170 @@ export interface FetchedEntries {
   sharedEntryIds: Set<string>;
 }
 
-export async function fetchEntries(userId: string, opts: { includeTrash?: boolean } = {}): Promise<FetchedEntries> {
+export interface FetchEntriesOptions {
+  includeTrash?: boolean;
+  /** When false, only owned pages are fetched (shared/collab state stays client-side). */
+  includeShares?: boolean;
+}
+
+export interface WorkspaceMetaSnapshot {
+  sharedEntryIds: string[];
+  roleMap: Record<string, ShareRole>;
+}
+
+/** True when cached share state suggests the account may have collaborators. */
+export function workspaceNeedsShareBootstrap(meta: WorkspaceMetaSnapshot | null): boolean {
+  if (!meta) return true;
+  if (meta.sharedEntryIds.length > 0) return true;
+  return Object.values(meta.roleMap).some((role) => role !== "owner");
+}
+
+function ownerRoleMap(ownEntries: Entry[]): Record<string, ShareRole> {
+  const roleMap: Record<string, ShareRole> = {};
+  ownEntries.forEach((e) => {
+    roleMap[e.id] = "owner";
+  });
+  return roleMap;
+}
+
+/** Replace owned pages from a server fetch while keeping collaborator pages from cache. */
+export function mergeOwnEntriesWithShared(
+  previous: Entry[],
+  ownEntries: Entry[],
+  userId: string,
+): Entry[] {
+  const shared = previous.filter((e) => e.user_id !== userId);
+  const seen = new Set<string>();
+  const merged: Entry[] = [];
+  for (const entry of [...ownEntries, ...shared]) {
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    merged.push(entry);
+  }
+  return merged;
+}
+
+export async function fetchOwnEntries(
+  userId: string,
+  opts: { includeTrash?: boolean } = {},
+): Promise<Entry[]> {
   let query = supabase
     .from("entries")
     .select(ENTRY_COLS_OWNER)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (!opts.includeTrash) query = query.is("deleted_at", null);
-  const { data: ownData, error: ownError } = await query;
-  if (ownError) {
-    logError("Failed to fetch own entries", ownError);
-    throw ownError;
+  const { data, error } = await query;
+  if (error) {
+    logError("Failed to fetch own entries", error);
+    throw error;
   }
+  return (data ?? []).map((d) => mapEntryRow(d as Record<string, unknown>));
+}
 
+async function fetchShareWorkspace(
+  userId: string,
+  opts: { includeTrash?: boolean },
+): Promise<Pick<FetchedEntries, "entries" | "roleMap" | "sharedEntryIds">> {
   const roleMap: Record<string, ShareRole> = {};
-  (ownData ?? []).forEach((e: { id: string }) => {
-    roleMap[e.id] = "owner";
-  });
-
   const sharedEntryIds = new Set<string>();
   let sharedEntries: Record<string, unknown>[] = [];
-  try {
-    const shareRows = await fetchShareBootstrapRows(userId);
 
-    shareRows.forEach((s) => sharedEntryIds.add(s.entry_id));
+  const shareRows = await fetchShareBootstrapRows(userId);
+  shareRows.forEach((s) => sharedEntryIds.add(s.entry_id));
 
-    const sharedWithUser = shareRows.filter((s) => s.shared_with_user_id === userId);
-    if (sharedWithUser.length > 0) {
-      sharedWithUser.forEach((s) => {
-        roleMap[s.entry_id] = s.role as ShareRole;
-      });
-      const sharedIds = sharedWithUser.map((s) => s.entry_id);
-      sharedEntries = await fetchCollaboratorEntries(sharedIds, !!opts.includeTrash);
-    }
-  } catch (err) {
-    logError("Failed to fetch shared entries", err);
+  const sharedWithUser = shareRows.filter((s) => s.shared_with_user_id === userId);
+  if (sharedWithUser.length > 0) {
+    sharedWithUser.forEach((s) => {
+      roleMap[s.entry_id] = s.role as ShareRole;
+    });
+    const sharedIds = sharedWithUser.map((s) => s.entry_id);
+    sharedEntries = await fetchCollaboratorEntries(sharedIds, !!opts.includeTrash);
   }
 
-  const all = [...(ownData ?? []), ...sharedEntries];
-  const seen = new Set<string>();
-  const unique = all.filter((e) => {
-    const id = String((e as { id: string }).id);
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
+  return {
+    entries: sharedEntries.map((d) => mapEntryRow(d as Record<string, unknown>)),
+    roleMap,
+    sharedEntryIds,
+  };
+}
 
-  return { entries: unique.map((d) => mapEntryRow(d as Record<string, unknown>)), roleMap, sharedEntryIds };
+function mergeFetchedEntries(ownEntries: Entry[], share: Pick<FetchedEntries, "entries" | "roleMap" | "sharedEntryIds">): FetchedEntries {
+  const roleMap = { ...ownerRoleMap(ownEntries), ...share.roleMap };
+  const seen = new Set<string>();
+  const entries: Entry[] = [];
+  for (const entry of [...ownEntries, ...share.entries]) {
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    entries.push(entry);
+  }
+  return { entries, roleMap, sharedEntryIds: share.sharedEntryIds };
+}
+
+/** Full workspace fetch — own pages plus share bootstrap (sidebar, collab flags). */
+export async function fetchEntries(userId: string, opts: FetchEntriesOptions = {}): Promise<FetchedEntries> {
+  const includeShares = opts.includeShares ?? true;
+  const ownEntries = await fetchOwnEntries(userId, opts);
+  if (!includeShares) {
+    return {
+      entries: ownEntries,
+      roleMap: ownerRoleMap(ownEntries),
+      sharedEntryIds: new Set<string>(),
+    };
+  }
+
+  try {
+    const share = await fetchShareWorkspace(userId, opts);
+    return mergeFetchedEntries(ownEntries, share);
+  } catch (err) {
+    logError("Failed to fetch shared entries", err);
+    return {
+      entries: ownEntries,
+      roleMap: ownerRoleMap(ownEntries),
+      sharedEntryIds: new Set<string>(),
+    };
+  }
+}
+
+/**
+ * Cache-first reconcile: own pages from the server; share bootstrap only when
+ * cached meta says this account may have collaborators (Notion-style — no
+ * workspace-wide share scan on every session tick).
+ */
+export async function syncWorkspaceEntries(
+  userId: string,
+  meta: WorkspaceMetaSnapshot | null,
+  previousEntries: Entry[],
+  opts: { includeTrash?: boolean; refreshShares?: boolean } = {},
+): Promise<FetchedEntries> {
+  const ownEntries = await fetchOwnEntries(userId, opts);
+  const needsShares = opts.refreshShares || workspaceNeedsShareBootstrap(meta);
+
+  if (!needsShares) {
+    const roleMap = ownerRoleMap(ownEntries);
+    if (meta) {
+      for (const [id, role] of Object.entries(meta.roleMap)) {
+        if (role !== "owner") roleMap[id] = role;
+      }
+    }
+    return {
+      entries: mergeOwnEntriesWithShared(previousEntries, ownEntries, userId),
+      roleMap,
+      sharedEntryIds: new Set(meta?.sharedEntryIds ?? []),
+    };
+  }
+
+  try {
+    const share = await fetchShareWorkspace(userId, opts);
+    return mergeFetchedEntries(ownEntries, share);
+  } catch (err) {
+    logError("Failed to fetch shared entries", err);
+    return {
+      entries: mergeOwnEntriesWithShared(previousEntries, ownEntries, userId),
+      roleMap: ownerRoleMap(ownEntries),
+      sharedEntryIds: new Set(meta?.sharedEntryIds ?? []),
+    };
+  }
 }
 
 export async function fetchTrash(userId: string): Promise<Entry[]> {

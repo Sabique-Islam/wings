@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, createEntry, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole, entryHasShares } from "@/lib/journal";
+import { fetchEntries, syncWorkspaceEntries, createEntry, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
 import { reorderSiblings, type DropPlacement } from "@/lib/pageOrder";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
 import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
@@ -107,7 +107,7 @@ export default function Index() {
   }, [routeId]);
 
   useEffect(() => {
-    if (!user || loading) return;
+    if (!userId || loading) return;
     void (async () => {
       const pending = await getPendingWrites();
       if (!pending.length) return;
@@ -131,30 +131,34 @@ export default function Index() {
         }
       }
     })();
-  }, [user, loading]);
+  }, [userId, loading]);
 
-  const loadEntries = useCallback(async () => {
-    if (!user) return;
-    const { entries: data, roleMap: roles, sharedEntryIds: shared } = await fetchEntries(user.id);
+  const loadEntries = useCallback(async (opts: { refreshShares?: boolean } = {}) => {
+    if (!userId) return;
+    const meta = await readWorkspaceMeta(userId);
+    const { entries: data, roleMap: roles, sharedEntryIds: shared } = await syncWorkspaceEntries(
+      userId,
+      meta,
+      entriesRef.current,
+      { refreshShares: opts.refreshShares },
+    );
     setEntries(data);
     setRoleMap(roles);
     setSharedEntryIds(shared);
-    // Backlinks and the graph read a local index that only the editor keeps up
-    // to date, so pages edited elsewhere need a rebuild once they arrive.
     reindexEntries(data);
-  }, [user]);
+  }, [userId]);
 
   // Paint from the IndexedDB mirror before the network answers, then reconcile.
   // Share state comes from the same snapshot so the editor knows whether to
   // mount collaboratively without waiting on Supabase.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let cancelled = false;
     void (async () => {
       await Promise.all([hydrateDraftCache(), hydrateLinkIndex()]);
       const [cached, meta] = await Promise.all([
-        readCachedEntries(user.id),
-        readWorkspaceMeta(user.id),
+        readCachedEntries(userId),
+        readWorkspaceMeta(userId),
       ]);
       if (cancelled) return;
       if (cached.length > 0 && meta) {
@@ -178,22 +182,22 @@ export default function Index() {
     return () => {
       cancelled = true;
     };
-  }, [user, loadEntries]);
+  }, [userId, loadEntries]);
 
   // Refresh the mirror off the typing path so the next open is instant.
   useEffect(() => {
-    if (!user || loading || entries.length === 0) return;
+    if (!userId || loading || entries.length === 0) return;
     const timer = setTimeout(() => {
-      void replaceCachedEntries(user.id, entries);
+      void replaceCachedEntries(userId, entries);
       void putWorkspaceMeta({
-        userId: user.id,
+        userId,
         roleMap,
         sharedEntryIds: Array.from(sharedEntryIds),
         fetchedAt: Date.now(),
       });
     }, 1000);
     return () => clearTimeout(timer);
-  }, [user, loading, entries, roleMap, sharedEntryIds]);
+  }, [userId, loading, entries, roleMap, sharedEntryIds]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -555,21 +559,12 @@ export default function Index() {
   }, [activeId, loading]);
 
   useEffect(() => {
-    const onSharesChanged = async (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
-      if (!id) return;
-      const shared = await entryHasShares(id);
-      setSharedEntryIds((prev) => {
-        if (prev.has(id) === shared) return prev;
-        const next = new Set(prev);
-        if (shared) next.add(id);
-        else next.delete(id);
-        return next;
-      });
+    const onSharesChanged = () => {
+      void loadEntries({ refreshShares: true });
     };
     window.addEventListener("nw:shares-changed", onSharesChanged);
     return () => window.removeEventListener("nw:shares-changed", onSharesChanged);
-  }, []);
+  }, [loadEntries]);
 
   const flushEditor = useCallback(() => {
     if (!activeId) return;
@@ -730,7 +725,7 @@ export default function Index() {
         onNew={handleNew}
         sidebarOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onRefetch={() => void loadEntries().catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
+        onRefetch={() => void loadEntries({ refreshShares: true }).catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
         onHome={() => setActiveId(null)}
         onReorder={handleReorderPages}
         onMove={handleMovePage}
