@@ -305,6 +305,23 @@ export type Database = {
           shared_with_user_id: string | null
         }[]
       }
+      fetch_collaborator_entries: {
+        Args: { _ids: string[]; _include_deleted?: boolean }
+        Returns: {
+          id: string
+          content: string
+          content_json: Json | null
+          created_at: string
+          user_id: string
+          pinned: boolean
+          parent_id: string | null
+          title: string
+          layout: Json
+          deleted_at: string | null
+          properties: Json
+          sort_order: number | null
+        }[]
+      }
       lookup_username: { Args: { _user_id: string }; Returns: string }
       get_user_id_by_username: { Args: { _username: string }; Returns: string }
       is_username_available: {
