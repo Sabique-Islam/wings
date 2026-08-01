@@ -144,7 +144,11 @@ function AppRoutes() {
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/auth" replace />;
+  const location = useLocation();
+  if (!user) {
+    const returnTo = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/auth?returnTo=${returnTo}`} replace />;
+  }
   return children;
 }
 

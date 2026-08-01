@@ -305,6 +305,10 @@ export type Database = {
           shared_with_user_id: string | null
         }[]
       }
+      fetch_share_workspace: {
+        Args: { _include_deleted?: boolean }
+        Returns: Json
+      }
       fetch_collaborator_entries: {
         Args: { _ids: string[]; _include_deleted?: boolean }
         Returns: {

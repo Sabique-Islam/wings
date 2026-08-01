@@ -28,21 +28,28 @@ src/pages/SharedEntry.tsx        Public /s/:token page
 src/components/JournalEditor.tsx canEditRole(), canManage, canDelete
 ```
 
-## Share token
+## Share token (public link — separate from invites)
 
 - 32-char hex stored in `entries.share_token`
 - Only **owner** can change token (DB trigger)
 - Public access: `get_shared_entry(token)` RPC — no anon table scan
 
-## Collab activation
+## Internal invite → recipient workspace
+
+Email invite writes `entry_shares` (no public token). Recipient sidebar loads via:
 
 ```ts
-entryHasShares(entryId) → setEntryShared → collabEnabled on JournalEditor
+supabase.rpc("fetch_share_workspace") // claims pending email invites, returns
+// { collaborators: entries+role, owned_shared_ids: uuid[] }
 ```
 
-When shared + `VITE_COLLAB_URL`: realtime Yjs session starts. Solo autosave skipped during live collab.
+- Client: `mapShareWorkspacePayload` in `journal.ts` — no email matching in TS
+- Instant: Realtime on `entry_shares` → `loadEntries({ refreshShares: true })`
+- Same-tab owner: `nw:shares-changed` CustomEvent
 
-Event: `nw:shares-changed` refreshes share state.
+## Collab activation
+
+`sharedEntryIds` = collaborator entry ids ∪ `owned_shared_ids`. When set + `VITE_COLLAB_URL`, Yjs session starts.
 
 ## UI permissions
 

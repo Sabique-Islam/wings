@@ -81,10 +81,76 @@ const ENTRY_COLS_OWNER =
 const ENTRY_COLS_SHARED =
   "id, content, content_json, created_at, user_id, pinned, parent_id, title, layout, deleted_at, properties, sort_order";
 
+export interface FetchedEntries {
+  entries: Entry[];
+  roleMap: Record<string, ShareRole>;
+  /** Entries with at least one share row — the pages that use realtime collab. */
+  sharedEntryIds: Set<string>;
+}
+
+export interface ShareWorkspacePayload {
+  collaborators: Array<Record<string, unknown> & { role?: string }>;
+  owned_shared_ids: string[];
+}
+
+function mapEntryRow(d: Record<string, unknown>): Entry {
+  return {
+    id: String(d.id),
+    content: String(d.content ?? ""),
+    content_json: (d.content_json as JSONContent | null) ?? null,
+    created_at: String(d.created_at),
+    user_id: String(d.user_id),
+    pinned: Boolean(d.pinned),
+    parent_id: (d.parent_id as string | null) ?? null,
+    title: String(d.title ?? ""),
+    share_token: (d.share_token as string | null) ?? null,
+    layout: normalizeLayout(d.layout),
+    sort_order: d.sort_order == null ? null : Number(d.sort_order),
+    deleted_at: (d.deleted_at as string | null) ?? null,
+  };
+}
+
+/** Map server `fetch_share_workspace` JSON into sidebar/collab state. */
+export function mapShareWorkspacePayload(
+  payload: ShareWorkspacePayload,
+): Pick<FetchedEntries, "entries" | "roleMap" | "sharedEntryIds"> {
+  const roleMap: Record<string, ShareRole> = {};
+  const sharedEntryIds = new Set<string>();
+  const entries: Entry[] = [];
+
+  for (const id of payload.owned_shared_ids) {
+    if (id) sharedEntryIds.add(String(id));
+  }
+
+  for (const row of payload.collaborators) {
+    const entry = mapEntryRow(row);
+    entries.push(entry);
+    sharedEntryIds.add(entry.id);
+    if (row.role && row.role !== "owner") {
+      roleMap[entry.id] = row.role as ShareRole;
+    }
+  }
+
+  return { entries, roleMap, sharedEntryIds };
+}
+
+function parseShareWorkspaceJson(data: unknown): ShareWorkspacePayload {
+  const obj = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const collaborators = Array.isArray(obj.collaborators)
+    ? (obj.collaborators as Array<Record<string, unknown> & { role?: string }>)
+    : [];
+  const ownedRaw = obj.owned_shared_ids;
+  const owned_shared_ids = Array.isArray(ownedRaw)
+    ? ownedRaw.map((id) => String(id)).filter(Boolean)
+    : [];
+  return { collaborators, owned_shared_ids };
+}
+
 async function fetchCollaboratorEntries(
   sharedIds: string[],
   includeTrash: boolean,
 ): Promise<Record<string, unknown>[]> {
+  if (sharedIds.length === 0) return [];
   const { data, error } = await supabase.rpc("fetch_collaborator_entries", {
     _ids: sharedIds,
     _include_deleted: includeTrash,
@@ -109,55 +175,50 @@ async function fetchCollaboratorEntries(
   return (legacy ?? []) as Record<string, unknown>[];
 }
 
-interface ShareBootstrapRow {
-  entry_id: string;
-  role: string;
-  shared_with_user_id: string | null;
-}
+/** Legacy path when `fetch_share_workspace` is not deployed yet. */
+async function fetchShareWorkspaceLegacy(
+  userId: string,
+  opts: { includeTrash?: boolean },
+): Promise<Pick<FetchedEntries, "entries" | "roleMap" | "sharedEntryIds">> {
+  const roleMap: Record<string, ShareRole> = {};
+  const sharedEntryIds = new Set<string>();
 
-async function fetchShareBootstrapRows(userId: string): Promise<ShareBootstrapRow[]> {
   const { data, error } = await supabase.rpc("list_my_shares");
-  if (!error) return (data ?? []) as ShareBootstrapRow[];
-
-  const rpcMissing =
-    error.code === "PGRST202" || (error.message?.includes("list_my_shares") ?? false);
-  if (!rpcMissing) {
-    logError("Failed to fetch share bootstrap rows", error);
-    return [];
+  let shareRows: Array<{ entry_id: string; role: string; shared_with_user_id: string | null }> = [];
+  if (!error) {
+    shareRows = (data ?? []) as typeof shareRows;
+  } else {
+    const rpcMissing =
+      error.code === "PGRST202" || (error.message?.includes("list_my_shares") ?? false);
+    if (!rpcMissing) {
+      logError("Failed to fetch share bootstrap rows", error);
+      return { entries: [], roleMap, sharedEntryIds };
+    }
+    const { data: legacy, error: legacyError } = await supabase
+      .from("entry_shares")
+      .select("entry_id, role, shared_with_user_id");
+    if (legacyError) {
+      logError("Failed to fetch share bootstrap rows (legacy)", legacyError);
+      return { entries: [], roleMap, sharedEntryIds };
+    }
+    shareRows = (legacy ?? []) as typeof shareRows;
   }
 
-  const { data: legacy, error: legacyError } = await supabase
-    .from("entry_shares")
-    .select("entry_id, role, shared_with_user_id");
-  if (legacyError) {
-    logError("Failed to fetch share bootstrap rows (legacy)", legacyError);
-    return [];
-  }
-  return (legacy ?? []) as ShareBootstrapRow[];
-}
+  shareRows.forEach((s) => sharedEntryIds.add(s.entry_id));
+  const sharedWithUser = shareRows.filter((s) => s.shared_with_user_id === userId);
+  sharedWithUser.forEach((s) => {
+    roleMap[s.entry_id] = s.role as ShareRole;
+  });
+  const sharedEntries = await fetchCollaboratorEntries(
+    sharedWithUser.map((s) => s.entry_id),
+    !!opts.includeTrash,
+  );
 
-function mapEntryRow(d: Record<string, unknown>): Entry {
   return {
-    id: String(d.id),
-    content: String(d.content ?? ""),
-    content_json: (d.content_json as JSONContent | null) ?? null,
-    created_at: String(d.created_at),
-    user_id: String(d.user_id),
-    pinned: Boolean(d.pinned),
-    parent_id: (d.parent_id as string | null) ?? null,
-    title: String(d.title ?? ""),
-    share_token: (d.share_token as string | null) ?? null,
-    layout: normalizeLayout(d.layout),
-    sort_order: null,
-    deleted_at: (d.deleted_at as string | null) ?? null,
+    entries: sharedEntries.map((d) => mapEntryRow(d as Record<string, unknown>)),
+    roleMap,
+    sharedEntryIds,
   };
-}
-
-export interface FetchedEntries {
-  entries: Entry[];
-  roleMap: Record<string, ShareRole>;
-  /** Entries with at least one share row — the pages that use realtime collab. */
-  sharedEntryIds: Set<string>;
 }
 
 export interface FetchEntriesOptions {
@@ -169,13 +230,6 @@ export interface FetchEntriesOptions {
 export interface WorkspaceMetaSnapshot {
   sharedEntryIds: string[];
   roleMap: Record<string, ShareRole>;
-}
-
-/** True when cached share state suggests the account may have collaborators. */
-export function workspaceNeedsShareBootstrap(meta: WorkspaceMetaSnapshot | null): boolean {
-  if (!meta) return true;
-  if (meta.sharedEntryIds.length > 0) return true;
-  return Object.values(meta.roleMap).some((role) => role !== "owner");
 }
 
 function ownerRoleMap(ownEntries: Entry[]): Record<string, ShareRole> {
@@ -225,27 +279,22 @@ async function fetchShareWorkspace(
   userId: string,
   opts: { includeTrash?: boolean },
 ): Promise<Pick<FetchedEntries, "entries" | "roleMap" | "sharedEntryIds">> {
-  const roleMap: Record<string, ShareRole> = {};
-  const sharedEntryIds = new Set<string>();
-  let sharedEntries: Record<string, unknown>[] = [];
+  const { data, error } = await supabase.rpc("fetch_share_workspace", {
+    _include_deleted: !!opts.includeTrash,
+  });
 
-  const shareRows = await fetchShareBootstrapRows(userId);
-  shareRows.forEach((s) => sharedEntryIds.add(s.entry_id));
-
-  const sharedWithUser = shareRows.filter((s) => s.shared_with_user_id === userId);
-  if (sharedWithUser.length > 0) {
-    sharedWithUser.forEach((s) => {
-      roleMap[s.entry_id] = s.role as ShareRole;
-    });
-    const sharedIds = sharedWithUser.map((s) => s.entry_id);
-    sharedEntries = await fetchCollaboratorEntries(sharedIds, !!opts.includeTrash);
+  if (!error) {
+    return mapShareWorkspacePayload(parseShareWorkspaceJson(data));
   }
 
-  return {
-    entries: sharedEntries.map((d) => mapEntryRow(d as Record<string, unknown>)),
-    roleMap,
-    sharedEntryIds,
-  };
+  const rpcMissing =
+    error.code === "PGRST202" || (error.message?.includes("fetch_share_workspace") ?? false);
+  if (!rpcMissing) {
+    logError("Failed to fetch share workspace", error);
+    return { entries: [], roleMap: {}, sharedEntryIds: new Set() };
+  }
+
+  return fetchShareWorkspaceLegacy(userId, opts);
 }
 
 function mergeFetchedEntries(ownEntries: Entry[], share: Pick<FetchedEntries, "entries" | "roleMap" | "sharedEntryIds">): FetchedEntries {
@@ -286,32 +335,16 @@ export async function fetchEntries(userId: string, opts: FetchEntriesOptions = {
 }
 
 /**
- * Cache-first reconcile: own pages from the server; share bootstrap only when
- * cached meta says this account may have collaborators (Notion-style — no
- * workspace-wide share scan on every session tick).
+ * Reconcile own pages from the server and always refresh Shared-with-me /
+ * outbound share flags (cheap indexed RPC; skipping caused sticky invisibility).
  */
 export async function syncWorkspaceEntries(
   userId: string,
-  meta: WorkspaceMetaSnapshot | null,
+  _meta: WorkspaceMetaSnapshot | null,
   previousEntries: Entry[],
   opts: { includeTrash?: boolean; refreshShares?: boolean } = {},
 ): Promise<FetchedEntries> {
   const ownEntries = await fetchOwnEntries(userId, opts);
-  const needsShares = opts.refreshShares || workspaceNeedsShareBootstrap(meta);
-
-  if (!needsShares) {
-    const roleMap = ownerRoleMap(ownEntries);
-    if (meta) {
-      for (const [id, role] of Object.entries(meta.roleMap)) {
-        if (role !== "owner") roleMap[id] = role;
-      }
-    }
-    return {
-      entries: mergeOwnEntriesWithShared(previousEntries, ownEntries, userId),
-      roleMap,
-      sharedEntryIds: new Set(meta?.sharedEntryIds ?? []),
-    };
-  }
 
   try {
     const share = await fetchShareWorkspace(userId, opts);
@@ -321,7 +354,7 @@ export async function syncWorkspaceEntries(
     return {
       entries: mergeOwnEntriesWithShared(previousEntries, ownEntries, userId),
       roleMap: ownerRoleMap(ownEntries),
-      sharedEntryIds: new Set(meta?.sharedEntryIds ?? []),
+      sharedEntryIds: new Set(_meta?.sharedEntryIds ?? []),
     };
   }
 }

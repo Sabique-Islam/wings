@@ -23,6 +23,7 @@ import { GraphView } from "@/components/GraphView";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { AIAssistant } from "@/components/AIAssistant";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
 
 function resolveEntryOwnerId(
@@ -566,6 +567,31 @@ export default function Index() {
     window.addEventListener("nw:shares-changed", onSharesChanged);
     return () => window.removeEventListener("nw:shares-changed", onSharesChanged);
   }, [loadEntries]);
+
+  // Cross-user: permission rows push via Realtime (RLS-scoped). Debounce so a
+  // burst of share edits collapses into one workspace refresh.
+  useEffect(() => {
+    if (!userId) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleRefresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void loadEntries({ refreshShares: true });
+      }, 150);
+    };
+    const channel = supabase
+      .channel(`entry-shares:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "entry_shares" },
+        scheduleRefresh,
+      )
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId, loadEntries]);
 
   const flushEditor = useCallback(() => {
     if (!activeId) return;
