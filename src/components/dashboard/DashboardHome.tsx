@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import { Plus, Sparkles, ChevronRight } from "lucide-react";
 import type { Entry } from "@/lib/journal";
 import { computeDashboardStats } from "@/lib/dashboardStats";
 import { asciiBox, toBlocks, toMeter } from "@/lib/ascii/art";
 import { Ascii } from "@/lib/ascii";
 import { useAuth } from "@/hooks/useAuth";
+import { getMyProfile, resolveGreetingName, type UserProfile } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -42,13 +44,6 @@ function formatWords(n: number): string {
   return n.toLocaleString();
 }
 
-function firstName(email?: string | null): string {
-  if (!email) return "there";
-  const local = email.split("@")[0] || "there";
-  const part = local.split(/[._-]/)[0];
-  return part ? part.charAt(0).toUpperCase() + part.slice(1) : "there";
-}
-
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("default", {
     day: "numeric",
@@ -59,9 +54,32 @@ function formatDate(iso: string): string {
 
 export function DashboardHome({ entries, roleMap, onSelect, onNew, onOpenAI }: Props) {
   const { user } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const stats = computeDashboardStats(entries, roleMap as any);
   const fillPct = Math.min(1, stats.pageCount / 50);
-  const name = firstName(user?.email);
+  const name = resolveGreetingName(profile, user?.email);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setProfile(null);
+      return;
+    }
+
+    let cancelled = false;
+    const load = () => {
+      getMyProfile(user.id).then((p) => {
+        if (!cancelled) setProfile(p);
+      });
+    };
+
+    load();
+    const onProfile = () => load();
+    window.addEventListener("nw:profile", onProfile);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nw:profile", onProfile);
+    };
+  }, [user?.id]);
 
   const workspaceArt = asciiBox("workspace", [
     `  pages      ${String(stats.pageCount).padStart(6)}`,

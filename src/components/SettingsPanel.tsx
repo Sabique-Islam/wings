@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   X, Sun, Moon, Monitor, User, Palette, Sparkles, Plug, Bell, Download,
   CreditCard, AlertTriangle, Eye, EyeOff, Check, Github, MessageCircle,
@@ -13,11 +13,22 @@ import {
   getModelFor, setModelFor,
 } from "@/lib/ai/storage";
 import { setUsername as saveUsername, updateUserPreferences, type UserPreferencesPatch } from "@/lib/profile";
+import { checkUsernameAvailability } from "@/lib/username";
 import { SOCIAL } from "@/config/navigation";
 import { VaultSettings } from "@/components/VaultSettings";
 import { SITE } from "@/config/site";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+
+const USERNAME_CHECK_DEBOUNCE_MS = 350;
+
+type UsernameStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "taken"
+  | "invalid"
+  | "current";
 
 const PRESET_COLORS = [
   "#6366f1", "#8b5cf6", "#a855f7", "#ec4899",
@@ -55,11 +66,19 @@ export function SettingsPanel() {
   const [tab, setTab] = useState<TabId>("account");
   const { theme, setTheme, accentColor, setAccentColor } = useTheme();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { id: routeEntryId, username: routeUsername } = useParams<{ id?: string; username?: string }>();
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsernameState] = useState("");
+  const [savedUsername, setSavedUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+  const [usernameHint, setUsernameHint] = useState<string | null>(null);
   const [usernameMsg, setUsernameMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
+  const usernameCheckSeq = useRef(0);
+  const usernameDebounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   // AI tab state
   const [provider, setProvider] = useState(() => getActiveProvider());
@@ -83,7 +102,12 @@ export function SettingsPanel() {
       .maybeSingle()
       .then(({ data }) => {
         if (data?.display_name) setDisplayName(data.display_name);
-        if (data?.username) setUsernameState(data.username);
+        if (data?.username) {
+          setUsernameState(data.username);
+          setSavedUsername(data.username);
+          setUsernameStatus("current");
+          setUsernameHint(null);
+        }
       });
   }, [user, open]);
 
@@ -91,6 +115,81 @@ export function SettingsPanel() {
     setApiKey(getApiKeyFor(provider));
     setModel(getModelFor(provider));
   }, [provider]);
+
+  useEffect(() => {
+    return () => {
+      if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+    };
+  }, []);
+
+  const runUsernameCheck = useCallback(
+    async (raw: string) => {
+      if (!user) return;
+      const draft = raw.trim().toLowerCase();
+      if (!draft) {
+        setUsernameStatus("idle");
+        setUsernameHint(null);
+        return;
+      }
+      if (savedUsername && draft === savedUsername.toLowerCase()) {
+        setUsernameStatus("current");
+        setUsernameHint(null);
+        return;
+      }
+
+      const seq = ++usernameCheckSeq.current;
+      setUsernameStatus("checking");
+      setUsernameHint("checking…");
+
+      const result = await checkUsernameAvailability(draft, user.id);
+      if (seq !== usernameCheckSeq.current) return;
+
+      if (result.status === "available") {
+        setUsernameStatus("available");
+        setUsernameHint("available");
+        return;
+      }
+      if (result.status === "taken") {
+        setUsernameStatus("taken");
+        setUsernameHint(result.message);
+        return;
+      }
+      setUsernameStatus("invalid");
+      setUsernameHint(result.message);
+    },
+    [user, savedUsername],
+  );
+
+  const onUsernameChange = (value: string) => {
+    setUsernameState(value);
+    setUsernameMsg(null);
+    if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+
+    const draft = value.trim().toLowerCase();
+    if (!draft) {
+      usernameCheckSeq.current += 1;
+      setUsernameStatus("idle");
+      setUsernameHint(null);
+      return;
+    }
+    if (savedUsername && draft === savedUsername.toLowerCase()) {
+      usernameCheckSeq.current += 1;
+      setUsernameStatus("current");
+      setUsernameHint(null);
+      return;
+    }
+
+    setUsernameStatus("checking");
+    setUsernameHint("checking…");
+    usernameDebounceRef.current = setTimeout(() => {
+      void runUsernameCheck(value);
+    }, USERNAME_CHECK_DEBOUNCE_MS);
+  };
+
+  const canSaveUsername =
+    !savingUsername &&
+    (usernameStatus === "available" || usernameStatus === "current") &&
+    username.trim().length > 0;
 
   const savePref = useCallback(async (patch: UserPreferencesPatch) => {
     if (!user) return false;
@@ -106,20 +205,42 @@ export function SettingsPanel() {
     if (!user) return;
     setSaving(true);
     const ok = await savePref({ display_name: displayName });
-    if (ok) toast.success("Display name saved");
+    if (ok) {
+      toast.success("Display name saved");
+      window.dispatchEvent(new CustomEvent("nw:profile"));
+    }
     setSaving(false);
   };
 
   const handleUsername = async () => {
-    if (!user || !username.trim()) return;
-    const res = await saveUsername(user.id, username, user.email);
+    if (!user || !canSaveUsername) return;
+    const next = username.trim().toLowerCase();
+    if (next === savedUsername.toLowerCase()) {
+      setUsernameMsg("saved");
+      setTimeout(() => setUsernameMsg(null), 2500);
+      return;
+    }
+
+    setSavingUsername(true);
+    const res = await saveUsername(user.id, next, user.email);
     if (res.ok) {
+      setUsernameState(next);
+      setSavedUsername(next);
+      setUsernameStatus("current");
+      setUsernameHint(null);
       setUsernameMsg("saved");
       toast.success("Username saved");
+      window.dispatchEvent(new CustomEvent("nw:profile"));
+      if (routeUsername?.toLowerCase() !== next) {
+        navigate(routeEntryId ? `/${next}/n/${routeEntryId}` : `/${next}`, { replace: true });
+      }
     } else {
+      setUsernameStatus("taken");
+      setUsernameHint(res.error || "error");
       setUsernameMsg(res.error || "error");
       toast.error(res.error || "Couldn't save username");
     }
+    setSavingUsername(false);
     setTimeout(() => setUsernameMsg(null), 2500);
   };
 
@@ -190,10 +311,37 @@ export function SettingsPanel() {
                 </Field>
                 <Field label="username">
                   <div className="flex gap-2">
-                    <input value={username} onChange={(e) => setUsernameState(e.target.value)} placeholder="username" className={inputCls} />
-                    <button onClick={handleUsername} className="rounded bg-foreground text-background text-xs font-mono px-3 hover:bg-foreground/90 transition-colors">save</button>
+                    <input
+                      value={username}
+                      onChange={(e) => onUsernameChange(e.target.value)}
+                      placeholder="username"
+                      className={inputCls}
+                      autoComplete="username"
+                      spellCheck={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUsername}
+                      disabled={!canSaveUsername}
+                      className="rounded bg-foreground text-background text-xs font-mono px-3 hover:bg-foreground/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      {savingUsername ? "…" : "save"}
+                    </button>
                   </div>
-                  {usernameMsg && <p className="text-[10px] text-ink-2">{usernameMsg}</p>}
+                  {(usernameHint || usernameMsg) && (
+                    <p
+                      className={cn(
+                        "text-[10px]",
+                        usernameMsg === "saved" || usernameStatus === "available"
+                          ? "text-ink-2"
+                          : usernameStatus === "taken" || usernameStatus === "invalid"
+                            ? "text-destructive/80"
+                            : "text-ink-2",
+                      )}
+                    >
+                      {usernameMsg === "saved" ? "saved" : usernameHint}
+                    </p>
+                  )}
                 </Field>
                 <Field label="email">
                   <div className={cn(inputCls, "text-ink-2 select-all")}>{user?.email}</div>
