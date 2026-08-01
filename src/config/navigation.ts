@@ -46,6 +46,6 @@ export const NAV_LINKS = [
 
 export const SOCIAL = {
   discord: SITE.social.discord,
-  github: SITE.social.github,
+  github: SITE.social.githubRepo,
   email: `mailto:${SITE.email}`,
 };
