@@ -1,0 +1,23 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Wings",
+    "description": "Wings does not expose a public third-party HTTP API. Sign-in and data access are provided by the first-party web app (Supabase Auth + PostgREST with RLS). AI features are BYOK in the browser. This OpenAPI document exists so agents can discover that fact programmatically.",
+    "version": "0.0.0",
+    "contact": {
+      "email": "mail@wings.nopejs.me",
+      "url": "https://wings.nopejs.me/contact"
+    },
+    "license": {
+      "name": "AGPL-3.0-or-later",
+      "url": "https://www.gnu.org/licenses/agpl-3.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://wings.nopejs.me",
+      "description": "Marketing site and SPA shell (no public REST surface)"
+    }
+  ],
+  "paths": {}
+}

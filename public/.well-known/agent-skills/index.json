@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "wings-product",
+      "type": "skill-md",
+      "description": "Understand what Wings is — a private BYOK notes journal with block editor, math, drawings, and share links.",
+      "url": "https://wings.nopejs.me/.well-known/agent-skills/wings-product/SKILL.md",
+      "digest": "sha256:88f82a4ac70a11577c329b34dad893b1315aeba765be29b6b011fee6d66c6b5d"
+    },
+    {
+      "name": "wings-export",
+      "type": "skill-md",
+      "description": "Explain how Wings users export notes and keep drafts offline.",
+      "url": "https://wings.nopejs.me/.well-known/agent-skills/wings-export/SKILL.md",
+      "digest": "sha256:e5114fa152f253525bf407dcbf041b644bcc369a2b02416906904e0c2d3719e8"
+    }
+  ]
+}

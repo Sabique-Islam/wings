@@ -1,0 +1,35 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://wings.nopejs.me/",
+      "service-doc": [
+        {
+          "href": "https://wings.nopejs.me/docs",
+          "type": "text/html"
+        },
+        {
+          "href": "https://wings.nopejs.me/docs.md",
+          "type": "text/markdown"
+        }
+      ],
+      "service-desc": [
+        {
+          "href": "https://wings.nopejs.me/openapi.json",
+          "type": "application/json"
+        }
+      ],
+      "describedby": [
+        {
+          "href": "https://wings.nopejs.me/llms.txt",
+          "type": "text/plain"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://wings.nopejs.me/status",
+          "type": "text/html"
+        }
+      ]
+    }
+  ]
+}

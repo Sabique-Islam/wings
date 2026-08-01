@@ -1,0 +1,6 @@
+Contact: mailto:mail@wings.nopejs.me
+Expires: 2027-08-01T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://wings.nopejs.me/.well-known/security.txt
+Policy: https://wings.nopejs.me/legal/security
+Acknowledgments: https://wings.nopejs.me/legal/security
