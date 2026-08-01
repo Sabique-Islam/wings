@@ -11,6 +11,7 @@ import { BubbleMenuToolbar } from "./BubbleMenuToolbar";
 import { TableMenu } from "./TableMenu";
 import { EditorPopoverInput, promptEditorInput } from "./EditorPopoverInput";
 import { isSafeHttpUrl } from "@/lib/safeUrl";
+import { applyEditorLinkAction, resolveEditorLinkAction } from "./editorLinkClick";
 import { fetchLinkPreview } from "@/lib/linkPreview";
 import type { EditorChangePayload, FullEditorChangePayload } from "@/lib/editorPayload";
 import { resolveInitialEditorContent } from "@/lib/editorContent";
@@ -431,20 +432,33 @@ export const BlockEditor = memo(function BlockEditor({
     <div
       className="block-editor-wrapper w-full min-w-0"
       onClick={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.tagName === "A") {
-          const href = target.getAttribute("href");
-          if (href?.startsWith("#page:")) {
-            e.preventDefault();
-            const pageId = href.replace("#page:", "");
-            window.dispatchEvent(new CustomEvent("nw:navigate", { detail: pageId }));
-          } else if (href && !editable) {
-            e.preventDefault();
-            if (isSafeHttpUrl(href)) {
-              window.open(href, "_blank", "noopener,noreferrer");
-            }
-          }
-        }
+        const anchor = (e.target as HTMLElement).closest("a");
+        if (!anchor || !e.currentTarget.contains(anchor)) return;
+        const href = anchor.getAttribute("href");
+        const action = resolveEditorLinkAction({
+          href,
+          editable,
+          modKey: e.metaKey || e.ctrlKey,
+          middleClick: false,
+        });
+        if (action.type === "ignore") return;
+        e.preventDefault();
+        applyEditorLinkAction(action);
+      }}
+      onAuxClick={(e) => {
+        if (e.button !== 1) return;
+        const anchor = (e.target as HTMLElement).closest("a");
+        if (!anchor || !e.currentTarget.contains(anchor)) return;
+        const href = anchor.getAttribute("href");
+        const action = resolveEditorLinkAction({
+          href,
+          editable,
+          modKey: false,
+          middleClick: true,
+        });
+        if (action.type === "ignore") return;
+        e.preventDefault();
+        applyEditorLinkAction(action);
       }}
     >
       <EditorPopoverInput />
