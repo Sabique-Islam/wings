@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { resolveEditorLinkAction } from "./editorLinkClick";
+import { normalizeExternalHref, resolveEditorLinkAction } from "./editorLinkClick";
+
+describe("normalizeExternalHref", () => {
+  it("keeps absolute https urls", () => {
+    expect(normalizeExternalHref("https://wavey.nopejs.me")).toBe("https://wavey.nopejs.me/");
+  });
+
+  it("prefixes https for bare hosts", () => {
+    expect(normalizeExternalHref("stenoai.co")).toBe("https://stenoai.co/");
+    expect(normalizeExternalHref("wavey.nopejs.me")).toBe("https://wavey.nopejs.me/");
+  });
+
+  it("rejects javascript and relative paths", () => {
+    expect(normalizeExternalHref("javascript:alert(1)")).toBeNull();
+    expect(normalizeExternalHref("/local/path")).toBeNull();
+  });
+});
 
 describe("resolveEditorLinkAction", () => {
   it("navigates internal page links on any click", () => {
@@ -13,7 +29,7 @@ describe("resolveEditorLinkAction", () => {
     ).toEqual({ type: "navigatePage", pageId: "abc" });
   });
 
-  it("ignores plain click on external links while editing", () => {
+  it("opens external links on plain click while editing", () => {
     expect(
       resolveEditorLinkAction({
         href: "https://stenoai.co",
@@ -21,32 +37,32 @@ describe("resolveEditorLinkAction", () => {
         modKey: false,
         middleClick: false,
       }),
-    ).toEqual({ type: "ignore" });
+    ).toEqual({ type: "openExternal", href: "https://stenoai.co/" });
   });
 
-  it("opens external links on mod-click while editing", () => {
+  it("opens bare-host links as https", () => {
     expect(
       resolveEditorLinkAction({
-        href: "https://stenoai.co",
+        href: "stenoai.co",
         editable: true,
-        modKey: true,
+        modKey: false,
         middleClick: false,
       }),
-    ).toEqual({ type: "openExternal", href: "https://stenoai.co" });
+    ).toEqual({ type: "openExternal", href: "https://stenoai.co/" });
   });
 
   it("opens external links on middle-click while editing", () => {
     expect(
       resolveEditorLinkAction({
-        href: "https://stenoai.co",
+        href: "https://wavey.nopejs.me",
         editable: true,
         modKey: false,
         middleClick: true,
       }),
-    ).toEqual({ type: "openExternal", href: "https://stenoai.co" });
+    ).toEqual({ type: "openExternal", href: "https://wavey.nopejs.me/" });
   });
 
-  it("opens external links on plain click when read-only", () => {
+  it("opens external links when read-only", () => {
     expect(
       resolveEditorLinkAction({
         href: "https://stenoai.co",
@@ -54,7 +70,7 @@ describe("resolveEditorLinkAction", () => {
         modKey: false,
         middleClick: false,
       }),
-    ).toEqual({ type: "openExternal", href: "https://stenoai.co" });
+    ).toEqual({ type: "openExternal", href: "https://stenoai.co/" });
   });
 
   it("ignores javascript: urls", () => {

@@ -431,9 +431,12 @@ export const BlockEditor = memo(function BlockEditor({
   return (
     <div
       className="block-editor-wrapper w-full min-w-0"
-      onClick={(e) => {
+      onClickCapture={(e) => {
+        // Capture so ProseMirror / node views cannot swallow the click before we open.
         const anchor = (e.target as HTMLElement).closest("a");
         if (!anchor || !e.currentTarget.contains(anchor)) return;
+        // Bookmark cards already use <a target="_blank"> — let the browser handle them.
+        if (anchor.classList.contains("bookmark-card")) return;
         const href = anchor.getAttribute("href");
         const action = resolveEditorLinkAction({
           href,
@@ -443,12 +446,14 @@ export const BlockEditor = memo(function BlockEditor({
         });
         if (action.type === "ignore") return;
         e.preventDefault();
+        e.stopPropagation();
         applyEditorLinkAction(action);
       }}
-      onAuxClick={(e) => {
+      onAuxClickCapture={(e) => {
         if (e.button !== 1) return;
         const anchor = (e.target as HTMLElement).closest("a");
         if (!anchor || !e.currentTarget.contains(anchor)) return;
+        if (anchor.classList.contains("bookmark-card")) return;
         const href = anchor.getAttribute("href");
         const action = resolveEditorLinkAction({
           href,
@@ -458,6 +463,7 @@ export const BlockEditor = memo(function BlockEditor({
         });
         if (action.type === "ignore") return;
         e.preventDefault();
+        e.stopPropagation();
         applyEditorLinkAction(action);
       }}
     >
