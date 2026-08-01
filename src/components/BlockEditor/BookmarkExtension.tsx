@@ -10,6 +10,7 @@ declare module "@tiptap/core" {
         url: string;
         title?: string;
         description?: string;
+        image?: string;
         favicon?: string;
       }) => ReturnType;
     };
@@ -17,10 +18,11 @@ declare module "@tiptap/core" {
 }
 
 function BookmarkView({ node }: NodeViewProps) {
-  const { url, title, description, favicon } = node.attrs as {
+  const { url, title, description, image, favicon } = node.attrs as {
     url: string;
     title: string;
     description: string;
+    image: string;
     favicon: string;
   };
   const safe = isSafeHttpUrl(url);
@@ -33,8 +35,8 @@ function BookmarkView({ node }: NodeViewProps) {
   })();
 
   const displayTitle = title || host;
-  const showHostLine =
-    Boolean(host) && displayTitle.toLowerCase() !== host.toLowerCase() && title.toLowerCase() !== host.toLowerCase();
+  const previewImage = image && isSafeHttpUrl(image) ? image : "";
+  const icon = favicon && isSafeHttpUrl(favicon) ? favicon : "";
 
   return (
     <NodeViewWrapper className="bookmark-block" data-type="bookmark">
@@ -46,14 +48,20 @@ function BookmarkView({ node }: NodeViewProps) {
         contentEditable={false}
       >
         <div className="bookmark-body">
-          {favicon ? (
-            <img src={favicon} alt="" className="bookmark-favicon w-4 h-4 rounded-sm object-cover" />
-          ) : null}
-          <p className="bookmark-title">{displayTitle}</p>
+          <div className="bookmark-title-row">
+            {icon ? (
+              <img src={icon} alt="" className="bookmark-favicon" />
+            ) : null}
+            <p className="bookmark-title">{displayTitle}</p>
+          </div>
           {description ? <p className="bookmark-desc">{description}</p> : null}
-          {showHostLine ? <p className="bookmark-url">{host}</p> : null}
+          {url ? <p className="bookmark-url">{url}</p> : null}
         </div>
-        <ExternalLink className="bookmark-icon h-4 w-4 shrink-0" />
+        {previewImage ? (
+          <img src={previewImage} alt="" className="bookmark-image" />
+        ) : (
+          <ExternalLink className="bookmark-icon h-4 w-4 shrink-0" />
+        )}
       </a>
     </NodeViewWrapper>
   );
@@ -70,6 +78,7 @@ export const Bookmark = Node.create({
       url: { default: "" },
       title: { default: "" },
       description: { default: "" },
+      image: { default: "" },
       favicon: { default: "" },
     };
   },
