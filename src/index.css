@@ -614,13 +614,18 @@
 /* Bookmark */
 .bookmark-block { @apply my-2; }
 .bookmark-card {
-  @apply flex items-center gap-3 p-3 rounded-md border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors no-underline;
+  @apply flex items-stretch gap-3 p-3 rounded-md border border-border bg-secondary/30 hover:bg-secondary/50 transition-colors no-underline overflow-hidden;
 }
-.bookmark-body { @apply flex flex-col gap-0.5 min-w-0 flex-1; }
+.bookmark-body { @apply flex flex-col gap-0.5 min-w-0 flex-1 justify-center; }
+.bookmark-title-row { @apply flex items-center gap-2 min-w-0; }
+.bookmark-favicon { @apply w-4 h-4 rounded-sm object-cover shrink-0; }
 .bookmark-title { @apply text-sm font-medium text-foreground truncate; }
 .bookmark-desc { @apply text-xs text-muted-foreground truncate; }
 .bookmark-url { @apply text-[10px] text-muted-foreground/60 truncate; }
-.bookmark-icon { @apply text-muted-foreground; }
+.bookmark-image {
+  @apply w-28 shrink-0 object-cover self-stretch min-h-[72px] max-h-28 rounded-sm bg-muted;
+}
+.bookmark-icon { @apply text-muted-foreground self-center; }
 
 /* Embed */
 .embed-block { @apply my-4 rounded-lg overflow-hidden; }

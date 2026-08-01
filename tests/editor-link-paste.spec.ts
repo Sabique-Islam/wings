@@ -19,6 +19,7 @@ test.describe("External link paste", () => {
 
     await expect(editor.locator('[data-type="bookmark"]')).toHaveCount(1);
     await expect(editor.locator("a.editor-link")).toHaveCount(0);
+    await expect(editor.locator(".bookmark-url")).toHaveText(url);
 
     const urlInTopLevelParagraph = await page.evaluate((pasteUrl) => {
       const root = document.querySelector(".ProseMirror");
