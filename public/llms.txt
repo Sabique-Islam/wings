@@ -1,0 +1,48 @@
+# Wings
+
+> Block editor for notes with nested pages, LaTeX math, Excalidraw drawings, and a BYOK AI panel. Share by link, export markdown, sign in with Google or magic link.
+
+Wings is a private journal product. User notes and share links are not for crawling. Use the pages below for product facts.
+
+## Product
+
+- [Home](https://wings.nopejs.me/): Product overview and sign-in entry
+- [Pricing](https://wings.nopejs.me/pricing): Free today; paid plans planned
+- [About](https://wings.nopejs.me/about): What Wings is and how it is built
+- [Roadmap](https://wings.nopejs.me/roadmap): Shipped, in progress, and exploring
+- [Docs](https://wings.nopejs.me/docs): Auth, sharing, export, AI BYOK, keyboard, FAQ
+- [Docs (markdown)](https://wings.nopejs.me/docs.md): Same docs as markdown
+
+## Blog
+
+- [Blog index](https://wings.nopejs.me/blog)
+- [Why Wings exists](https://wings.nopejs.me/blog/why-wings-exists)
+- [BYOK AI in the browser](https://wings.nopejs.me/blog/byok-ai-in-the-browser)
+- [How Wings refuses to lose your notes](https://wings.nopejs.me/blog/how-wings-refuses-to-lose-your-notes)
+- [Keyboard-first notes](https://wings.nopejs.me/blog/keyboard-first-notes)
+- [RSS](https://wings.nopejs.me/rss.xml)
+
+## Legal
+
+- [Privacy](https://wings.nopejs.me/legal/privacy)
+- [Terms](https://wings.nopejs.me/legal/terms)
+- [Security](https://wings.nopejs.me/legal/security)
+- [Cookies](https://wings.nopejs.me/legal/cookies)
+
+## Agent discovery
+
+- [auth.md](https://wings.nopejs.me/auth.md): Human auth only; no agent registration API
+- [API catalog](https://wings.nopejs.me/.well-known/api-catalog): RFC 9727 linkset (no public HTTP API)
+- [OpenAPI](https://wings.nopejs.me/openapi.json): Empty paths document stating no public API
+- [Agent skills index](https://wings.nopejs.me/.well-known/agent-skills/index.json)
+- [security.txt](https://wings.nopejs.me/.well-known/security.txt)
+- [Agent discovery status](https://wings.nopejs.me/.well-known/agent-discovery.md)
+- [humans.txt](https://wings.nopejs.me/humans.txt)
+
+## Optional
+
+- [Contact](https://wings.nopejs.me/contact)
+- [Support](https://wings.nopejs.me/support)
+- [Press](https://wings.nopejs.me/press)
+- [Sitemap](https://wings.nopejs.me/sitemap.xml)
+- [llms-full.txt](https://wings.nopejs.me/llms-full.txt)

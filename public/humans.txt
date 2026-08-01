@@ -1,0 +1,11 @@
+/* TEAM */
+Creator: Sabique Islam
+Contact: mail@wings.nopejs.me
+GitHub: https://github.com/Sabique-Islam/wings
+Site: https://wings.nopejs.me
+
+/* SITE */
+Standards: HTML5, CSS3, ES modules
+Components: React, TipTap, Supabase, Vite
+Software: TypeScript, Tailwind CSS
+License: AGPL-3.0-or-later

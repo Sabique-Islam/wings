@@ -1,3 +1,9 @@
+# Wings crawler policy
+# Content-Signal: search=yes, ai-train=no, ai-input=yes
+# Training bots are Disallow. Search and citation bots stay allowed via the
+# wildcard rules below (Googlebot, Bingbot, DuckDuckBot, Applebot,
+# OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-User, PerplexityBot).
+
 User-agent: *
 Allow: /
 Allow: /pricing
@@ -11,6 +17,7 @@ Allow: /support
 Allow: /status
 Allow: /press
 Allow: /legal/
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 
 # Private user dashboards and app routes
 Disallow: /auth
@@ -18,5 +25,28 @@ Disallow: /app
 Disallow: /n/
 Disallow: /s/
 Disallow: /checkout/
+
+# --- AI training opt-out (ai-train=no). Does not block search/citation bots. ---
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
 
 Sitemap: https://wings.nopejs.me/sitemap.xml

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Wings blog</title>
+    <link>https://wings.nopejs.me/blog</link>
+    <description>Essays on why Wings exists, BYOK AI, data safety, and keyboard-first notes.</description>
+    <language>en</language>
+    <lastBuildDate>Fri, 01 Aug 2026 00:00:00 GMT</lastBuildDate>
+    <atom:link href="https://wings.nopejs.me/rss.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Why Wings exists</title>
+      <link>https://wings.nopejs.me/blog/why-wings-exists</link>
+      <guid isPermaLink="true">https://wings.nopejs.me/blog/why-wings-exists</guid>
+      <pubDate>Fri, 01 Aug 2026 00:00:00 GMT</pubDate>
+      <description>I hit a Notion workspace limit in February 2026 and built a notes app for myself. Friends used it. It grew into Wings.</description>
+    </item>
+    <item>
+      <title>BYOK AI in the browser</title>
+      <link>https://wings.nopejs.me/blog/byok-ai-in-the-browser</link>
+      <guid isPermaLink="true">https://wings.nopejs.me/blog/byok-ai-in-the-browser</guid>
+      <pubDate>Fri, 01 Aug 2026 00:00:00 GMT</pubDate>
+      <description>Wings runs its AI panel with your own provider keys in the browser. Keys stay local. Prompts go to the model you choose.</description>
+    </item>
+    <item>
+      <title>How Wings refuses to lose your notes</title>
+      <link>https://wings.nopejs.me/blog/how-wings-refuses-to-lose-your-notes</link>
+      <guid isPermaLink="true">https://wings.nopejs.me/blog/how-wings-refuses-to-lose-your-notes</guid>
+      <pubDate>Fri, 01 Aug 2026 00:00:00 GMT</pubDate>
+      <description>Empty saves, empty drafts, and empty collab replays are blocked when they would wipe real content.</description>
+    </item>
+    <item>
+      <title>Keyboard-first notes in Wings</title>
+      <link>https://wings.nopejs.me/blog/keyboard-first-notes</link>
+      <guid isPermaLink="true">https://wings.nopejs.me/blog/keyboard-first-notes</guid>
+      <pubDate>Fri, 01 Aug 2026 00:00:00 GMT</pubDate>
+      <description>Slash commands, nested pages, AI panel, and export without leaving the keyboard.</description>
+    </item>
+  </channel>
+</rss>

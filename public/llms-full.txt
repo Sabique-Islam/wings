@@ -1,0 +1,32 @@
+# Wings - full agent context
+
+> Block editor for nested pages with LaTeX, Excalidraw, and BYOK AI. Private journal product on https://wings.nopejs.me
+
+## Summary
+
+Wings is a Vite SPA journal. Marketing pages and the blog are public. The app (`/app`, `/:username`), auth, checkout, and share links (`/s/`) are private or noindex. There is no public REST API for third parties. Auth is Supabase (Google OAuth + magic link PKCE). AI is bring-your-own-key in the browser.
+
+## Docs and blog
+
+- Docs: https://wings.nopejs.me/docs.md
+- Blog: https://wings.nopejs.me/blog
+- Why Wings exists: https://wings.nopejs.me/blog/why-wings-exists.md
+- BYOK AI: https://wings.nopejs.me/blog/byok-ai-in-the-browser.md
+- Data safety: https://wings.nopejs.me/blog/how-wings-refuses-to-lose-your-notes.md
+- Keyboard-first: https://wings.nopejs.me/blog/keyboard-first-notes.md
+- RSS: https://wings.nopejs.me/rss.xml
+
+## Legal (pointers)
+
+- Privacy: https://wings.nopejs.me/legal/privacy
+- Terms: https://wings.nopejs.me/legal/terms
+- Security: https://wings.nopejs.me/legal/security
+- Cookies: https://wings.nopejs.me/legal/cookies
+
+## Crawler policy
+
+robots.txt declares Content-Signal: ai-train=no, search=yes, ai-input=yes. Training bots (GPTBot, Google-Extended, Applebot-Extended, ClaudeBot, CCBot, Bytespider) are Disallow. Search and citation bots remain allowed. User content routes stay Disallow.
+
+## Discovery index
+
+Curated links: https://wings.nopejs.me/llms.txt
