@@ -13,7 +13,13 @@ function extractMeta(html: string, property: string): string {
     "i",
   );
   const m = html.match(re);
-  return m?.[1]?.trim() ?? "";
+  if (m?.[1]) return m[1].trim();
+  // content before property/name (common alternate attribute order)
+  const reAlt = new RegExp(
+    `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["']`,
+    "i",
+  );
+  return html.match(reAlt)?.[1]?.trim() ?? "";
 }
 
 function extractTitle(html: string): string {
@@ -23,6 +29,33 @@ function extractTitle(html: string): string {
     html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ||
     ""
   );
+}
+
+function absoluteUrl(base: string, raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  try {
+    return new URL(value, base).href;
+  } catch {
+    return "";
+  }
+}
+
+function extractFavicon(html: string, pageUrl: string): string {
+  const iconRe =
+    /<link[^>]+rel=["'](?:shortcut icon|icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i;
+  const iconReAlt =
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'](?:shortcut icon|icon|apple-touch-icon)["']/i;
+  const href = html.match(iconRe)?.[1] || html.match(iconReAlt)?.[1] || "";
+  if (href) {
+    const abs = absoluteUrl(pageUrl, href);
+    if (abs) return abs;
+  }
+  try {
+    return new URL("/favicon.ico", pageUrl).href;
+  } catch {
+    return "";
+  }
 }
 
 Deno.serve(async (req) => {
@@ -72,16 +105,13 @@ Deno.serve(async (req) => {
     const html = (await res.text()).slice(0, 120_000);
     const title = extractTitle(html) || new URL(url).hostname;
     const description = extractMeta(html, "og:description") || extractMeta(html, "description");
-    let favicon = extractMeta(html, "og:image");
-    if (!favicon) {
-      try {
-        favicon = new URL("/favicon.ico", url).href;
-      } catch {
-        favicon = "";
-      }
-    }
+    const image = absoluteUrl(
+      url,
+      extractMeta(html, "og:image") || extractMeta(html, "twitter:image"),
+    );
+    const favicon = extractFavicon(html, url);
 
-    return json({ title, description, favicon });
+    return json({ title, description, image, favicon });
   } catch {
     try {
       return json({ title: new URL(url).hostname }, 200);
