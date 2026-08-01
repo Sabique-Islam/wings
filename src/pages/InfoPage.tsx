@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ReactNode } from "react";
+import { Seo, type FaqItem } from "@/components/Seo";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -9,12 +10,26 @@ interface Props {
   eyebrow: string;
   title: string;
   updated?: string;
+  path: string;
+  description: string;
+  faq?: FaqItem[];
   children: ReactNode;
 }
 
-export default function InfoPage({ eyebrow, title, updated, children }: Props) {
+export default function InfoPage({
+  eyebrow,
+  title,
+  updated,
+  path,
+  description,
+  faq,
+  children,
+}: Props) {
+  const seoTitle = title.replace(/\.$/, "");
+
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <Seo title={seoTitle} path={path} description={description} faq={faq} />
       <header className="fixed top-0 inset-x-0 z-50 backdrop-blur-xl bg-background/60 border-b border-border/40">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-xs font-mono text-muted-foreground hover:text-foreground transition-colors">

@@ -14,7 +14,9 @@ import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
 import Legal from "./pages/Legal";
 import EditorE2E from "./pages/EditorE2E";
-import { About, Careers, Blog, Contact, Roadmap, Docs, Support, Status, Press } from "./pages/StaticPages";
+import { About, Careers, Contact, Roadmap, Docs, Support, Status, Press } from "./pages/StaticPages";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import { CookieBanner } from "@/components/CookieBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DitherFilterDefs } from "@/lib/dither/filters";
@@ -113,6 +115,7 @@ function AppRoutes() {
       <Route path="/about" element={<About />} />
       <Route path="/careers" element={<Careers />} />
       <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/changelog" element={<Navigate to="/roadmap" replace />} />
       <Route path="/roadmap" element={<Roadmap />} />

@@ -15,6 +15,7 @@ import { ArrowRight } from "lucide-react";
 import { motionEase } from "@/components/landing/constants";
 import { AsciiSpinner } from "@/components/AsciiAnimation";
 import { Dither } from "@/components/ui/Dither";
+import { registerLandingWebMcp } from "@/lib/webmcp";
 
 export default function Landing() {
   const { user, loading: authLoading } = useAuth();
@@ -25,6 +26,11 @@ export default function Landing() {
     if (!user) return;
     getDashboardPath(user.id).then((path) => navigate(path, { replace: true }));
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (authLoading || user) return;
+    return registerLandingWebMcp();
+  }, [authLoading, user]);
 
   if (authLoading || user) {
     return (
@@ -39,7 +45,7 @@ export default function Landing() {
 
   return (
     <>
-      <Seo path="/" />
+      <Seo path="/" jsonLd />
       <div className="relative min-h-screen bg-background text-foreground overflow-x-hidden">
         <Dither variant="grain" fade="radial" density="sparse" className="opacity-100" />
         <NavBar ctaHref={ctaHref} ctaLabel={ctaLabel} />

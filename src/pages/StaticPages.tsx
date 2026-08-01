@@ -1,21 +1,39 @@
 import InfoPage from "./InfoPage";
 import { SITE } from "@/config/site";
+import { DOCS_FAQ } from "@/content/docsFaq";
 
 export function About() {
   return (
-    <InfoPage eyebrow="company · about" title="what Wings is.">
+    <InfoPage
+      eyebrow="company · about"
+      title="what Wings is."
+      path="/about"
+      description="Wings is a web notes app with nested pages, LaTeX, Excalidraw, and a BYOK AI panel. Built for keyboard-first writing."
+    >
       <p className="text-muted-foreground">
         {SITE.brand} is a web-based notes app: nested pages, a block editor, LaTeX math, Excalidraw drawings, and an AI panel that reads the page you have open. Pages can be shared by public link or email invite.
       </p>
       <p className="text-muted-foreground">
-        It's built by a small team. The editor runs in the browser; your pages are stored in Supabase. AI calls go to whichever provider you configure — keys stay in your browser, not on our servers.
+        It started after a Notion workspace limit in February 2026 and moved onto a personal React, Vite, Supabase, and TipTap stack in July 2026. The editor runs in the browser. Your pages sync through Supabase. AI calls go to whichever provider you configure. Keys stay in your browser, not on our servers.
       </p>
-      <h2 className="text-base font-mono uppercase tracking-tight pt-4">— how we build</h2>
+      <p className="text-muted-foreground">
+        Source is AGPL-3.0 on{" "}
+        <a href={SITE.social.githubRepo} className="underline underline-offset-2 hover:text-foreground">
+          GitHub
+        </a>
+        . Live product:{" "}
+        <a href={SITE.url} className="underline underline-offset-2 hover:text-foreground">
+          {SITE.domain}
+        </a>
+        .
+      </p>
+      <h2 className="text-base font-mono uppercase tracking-tight pt-4">how we build</h2>
       <ul className="list-none space-y-2 pl-0">
         <li className="text-muted-foreground">▸ ship real features before marketing them</li>
         <li className="text-muted-foreground">▸ keyboard shortcuts for common actions</li>
         <li className="text-muted-foreground">▸ markdown-compatible blocks, not a proprietary format</li>
         <li className="text-muted-foreground">▸ export your data as markdown or JSON</li>
+        <li className="text-muted-foreground">▸ refuse empty overwrites of substantial notes</li>
       </ul>
     </InfoPage>
   );
@@ -23,22 +41,17 @@ export function About() {
 
 export function Careers() {
   return (
-    <InfoPage eyebrow="company · careers" title="not hiring right now.">
+    <InfoPage
+      eyebrow="company · careers"
+      title="not hiring right now."
+      path="/careers"
+      description="Wings is not hiring right now. Reach out anyway at our contact email if you want to say hello."
+    >
       <p className="text-muted-foreground">
         we don't have open roles at the moment. when we do, they'll be listed here.
       </p>
       <p className="text-muted-foreground pt-2">
-        if you want to reach out anyway — {SITE.email}
-      </p>
-    </InfoPage>
-  );
-}
-
-export function Blog() {
-  return (
-    <InfoPage eyebrow="company · blog" title="no posts yet.">
-      <p className="text-muted-foreground">
-        we'll publish write-ups about the editor, AI integration, and infrastructure here when we have something worth sharing.
+        if you want to reach out anyway: {SITE.email}
       </p>
     </InfoPage>
   );
@@ -46,7 +59,12 @@ export function Blog() {
 
 export function Contact() {
   return (
-    <InfoPage eyebrow="company · contact" title="get in touch.">
+    <InfoPage
+      eyebrow="company · contact"
+      title="get in touch."
+      path="/contact"
+      description={`Contact Wings at ${SITE.email} for bugs, account issues, security reports, and general questions.`}
+    >
       <p className="text-muted-foreground pt-2">
         one inbox for everything: bugs, account issues, security reports, and general questions.
       </p>
@@ -55,7 +73,8 @@ export function Contact() {
         <a href={`mailto:${SITE.email}`} className="text-sm font-mono mt-2 block hover:underline">{SITE.email}</a>
       </div>
       <p className="text-xs text-muted-foreground pt-4">
-        for security vulnerabilities, please include steps to reproduce. we aim to respond within a few business days.
+        for security vulnerabilities, please include steps to reproduce. we aim to respond within a few business days. Also see{" "}
+        <a href="/.well-known/security.txt" className="underline underline-offset-2 hover:text-foreground">security.txt</a>.
       </p>
     </InfoPage>
   );
@@ -93,9 +112,14 @@ export function Roadmap() {
     },
   ];
   return (
-    <InfoPage eyebrow="product · roadmap" title="what exists and what's next.">
+    <InfoPage
+      eyebrow="product · roadmap"
+      title="what exists and what's next."
+      path="/roadmap"
+      description="Wings roadmap: shipped features, work in progress, and ideas we are exploring."
+    >
       <p className="text-muted-foreground">
-        this is an honest list — not a commitment. things move as we learn what people actually use.
+        this is an honest list, not a commitment. things move as we learn what people actually use.
       </p>
       <div className="grid md:grid-cols-3 gap-4 pt-4">
         {groups.map((g) => (
@@ -113,11 +137,49 @@ export function Roadmap() {
 
 export function Docs() {
   return (
-    <InfoPage eyebrow="resources · docs" title="keyboard shortcuts.">
+    <InfoPage
+      eyebrow="resources · docs"
+      title="using Wings."
+      path="/docs"
+      description="Wings docs: sign-in, sharing, export, BYOK AI, keyboard shortcuts, and FAQ."
+      faq={DOCS_FAQ}
+    >
       <p className="text-muted-foreground">
-        these work in the editor. press ⌘? (or Ctrl+?) anywhere in the app to open the full shortcut list.
+        Prefer markdown? Agents can fetch{" "}
+        <a href="/docs.md" className="underline underline-offset-2 hover:text-foreground">/docs.md</a>
+        {" "}or request <code className="text-xs">Accept: text/markdown</code> on this page. Essays:{" "}
+        <a href="/blog" className="underline underline-offset-2 hover:text-foreground">/blog</a>.
       </p>
-      <h2 className="text-base font-mono uppercase tracking-tight pt-4">— navigation</h2>
+
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">sign in</h2>
+      <p className="text-muted-foreground">
+        Open <a href="/auth" className="underline underline-offset-2 hover:text-foreground">/auth</a>. Use Google OAuth or a magic link (email OTP). Auth is Supabase PKCE; there is no Wings API key for third parties. See{" "}
+        <a href="/auth.md" className="underline underline-offset-2 hover:text-foreground">auth.md</a>.
+      </p>
+
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">sharing</h2>
+      <ul className="list-none space-y-2 pl-0">
+        <li className="text-muted-foreground">▸ public link (<code className="text-xs">/s/:token</code>): view or edit by role; these URLs are noindex</li>
+        <li className="text-muted-foreground">▸ email invite with viewer / editor / admin roles</li>
+      </ul>
+
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">export and drafts</h2>
+      <ul className="list-none space-y-2 pl-0">
+        <li className="text-muted-foreground">▸ export a page as markdown or JSON from the app</li>
+        <li className="text-muted-foreground">▸ offline draft cache keeps recent edits in the browser</li>
+        <li className="text-muted-foreground">▸ empty saves cannot overwrite substantial server content</li>
+      </ul>
+
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">AI (BYOK)</h2>
+      <p className="text-muted-foreground">
+        Open the AI panel with ⌘J (Ctrl+J). Configure your own provider keys in the browser. Keys stay local; prompts go to the provider you choose.
+      </p>
+
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">keyboard shortcuts</h2>
+      <p className="text-muted-foreground">
+        Press ⌘? (or Ctrl+?) anywhere in the app for the full shortcut list.
+      </p>
+      <h3 className="text-sm font-mono uppercase tracking-tight pt-4 text-muted-foreground">navigation</h3>
       <div className="grid sm:grid-cols-2 gap-2 pt-2">
         {[
           ["⌘K", "command palette"],
@@ -133,7 +195,7 @@ export function Docs() {
           </div>
         ))}
       </div>
-      <h2 className="text-base font-mono uppercase tracking-tight pt-6">— editing</h2>
+      <h3 className="text-sm font-mono uppercase tracking-tight pt-6 text-muted-foreground">editing</h3>
       <div className="grid sm:grid-cols-2 gap-2 pt-2">
         {[
           ["/", "slash commands (type at line start)"],
@@ -154,18 +216,34 @@ export function Docs() {
           </div>
         ))}
       </div>
+
+      <h2 className="text-base font-mono uppercase tracking-tight pt-10">FAQ</h2>
+      <div className="space-y-5 pt-2">
+        {DOCS_FAQ.map((item) => (
+          <section key={item.question} className="space-y-2">
+            <h3 className="text-sm font-mono text-foreground">{item.question}</h3>
+            <p className="text-muted-foreground">{item.answer}</p>
+          </section>
+        ))}
+      </div>
     </InfoPage>
   );
 }
 
 export function Support() {
   return (
-    <InfoPage eyebrow="resources · support" title="need help?">
+    <InfoPage
+      eyebrow="resources · support"
+      title="need help?"
+      path="/support"
+      description="Get help with Wings: docs for shortcuts and usage, or email for account and bug reports."
+    >
       <p className="text-muted-foreground">
-        check the <a href="/docs" className="underline underline-offset-2 hover:text-foreground">docs</a> for keyboard shortcuts and basic usage.
+        check the <a href="/docs" className="underline underline-offset-2 hover:text-foreground">docs</a> for sign-in, sharing, export, AI, and keyboard shortcuts.
       </p>
       <p className="text-muted-foreground pt-2">
-        for account issues, bugs, or anything else — email <a href={`mailto:${SITE.email}`} className="underline underline-offset-2 hover:text-foreground">{SITE.email}</a>. we typically reply within a few business days.
+        for account issues, bugs, or anything else, email{" "}
+        <a href={`mailto:${SITE.email}`} className="underline underline-offset-2 hover:text-foreground">{SITE.email}</a>. we typically reply within a few business days.
       </p>
     </InfoPage>
   );
@@ -173,12 +251,17 @@ export function Support() {
 
 export function Status() {
   return (
-    <InfoPage eyebrow="resources · status" title="no status page yet.">
+    <InfoPage
+      eyebrow="resources · status"
+      title="no status page yet."
+      path="/status"
+      description="Wings does not run a public uptime monitor yet. Email us if something seems broken."
+    >
       <p className="text-muted-foreground">
         we don't run a public uptime monitor. if something seems broken, email {SITE.email} and we'll look into it.
       </p>
       <p className="text-muted-foreground pt-2 text-sm">
-        Wings depends on Supabase (auth + database) and your configured AI provider. outages there will affect sign-in, sync, or AI — not the local draft cache in your browser.
+        Wings depends on Supabase (auth + database) and your configured AI provider. outages there will affect sign-in, sync, or AI, not the local draft cache in your browser.
       </p>
     </InfoPage>
   );
@@ -186,9 +269,40 @@ export function Status() {
 
 export function Press() {
   return (
-    <InfoPage eyebrow="resources · press" title="press inquiries.">
+    <InfoPage
+      eyebrow="resources · press"
+      title="press kit."
+      path="/press"
+      description="Boilerplate and contact for Wings press inquiries."
+    >
+      <h2 className="text-base font-mono uppercase tracking-tight">boilerplate</h2>
       <p className="text-muted-foreground">
-        we don't have a press kit yet. for interviews or coverage questions, email {SITE.email} with your outlet and deadline.
+        Wings is a web notes app with nested pages, a block editor, LaTeX math, Excalidraw drawings, and a bring-your-own-key AI panel. It is free for features that ship today, open source under AGPL-3.0, and hosted at {SITE.domain}.
+      </p>
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">assets</h2>
+      <ul className="list-none space-y-2 pl-0">
+        <li className="text-muted-foreground">
+          ▸ logo:{" "}
+          <a href="/wings-logo.png" className="underline underline-offset-2 hover:text-foreground">
+            /wings-logo.png
+          </a>
+        </li>
+        <li className="text-muted-foreground">
+          ▸ site:{" "}
+          <a href={SITE.url} className="underline underline-offset-2 hover:text-foreground">
+            {SITE.url}
+          </a>
+        </li>
+        <li className="text-muted-foreground">
+          ▸ source:{" "}
+          <a href={SITE.social.githubRepo} className="underline underline-offset-2 hover:text-foreground">
+            {SITE.social.githubRepo}
+          </a>
+        </li>
+      </ul>
+      <h2 className="text-base font-mono uppercase tracking-tight pt-6">contact</h2>
+      <p className="text-muted-foreground">
+        Email {SITE.email} with your outlet, deadline, and what you need. We do not have a full media kit yet.
       </p>
     </InfoPage>
   );

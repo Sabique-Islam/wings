@@ -1,6 +1,18 @@
 import { Helmet } from "react-helmet-async";
 import { SITE } from "@/config/site";
 
+export interface ArticleSeo {
+  headline: string;
+  datePublished: string;
+  dateModified?: string;
+  tags?: string[];
+}
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+}
+
 interface SeoProps {
   title?: string;
   description?: string;
@@ -8,6 +20,90 @@ interface SeoProps {
   image?: string;
   type?: "website" | "article";
   noIndex?: boolean;
+  /** When true, emit Organization + SoftwareApplication JSON-LD (homepage). */
+  jsonLd?: boolean;
+  article?: ArticleSeo;
+  faq?: FaqItem[];
+}
+
+function buildSiteJsonLd(url: string, description: string) {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${SITE.url}/#organization`,
+        name: SITE.brand,
+        url: SITE.url,
+        email: SITE.email,
+        sameAs: [
+          SITE.social.githubRepo,
+          SITE.social.github,
+          SITE.social.discord,
+          SITE.social.twitter,
+        ],
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${SITE.url}/#website`,
+        name: SITE.brand,
+        url: SITE.url,
+        description,
+        publisher: { "@id": `${SITE.url}/#organization` },
+        inLanguage: "en",
+      },
+      {
+        "@type": "WebApplication",
+        "@id": `${SITE.url}/#app`,
+        name: SITE.brand,
+        url,
+        description,
+        applicationCategory: "ProductivityApplication",
+        operatingSystem: "Web",
+        browserRequirements: "Requires JavaScript",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+        publisher: { "@id": `${SITE.url}/#organization` },
+      },
+    ],
+  };
+}
+
+function buildArticleJsonLd(url: string, description: string, article: ArticleSeo) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: article.headline,
+    description,
+    datePublished: article.datePublished,
+    dateModified: article.dateModified ?? article.datePublished,
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+    author: { "@type": "Organization", name: SITE.brand, url: SITE.url },
+    publisher: {
+      "@type": "Organization",
+      name: SITE.brand,
+      url: SITE.url,
+    },
+    keywords: article.tags?.join(", "),
+  };
+}
+
+function buildFaqJsonLd(faq: FaqItem[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  };
 }
 
 export function Seo({
@@ -17,10 +113,15 @@ export function Seo({
   image = SITE.ogImage,
   type = "website",
   noIndex = false,
+  jsonLd = false,
+  article,
+  faq,
 }: SeoProps) {
-  const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
+  const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
   const url = `${SITE.url}${path}`;
   const ogImage = image.startsWith("http") ? image : `${SITE.url}${image}`;
+  const ogTitle = title ? fullTitle : SITE.ogTitle;
+  const ogDescription = title ? description : SITE.ogDescription;
 
   return (
     <Helmet>
@@ -30,21 +131,36 @@ export function Seo({
       <link rel="icon" href="/favicon.ico" type="image/x-icon" />
       {noIndex && <meta name="robots" content="noindex, nofollow" />}
 
-      {/* OpenGraph */}
       <meta property="og:type" content={type} />
       <meta property="og:site_name" content={SITE.name} />
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
+      <meta property="og:title" content={ogTitle} />
+      <meta property="og:description" content={ogDescription} />
       <meta property="og:url" content={url} />
       <meta property="og:image" content={ogImage} />
+      <meta property="og:locale" content="en_US" />
+      {article && (
+        <>
+          <meta property="article:published_time" content={article.datePublished} />
+          <meta property="article:modified_time" content={article.dateModified ?? article.datePublished} />
+        </>
+      )}
 
-      {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:site" content={SITE.twitterHandle} />
       <meta name="twitter:creator" content={SITE.twitterHandle} />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
+      <meta name="twitter:title" content={ogTitle} />
+      <meta name="twitter:description" content={ogDescription} />
       <meta name="twitter:image" content={ogImage} />
+
+      {jsonLd && (
+        <script type="application/ld+json">{JSON.stringify(buildSiteJsonLd(url, description))}</script>
+      )}
+      {article && (
+        <script type="application/ld+json">{JSON.stringify(buildArticleJsonLd(url, description, article))}</script>
+      )}
+      {faq && faq.length > 0 && (
+        <script type="application/ld+json">{JSON.stringify(buildFaqJsonLd(faq))}</script>
+      )}
     </Helmet>
   );
 }

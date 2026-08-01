@@ -2,6 +2,7 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { Ascii } from "@/lib/ascii";
 import { Dither } from "@/components/ui/Dither";
+import { Seo } from "@/components/Seo";
 
 const NotFound = () => {
   const location = useLocation();
@@ -12,6 +13,7 @@ const NotFound = () => {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background text-foreground overflow-hidden px-4">
+      <Seo title="page not found" path={location.pathname} noIndex description="This page does not exist on Wings." />
       <Dither variant="grain" fade="radial" density="sparse" />
       <div className="relative text-center space-y-6">
         <Ascii size="text-[10px] sm:text-xs" className="text-ink-2 inline-block text-left">
