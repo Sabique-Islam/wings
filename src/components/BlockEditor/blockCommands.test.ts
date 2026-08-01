@@ -63,11 +63,30 @@ describe("pasteExternalUrl", () => {
     const url = "https://github.com/org/repo";
     const pos = pasteExternalUrl(editor, url)!;
     expect(bookmarkCount(editor)).toBe(1);
-    updateBookmarkMeta(editor, pos, { title: "My Repo", description: "Notes" });
+    updateBookmarkMeta(editor, pos, {
+      title: "My Repo",
+      description: "Notes",
+      image: "https://example.com/og.png",
+      favicon: "https://github.com/favicon.ico",
+    });
     expect(bookmarkCount(editor)).toBe(1);
     const node = editor.state.doc.nodeAt(pos);
     expect(node?.attrs.title).toBe("My Repo");
     expect(node?.attrs.description).toBe("Notes");
+    expect(node?.attrs.url).toBe(url);
+    expect(node?.attrs.image).toBe("https://example.com/og.png");
+    expect(node?.attrs.favicon).toBe("https://github.com/favicon.ico");
+    editor.destroy();
+  });
+
+  it("stores the full URL on insert before preview metadata arrives", () => {
+    const editor = makeEditor("<p></p>");
+    editor.commands.focus();
+    const url = "https://github.com/org/repo";
+    const pos = pasteExternalUrl(editor, url)!;
+    const node = editor.state.doc.nodeAt(pos);
+    expect(node?.attrs.url).toBe(url);
+    expect(node?.attrs.title).toBe("github.com");
     editor.destroy();
   });
 });

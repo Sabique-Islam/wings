@@ -6,6 +6,7 @@ import { getTopLevelBlockPos, type BlockPos } from "./blockUtils";
 export interface BookmarkMeta {
   title?: string;
   description?: string;
+  image?: string;
   favicon?: string;
 }
 
@@ -23,6 +24,7 @@ function bookmarkAttrs(url: string, meta?: BookmarkMeta) {
     url,
     title: bookmarkTitle(url, meta),
     description: meta?.description ?? "",
+    image: meta?.image ?? "",
     favicon: meta?.favicon ?? "",
   };
 }
@@ -209,6 +211,7 @@ export function updateBookmarkMeta(editor: Editor, pos: number, meta: BookmarkMe
       ...node.attrs,
       title: meta.title ?? bookmarkTitle(url, meta),
       description: meta.description ?? node.attrs.description ?? "",
+      image: meta.image ?? node.attrs.image ?? "",
       favicon: meta.favicon ?? node.attrs.favicon ?? "",
     })
     .setMeta("preventAutolink", true);
