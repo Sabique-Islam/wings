@@ -70,6 +70,43 @@ export async function getMyUsername(userId: string): Promise<string | null> {
   return data?.username ?? null;
 }
 
+export type UserProfile = {
+  display_name: string | null;
+  username: string | null;
+};
+
+export async function getMyProfile(userId: string): Promise<UserProfile | null> {
+  const { data } = await supabase
+    .from("user_preferences")
+    .select("display_name, username")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    display_name: data.display_name ?? null,
+    username: data.username ?? null,
+  };
+}
+
+function firstNameFromEmail(email?: string | null): string {
+  if (!email) return "there";
+  const local = email.split("@")[0] || "there";
+  const part = local.split(/[._-]/)[0];
+  return part ? part.charAt(0).toUpperCase() + part.slice(1) : "there";
+}
+
+/** Greeting label: display_name → username → email local-part. */
+export function resolveGreetingName(
+  profile: UserProfile | null,
+  email?: string | null,
+): string {
+  const display = profile?.display_name?.trim();
+  if (display) return display;
+  const username = profile?.username?.trim();
+  if (username) return username;
+  return firstNameFromEmail(email);
+}
+
 export async function getUserIdByUsername(username: string): Promise<string | null> {
   const { data, error } = await supabase.rpc("get_user_id_by_username", {
     _username: username.trim().toLowerCase(),
@@ -92,6 +129,9 @@ export async function setUsername(
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+
+  const available = await isUsernameAvailable(u, userId);
+  if (!available) return { ok: false, error: "username already taken" };
 
   const { error } = await supabase
     .from("user_preferences")

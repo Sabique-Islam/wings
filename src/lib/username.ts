@@ -28,14 +28,64 @@ export function validateUsername(raw: string): UsernameCheckResult {
   return { ok: true };
 }
 
-export async function isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+export type UsernameAvailabilityStatus =
+  | "invalid"
+  | "reserved"
+  | "too_short"
+  | "too_long"
+  | "taken"
+  | "available";
+
+export interface UsernameAvailabilityResult {
+  status: UsernameAvailabilityStatus;
+  message: string;
+}
+
+/** Low-level probe: available | taken | error (RPC/network failure). */
+export async function probeUsernameAvailability(
+  username: string,
+  excludeUserId?: string,
+): Promise<"available" | "taken" | "error"> {
   const u = username.trim().toLowerCase();
   const { data, error } = await supabase.rpc("is_username_available", {
     _username: u,
     _exclude_user_id: excludeUserId ?? undefined,
   });
+  if (error) return "error";
+  return data === true ? "available" : "taken";
+}
+
+export async function isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
   // Fail closed: treat lookup errors as "not available" so we never hand out a
   // name we couldn't verify.
-  if (error) return false;
-  return data === true;
+  return (await probeUsernameAvailability(username, excludeUserId)) === "available";
+}
+
+type AvailabilityLookup = (
+  username: string,
+  excludeUserId?: string,
+) => Promise<"available" | "taken" | "error">;
+
+/** Local format/reserved check, then index-backed RPC availability. */
+export async function checkUsernameAvailability(
+  raw: string,
+  excludeUserId?: string,
+  lookup: AvailabilityLookup = probeUsernameAvailability,
+): Promise<UsernameAvailabilityResult> {
+  const check = validateUsername(raw);
+  if (!check.ok) {
+    return {
+      status: check.reason ?? "invalid",
+      message: check.message || "invalid username",
+    };
+  }
+
+  const result = await lookup(raw.trim().toLowerCase(), excludeUserId);
+  if (result === "error") {
+    return { status: "taken", message: "couldn't verify" };
+  }
+  if (result === "taken") {
+    return { status: "taken", message: "username already taken" };
+  }
+  return { status: "available", message: "available" };
 }
