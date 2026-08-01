@@ -11,52 +11,43 @@
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="apple-touch-icon" href="/icon-512.png" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Wings | notes, math, drawings, and ai</title>
+    <title>wings | notes, math, drawings, and ai in one editor.</title>
     <meta name="description" content="Block editor for nested pages with LaTeX math, Excalidraw drawings, and an AI panel. Share by link, export markdown, sign in with Google or magic link.">
     <meta name="author" content="wings" />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="canonical" href="https://wings.nopejs.me/" />
+    <link rel="alternate" type="text/markdown" href="https://wings.nopejs.me/index.md" title="Wings (Markdown)" />
+    <link rel="describedby" href="https://wings.nopejs.me/llms.txt" />
     <meta property="og:site_name" content="wings" />
-    
-    
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://wings.nopejs.me/" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/ITEhookfEOa8B0y7TYBaSkuVJxV2/social-images/social-1780576498159-wings-banner.webp">
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@nopeJS" />
     <meta name="twitter:creator" content="@nopeJS" />
-    
-    
     <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/ITEhookfEOa8B0y7TYBaSkuVJxV2/social-images/social-1780576498159-wings-banner.webp">
-    
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  <meta property="og:title" content="Wings | think in plain text. render in everything">
-  <meta name="twitter:title" content="Wings | think in plain text. render in everything">
-  <meta property="og:description" content="A corner for ideas. Markdown, LaTeX, drawings, and an agentic AI - without ever leaving the keyboard.">
-  <meta name="twitter:description" content="A corner for ideas. Markdown, LaTeX, drawings, and an agentic AI - without ever leaving the keyboard.">
-  <script>
-    // No-flash theme: resolve and apply data-theme before first paint.
-    (function () {
-      try {
-        var t = localStorage.getItem('nw-theme') || 'system';
-        var resolved = t === 'system'
-          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-          : t;
-        document.documentElement.setAttribute('data-theme', resolved);
-      } catch (e) {}
-    })();
-  </script>
-</head>
+    <meta property="og:title" content="Wings | think in plain text. render in everything">
+    <meta name="twitter:title" content="Wings | think in plain text. render in everything">
+    <meta property="og:description" content="A corner for ideas | Markdown, LaTeX, drawings, and an agentic AI without ever leaving the keyboard.">
+    <meta name="twitter:description" content="A corner for ideas | Markdown, LaTeX, drawings, and an agentic AI without ever leaving the keyboard.">
+    <link rel="alternate" type="application/rss+xml" title="Wings blog" href="https://wings.nopejs.me/rss.xml" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://wings.nopejs.me/#organization","name":"Wings","url":"https://wings.nopejs.me","email":"mail@wings.nopejs.me","sameAs":["https://github.com/Sabique-Islam/wings","https://github.com/Sabique-Islam","https://discord.gg/mJsCnBHr","https://twitter.com/nopeJS"]},{"@type":"WebSite","@id":"https://wings.nopejs.me/#website","name":"Wings","url":"https://wings.nopejs.me","description":"Block editor for nested pages with LaTeX math, Excalidraw drawings, and an AI panel. Share by link, export markdown, sign in with Google or magic link.","publisher":{"@id":"https://wings.nopejs.me/#organization"},"inLanguage":"en"},{"@type":"WebApplication","@id":"https://wings.nopejs.me/#app","name":"Wings","url":"https://wings.nopejs.me/","description":"Block editor for nested pages with LaTeX math, Excalidraw drawings, and an AI panel. Share by link, export markdown, sign in with Google or magic link.","applicationCategory":"ProductivityApplication","operatingSystem":"Web","browserRequirements":"Requires JavaScript","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@id":"https://wings.nopejs.me/#organization"}}]}
+    </script>
+    <script>
+      // No-flash theme: resolve and apply data-theme before first paint.
+      (function () {
+        try {
+          var t = localStorage.getItem('nw-theme') || 'system';
+          var resolved = t === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : t;
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
