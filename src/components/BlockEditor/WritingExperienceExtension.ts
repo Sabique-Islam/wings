@@ -2,6 +2,7 @@ import { Extension } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { turnInto, type TurnIntoType } from "./blockCommands";
 import { findTopLevelDepth } from "./blockUtils";
+import { openLinkHref } from "./editorLinkClick";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WritingExperience — the "Notion-parity" keymap.
@@ -247,13 +248,8 @@ function modifyCurrentBlock(editor: any): boolean {
 
   const marks = state.doc.resolve(from).marks();
   const link = marks.find((m) => m.type.name === "link");
-  if (link?.attrs.href?.startsWith("#page:")) {
-    window.dispatchEvent(
-      new CustomEvent("nw:navigate", { detail: link.attrs.href.replace("#page:", "") }),
-    );
-    return true;
-  }
-  return false;
+  if (!link?.attrs.href) return false;
+  return openLinkHref(link.attrs.href as string);
 }
 
 const TURN_INTO_KEYS: Record<string, TurnIntoType> = {

@@ -4,6 +4,8 @@ import { isSafeHttpUrl } from "@/lib/safeUrl";
 export interface LinkPreviewMeta {
   title?: string;
   description?: string;
+  /** Open Graph / Twitter preview image (absolute URL). */
+  image?: string;
   favicon?: string;
 }
 
