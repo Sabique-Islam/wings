@@ -1071,7 +1071,78 @@
 }
 
 .nw-dash-kpi-cell {
-  @apply relative p-5 md:p-6 overflow-hidden;
+  @apply p-5 md:p-6;
+}
+
+.nw-dash-bento {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+@media (min-width: 768px) {
+  .nw-dash-bento {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .nw-dash-bento__activity {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .nw-dash-bento__week {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .nw-dash-bento__cal {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .nw-dash-bento__recent {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .nw-dash-bento__rhythm {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+}
+
+@media (min-width: 1024px) {
+  .nw-dash-bento {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto;
+  }
+
+  .nw-dash-bento__activity {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .nw-dash-bento__week {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .nw-dash-bento__cal {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .nw-dash-bento__recent {
+    grid-column: 1 / 3;
+    grid-row: 2;
+  }
+
+  .nw-dash-bento__rhythm {
+    grid-column: 3;
+    grid-row: 2;
+  }
 }
 
 .nw-dash-chart-header {
@@ -1093,10 +1164,13 @@
 }
 
 .nw-dash-recent-row {
-  @apply flex items-center gap-3 px-1 py-3.5 text-left transition-colors overflow-visible;
+  @apply flex items-center gap-3 px-1 py-3.5 text-left transition-colors;
 }
 .nw-dash-recent-row:hover {
   background: hsl(var(--accent-soft) / 0.12);
+}
+.nw-dash-recent-row:focus-visible {
+  @apply outline-none ring-1 ring-accent-strong/50;
 }
 
 .nw-dash-cal-grid {
