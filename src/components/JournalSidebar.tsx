@@ -16,7 +16,6 @@ import {
 import {
   Sidebar,
   SidebarProvider,
-  SidebarHeader,
   SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
@@ -298,28 +297,22 @@ export const JournalSidebar = memo(function JournalSidebar({
   };
 
   const sidebarBody = (
-    <SidebarProvider
-      defaultOpen
-      className="min-h-0! h-full w-fit"
-      style={{ "--sidebar-width": EXPANDED } as React.CSSProperties}
-    >
+    <SidebarProvider defaultOpen className="h-full w-full">
       <div
-        className="shrink-0 overflow-hidden h-full"
+        className="h-full shrink-0 overflow-hidden"
         style={{
           width: isMobile ? EXPANDED : railCollapsed ? COLLAPSED : EXPANDED,
           transition: isMobile ? undefined : `width ${DURATION}ms ${EASE}`,
         }}
       >
-        <Sidebar
-          collapsible="none"
-          className="flex h-full min-h-0 w-full! flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border"
-        >
-          <SidebarHeader className="flex-row! w-full items-center justify-between gap-2 p-2! pt-2 h-12 shrink-0">
-            <button
-              type="button"
-              onClick={onHome}
-              className="flex min-w-0 items-center gap-1.5 pl-1 h-8 overflow-clip"
-            >
+        <Sidebar collapsible="none" className="h-full w-full flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+          <div
+            className={cn(
+              "flex h-12 shrink-0 items-center border-b border-sidebar-border",
+              isMobile ? "justify-between px-3" : railCollapsed ? "justify-center" : "px-3",
+            )}
+          >
+            <button type="button" onClick={onHome} className="flex items-center gap-2">
               <Logo
                 size={22}
                 withWordmark={!railCollapsed}
@@ -331,14 +324,14 @@ export const JournalSidebar = memo(function JournalSidebar({
                 type="button"
                 aria-label="Close sidebar"
                 onClick={onToggle}
-                className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:text-foreground"
+                className="grid size-8 place-items-center text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
-          </SidebarHeader>
+          </div>
 
-          <SidebarMenu className="gap-px! pt-2 px-2">
+          <SidebarMenu className={cn("gap-px pt-2", railCollapsed ? "px-1" : "px-2")}>
             {navItems.map((it) => (
               <SidebarMenuItem key={it.id} className="list-none!">
                 <NavRow item={it} collapsed={railCollapsed} />
@@ -496,31 +489,25 @@ function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       aria-label={item.label}
       title={collapsed ? item.label : undefined}
       className={cn(
-        "group relative flex h-9 w-full items-center px-3 text-sm transition-colors duration-75 active:scale-[0.99] overflow-visible",
+        "group relative flex h-9 items-center text-sm transition-colors duration-75 active:scale-[0.99]",
+        collapsed ? "mx-auto w-9 justify-center overflow-hidden" : "w-full justify-start px-3 overflow-visible",
         item.active ? "text-accent-strong" : "text-sidebar-foreground/80 hover:text-foreground",
       )}
     >
-      <SharpHighlight active={item.active} />
-      <div className="relative z-10 flex w-full items-center gap-3">
-        <span className="grid size-5 shrink-0 place-items-center">{item.icon}</span>
-        <span
-          className="flex-1 truncate text-left"
-          style={{
-            transition: `opacity 150ms ${EASE}`,
-            opacity: collapsed ? 0 : 1,
-          }}
-        >
-          {item.label}
-        </span>
-        {item.shortcut && (
-          <span
-            className="text-[11px] text-muted-foreground opacity-0 transition-opacity duration-75 group-hover:opacity-100"
-            style={{ display: collapsed ? "none" : undefined }}
-          >
-            {item.shortcut}
-          </span>
-        )}
-      </div>
+      <SharpHighlight active={item.active} compact={collapsed} />
+      {collapsed ? (
+        <span className="relative z-10 grid size-5 place-items-center">{item.icon}</span>
+      ) : (
+        <div className="relative z-10 flex w-full min-w-0 items-center gap-3">
+          <span className="grid size-5 shrink-0 place-items-center">{item.icon}</span>
+          <span className="flex-1 truncate text-left">{item.label}</span>
+          {item.shortcut && (
+            <span className="text-[11px] text-muted-foreground opacity-0 transition-opacity duration-75 group-hover:opacity-100">
+              {item.shortcut}
+            </span>
+          )}
+        </div>
+      )}
     </button>
   );
 }

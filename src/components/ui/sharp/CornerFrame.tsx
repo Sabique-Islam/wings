@@ -13,18 +13,23 @@ const toneClass: Record<CornerTone, string> = {
 export function CornerFrame({
   variant = "dashed",
   tone = "muted",
+  compact = false,
   className,
 }: {
   variant?: CornerVariant;
   tone?: CornerTone;
+  compact?: boolean;
   className?: string;
 }) {
   const dash = variant === "dashed" ? "border-dashed" : "";
   const color = toneClass[tone];
-  const corner = cn("absolute block size-5 sm:size-6", color, dash);
+  const corner = cn("absolute block", compact ? "size-3" : "size-5 sm:size-6", color, dash);
 
   return (
-    <div className={cn("pointer-events-none absolute inset-0 z-30", className)} aria-hidden>
+    <div
+      className={cn("pointer-events-none absolute z-30", compact ? "inset-1" : "inset-0", className)}
+      aria-hidden
+    >
       <span className={cn(corner, "top-0 left-0 border-t border-l")} />
       <span className={cn(corner, "top-0 right-0 border-t border-r")} />
       <span className={cn(corner, "bottom-0 left-0 border-b border-l")} />
@@ -67,9 +72,11 @@ function StarCorner({ className }: { className?: string }) {
 /** Hover = dashed corners; active/selected = solid accent corners. */
 export function SharpHighlight({
   active = false,
+  compact = false,
   className,
 }: {
   active?: boolean;
+  compact?: boolean;
   className?: string;
 }) {
   return (
@@ -77,12 +84,13 @@ export function SharpHighlight({
       <CornerFrame
         variant="dashed"
         tone="muted"
+        compact={compact}
         className={cn(
           "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-active:opacity-100",
           className,
         )}
       />
-      {active && <CornerFrame variant="solid" tone="accent" />}
+      {active && <CornerFrame variant="solid" tone="accent" compact={compact} />}
     </>
   );
 }
