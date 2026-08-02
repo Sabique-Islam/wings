@@ -4,6 +4,8 @@ import {
   CreditCard, AlertTriangle, Eye, EyeOff, Check, Github, MessageCircle,
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import { Slider } from "@/components/ui/slider";
+import { SURFACE_SHIFT_MAX, SURFACE_SHIFT_MIN } from "@/lib/themeSurfaceShift";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -61,10 +63,65 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputCls =
   "w-full bg-background border border-border rounded px-3 py-1.5 text-sm text-foreground placeholder:text-ink-3 focus:outline-none focus:ring-1 focus:ring-ring font-mono";
 
+function SurfaceBrightnessField({
+  label,
+  value,
+  onChange,
+  onReset,
+}: {
+  label: string;
+  value: number;
+  onChange: (shift: number) => void;
+  onReset: () => void;
+}) {
+  return (
+    <Field label={label}>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] font-mono text-ink-3 w-12 shrink-0">darker</span>
+          <Slider
+            min={SURFACE_SHIFT_MIN}
+            max={SURFACE_SHIFT_MAX}
+            step={1}
+            value={[value]}
+            onValueChange={([next]) => onChange(next ?? 0)}
+            className="flex-1"
+          />
+          <span className="text-[10px] font-mono text-ink-3 w-12 shrink-0 text-right">lighter</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono text-ink-2 tabular-nums">
+            {value > 0 ? `+${value}` : value}
+          </span>
+          {value !== 0 && (
+            <button
+              type="button"
+              onClick={onReset}
+              className="text-[10px] font-mono text-ink-2 hover:text-foreground transition-colors"
+            >
+              reset
+            </button>
+          )}
+        </div>
+      </div>
+    </Field>
+  );
+}
+
 export function SettingsPanel() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("account");
-  const { theme, setTheme, accentColor, setAccentColor } = useTheme();
+  const {
+    theme,
+    resolvedTheme,
+    setTheme,
+    accentColor,
+    setAccentColor,
+    darkSurfaceShift,
+    lightSurfaceShift,
+    setDarkSurfaceShift,
+    setLightSurfaceShift,
+  } = useTheme();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { id: routeEntryId, username: routeUsername } = useParams<{ id?: string; username?: string }>();
@@ -252,6 +309,14 @@ export function SettingsPanel() {
     setAccentColor(c);
     await savePref({ accent_color: c });
   };
+  const pickDarkSurfaceShift = async (shift: number) => {
+    setDarkSurfaceShift(shift);
+    await savePref({ dark_surface_shift: shift });
+  };
+  const pickLightSurfaceShift = async (shift: number) => {
+    setLightSurfaceShift(shift);
+    await savePref({ light_surface_shift: shift });
+  };
 
   const saveAI = () => {
     setActiveProvider(provider);
@@ -372,6 +437,22 @@ export function SettingsPanel() {
                     ))}
                   </div>
                 </Field>
+
+                {resolvedTheme === "dark" ? (
+                  <SurfaceBrightnessField
+                    label="dark mode brightness"
+                    value={darkSurfaceShift}
+                    onChange={pickDarkSurfaceShift}
+                    onReset={() => pickDarkSurfaceShift(0)}
+                  />
+                ) : (
+                  <SurfaceBrightnessField
+                    label="light mode brightness"
+                    value={lightSurfaceShift}
+                    onChange={pickLightSurfaceShift}
+                    onReset={() => pickLightSurfaceShift(0)}
+                  />
+                )}
 
                 <Field label="accent color">
                   <div className="flex items-center gap-2 flex-wrap">
