@@ -19,7 +19,7 @@
     </p>
     <p>
         <a href="https://wings.nopejs.me">Live</a>
-        · <a href="https://discord.gg/mJsCnBHr">Discord</a>
+        · <a href="https://discord.gg/vjGdgreZqp">Discord</a>
     </p>
 </div>
 

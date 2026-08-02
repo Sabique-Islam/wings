@@ -106,7 +106,9 @@ export default function Auth() {
                 </div>
 
                 <form onSubmit={handleRequest} className="space-y-3">
+                  <label className="sr-only" htmlFor="auth-email">email</label>
                   <input
+                    id="auth-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

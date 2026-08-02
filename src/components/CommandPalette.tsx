@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, Plus, Search, Settings, Share2, Sparkles, PanelLeft, Star } from "lucide-react";
+import { FileText, Plus, Search, Settings, Share2, Sparkles, PanelLeft, Pin } from "lucide-react";
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut,
 } from "@/components/ui/command";
@@ -66,7 +66,7 @@ export function CommandPalette({ entries, onSelect, onNew, onToggleSidebar }: Pr
           <CommandGroup heading="favorites">
             {pinned.map((e) => (
               <CommandItem key={e.id} value={`fav ${getEntryTitle(e)}`} onSelect={() => run(() => onSelect(e.id))}>
-                <Star className="mr-2" /> {getEntryTitle(e)}
+                <Pin className="mr-2" /> {getEntryTitle(e)}
               </CommandItem>
             ))}
           </CommandGroup>

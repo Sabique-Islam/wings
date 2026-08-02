@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Check, ArrowRight } from "lucide-react";
-import { StarField } from "./StarField";
 import { cn } from "@/lib/utils";
 import type { PricingTier } from "@/config/pricing";
 
@@ -14,6 +13,9 @@ interface Props {
 }
 
 export function PricingCard({ tier, index, onSelect, busy }: Props) {
+  const checkoutReady = tier.id === "free" || Boolean(tier.productId);
+  const disabled = busy || !checkoutReady;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -35,7 +37,6 @@ export function PricingCard({ tier, index, onSelect, busy }: Props) {
             : "border-b border-border-subtle",
         )}
       >
-        {tier.accent && <StarField />}
         <div className="relative z-10 space-y-2">
           <div className="flex items-center justify-between">
             <div className={cn("text-xs font-mono uppercase tracking-[0.3em]", tier.accent ? "opacity-90" : "text-ink-2")}>{tier.name}</div>
@@ -61,15 +62,16 @@ export function PricingCard({ tier, index, onSelect, busy }: Props) {
         </ul>
         <button
           onClick={() => onSelect(tier)}
-          disabled={busy}
+          disabled={disabled}
           className={cn(
-            "mt-7 sm:mt-8 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[11px] font-mono uppercase tracking-[0.2em] transition-all hover:gap-3 disabled:opacity-60",
+            "mt-7 sm:mt-8 inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[11px] font-mono uppercase tracking-[0.2em] transition-all hover:gap-3 disabled:opacity-60 disabled:hover:gap-2",
             tier.accent
               ? "bg-accent-strong text-accent-strong-foreground hover:bg-accent-strong-hover"
               : "bg-foreground text-background hover:bg-foreground/90",
           )}
         >
-          {busy ? "loading…" : tier.cta} <ArrowRight className="w-3.5 h-3.5" />
+          {busy ? "loading…" : checkoutReady ? tier.cta : "coming soon"}
+          {checkoutReady && <ArrowRight className="w-3.5 h-3.5" />}
         </button>
       </div>
     </motion.div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
 import {
-  Plus, FileText, Search, X, LogOut, Download, Star, ChevronRight, Settings,
+  Plus, FileText, Search, X, LogOut, Download, Pin, ChevronRight, Settings,
   Users, Trash2, RotateCcw, Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -228,7 +228,7 @@ export const JournalSidebar = memo(function JournalSidebar({
                 : "text-ink-1 hover:bg-surface-2 hover:text-foreground",
             )}
           >
-            {entry.pinned ? <Star className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+            {entry.pinned ? <Pin className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
             <span className="truncate">{preview}</span>
             {hasChildren && <span className="text-[9px] text-ink-3 ml-auto tabular-nums">{children.length}</span>}
           </button>

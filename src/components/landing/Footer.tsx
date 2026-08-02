@@ -29,7 +29,11 @@ export function Footer() {
               <ul className="space-y-2">
                 {c.links.map((l) => (
                   <li key={l.l}>
-                    <Link to={l.to} className="text-xs font-mono text-ink-1 hover:text-foreground transition-colors">{l.l}</Link>
+                    {l.to.startsWith("/#") ? (
+                      <a href={l.to} className="text-xs font-mono text-ink-1 hover:text-foreground transition-colors">{l.l}</a>
+                    ) : (
+                      <Link to={l.to} className="text-xs font-mono text-ink-1 hover:text-foreground transition-colors">{l.l}</Link>
+                    )}
                   </li>
                 ))}
               </ul>

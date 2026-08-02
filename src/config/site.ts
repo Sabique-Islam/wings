@@ -28,7 +28,7 @@ export const SITE = {
     },
   },
   social: {
-    discord: "https://discord.gg/mJsCnBHr",
+    discord: "https://discord.gg/vjGdgreZqp",
     github: "https://github.com/Sabique-Islam",
     githubRepo: "https://github.com/Sabique-Islam/wings",
     twitter: "https://twitter.com/nopeJS",

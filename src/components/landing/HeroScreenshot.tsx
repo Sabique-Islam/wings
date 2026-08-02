@@ -14,7 +14,7 @@ export function HeroScreenshot() {
           <span className="w-2.5 h-2.5 rounded-full bg-ink-3/60" />
           <span className="w-2.5 h-2.5 rounded-full bg-ink-3/40" />
           <span className="w-2.5 h-2.5 rounded-full bg-ink-3/25" />
-          <span className="ml-3 text-[9px] sm:text-[10px] font-mono text-ink-2 truncate">wings.nopejs.me/n/today</span>
+          <span className="ml-3 text-[9px] sm:text-[10px] font-mono text-ink-2 truncate">wings.nopejs.me/app/n/…</span>
         </div>
         <div className="grid grid-cols-12 min-h-[300px] sm:min-h-[380px] md:min-h-[460px]">
           <aside className="col-span-3 border-r border-border-subtle p-3 space-y-2 hidden md:block bg-surface-0">
@@ -31,7 +31,7 @@ export function HeroScreenshot() {
               <div className="h-2 rounded bg-surface-2 w-10/12" />
               <div className="h-2 rounded bg-surface-2/70 w-7/12" />
               <div className="rounded-md border border-border-subtle p-3 mt-3 font-mono text-[10px] sm:text-xs text-ink-2 bg-surface-0 overflow-x-auto">
-                $$\begin{`{pmatrix}`} 1 & 0 \\ 0 & 1 \end{`{pmatrix}`}$$
+                {"$$\\begin{pmatrix} 1 & 0 \\\\ 0 & 1 \\end{pmatrix}$$"}
               </div>
               <div className="h-2 rounded bg-surface-2/70 w-9/12" />
               <div className="h-2 rounded bg-surface-2/70 w-6/12" />

@@ -36,13 +36,19 @@ export function NavBar({ ctaHref, ctaLabel }: Props) {
             <span>{ctaLabel}</span>
             <ArrowRight className="w-3 h-3" />
           </Link>
-          <button onClick={() => setOpen(!open)} className="md:hidden p-1.5 rounded border border-border-subtle" aria-label="menu">
+          <button
+            onClick={() => setOpen(!open)}
+            className="md:hidden p-1.5 rounded border border-border-subtle"
+            aria-label="menu"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+          >
             {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
         </div>
       </div>
       {open && (
-        <div className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur">
+        <div id="mobile-nav" className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur">
           <nav className="px-4 py-4 flex flex-col gap-3 text-sm font-mono">
             {NAV_LINKS.map((l) => (
               l.to.startsWith("/#")

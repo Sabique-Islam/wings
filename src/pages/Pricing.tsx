@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Seo } from "@/components/Seo";
@@ -9,6 +8,7 @@ import { PricingCard } from "@/components/pricing/PricingCard";
 import { dodo } from "@/lib/payments/dodo";
 import { toast } from "sonner";
 import { NavBar } from "@/components/landing/NavBar";
+import { Footer } from "@/components/landing/Footer";
 import { Dither } from "@/components/ui/Dither";
 import { Check } from "lucide-react";
 import { getDashboardPath } from "@/lib/auth/redirect";
@@ -47,7 +47,7 @@ export default function Pricing() {
       await dodo.startCheckout({
         productId: tier.productId,
         customerEmail: user.email ?? undefined,
-        returnUrl: `${window.location.origin}/checkout/success`,
+        returnUrl: `${window.location.origin}/pricing?checkout=success`,
         onEvent: (e) => {
           if (e.event_type === "checkout.success") toast.success("payment successful");
         },
@@ -69,7 +69,7 @@ export default function Pricing() {
         <section className="relative pt-28 sm:pt-36 pb-20 sm:pb-24 px-4 sm:px-6">
           <div className="max-w-6xl mx-auto text-center space-y-4 sm:space-y-5 mb-12 sm:mb-16">
             <div className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-1/40 px-3 py-1 text-[10px] font-mono uppercase tracking-widest text-ink-2">
-              <Sparkles className="w-3 h-3" /> pricing
+              pricing
             </div>
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
@@ -112,6 +112,7 @@ export default function Pricing() {
             data is stored in Supabase with row-level security. AI requests go directly from your browser to the provider you configure.
           </div>
         </section>
+        <Footer />
       </div>
     </>
   );

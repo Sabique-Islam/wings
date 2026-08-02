@@ -27,14 +27,6 @@ export function About() {
         </a>
         .
       </p>
-      <h2 className="text-base font-mono uppercase tracking-tight pt-4">how we build</h2>
-      <ul className="list-none space-y-2 pl-0">
-        <li className="text-muted-foreground">▸ ship real features before marketing them</li>
-        <li className="text-muted-foreground">▸ keyboard shortcuts for common actions</li>
-        <li className="text-muted-foreground">▸ markdown-compatible blocks, not a proprietary format</li>
-        <li className="text-muted-foreground">▸ export your data as markdown or JSON</li>
-        <li className="text-muted-foreground">▸ refuse empty overwrites of substantial notes</li>
-      </ul>
     </InfoPage>
   );
 }
@@ -51,7 +43,10 @@ export function Careers() {
         we don't have open roles at the moment. when we do, they'll be listed here.
       </p>
       <p className="text-muted-foreground pt-2">
-        if you want to reach out anyway: {SITE.email}
+        if you want to reach out anyway:{" "}
+        <a href={`mailto:${SITE.email}`} className="underline underline-offset-2 hover:text-foreground">
+          {SITE.email}
+        </a>
       </p>
     </InfoPage>
   );
@@ -100,12 +95,12 @@ export function Roadmap() {
         "paid plans & hosted AI credits",
         "version history",
         "table of contents block",
+        "real-time collaboration (optional collab server)",
       ],
     },
     {
       h: "exploring",
       items: [
-        "real-time collaboration",
         "mobile app",
         "plugin API",
       ],
@@ -258,7 +253,11 @@ export function Status() {
       description="Wings does not run a public uptime monitor yet. Email us if something seems broken."
     >
       <p className="text-muted-foreground">
-        we don't run a public uptime monitor. if something seems broken, email {SITE.email} and we'll look into it.
+        we don't run a public uptime monitor. if something seems broken, email{" "}
+        <a href={`mailto:${SITE.email}`} className="underline underline-offset-2 hover:text-foreground">
+          {SITE.email}
+        </a>{" "}
+        and we'll look into it.
       </p>
       <p className="text-muted-foreground pt-2 text-sm">
         Wings depends on Supabase (auth + database) and your configured AI provider. outages there will affect sign-in, sync, or AI, not the local draft cache in your browser.
