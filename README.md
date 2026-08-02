@@ -44,11 +44,11 @@
 
 ![Notion workspace limit](history/assets/notion-limit.png)
 
-I hit my Notion workspace limit in February 2026 and spun this up on Lovable. Intended just for myself with no future plans.
+i hit notion's limits in feb 2026. not on blocks (free tier gives you unlimited workspace blocks until you share), but shared workspace usage and the ai quota. needed more of both, so i threw this together on lovable.
 
-It grew anyway. Friends liked it. I still work on it occasionally, fixing bugs or adding features as requested or if I feel the lack of something.
+friends liked it :) i still work on it occasionally, fixing bugs or adding features as requested or if i feel the lack of something.
 
-Migrated from Lovable to a personal stack in July 2026.
+migrated from lovable to a personal stack in july 2026.
 
 ---
 
