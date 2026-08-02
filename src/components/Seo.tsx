@@ -1,5 +1,6 @@
 import { Helmet } from "react-helmet-async";
 import { SITE } from "@/config/site";
+import { buildDocumentTitle } from "@/lib/documentTitle";
 
 export interface ArticleSeo {
   headline: string;
@@ -117,7 +118,7 @@ export function Seo({
   article,
   faq,
 }: SeoProps) {
-  const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name} | ${SITE.tagline}`;
+  const fullTitle = buildDocumentTitle(title);
   const url = `${SITE.url}${path}`;
   const ogImage = image.startsWith("http") ? image : `${SITE.url}${image}`;
   const ogTitle = title ? fullTitle : SITE.ogTitle;

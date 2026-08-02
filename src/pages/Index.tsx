@@ -25,6 +25,7 @@ import { AIAssistant } from "@/components/AIAssistant";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { LoadingScreen } from "@/components/ui/spinner";
+import { Seo } from "@/components/Seo";
 
 function resolveEntryOwnerId(
   parentId: string | undefined,
@@ -774,11 +775,16 @@ export default function Index() {
 
   const openAI = useCallback(() => setAiOpen(true), []);
 
+  const tabTitle = activeEntry ? getEntryTitle(activeEntry) : "workspace";
+  const tabPath = activeId ? `${basePath}/n/${activeId}` : basePath || "/app";
+
   if (loading) {
     return <LoadingScreen variant="gyro" />;
   }
 
   return (
+    <>
+      <Seo title={tabTitle} path={tabPath} noIndex />
     <div className="flex w-full h-screen overflow-hidden min-w-0">
       <JournalSidebar
         allEntries={entries}
@@ -848,5 +854,6 @@ export default function Index() {
         onNavigate={setActiveId}
       />
     </div>
+    </>
   );
 }
