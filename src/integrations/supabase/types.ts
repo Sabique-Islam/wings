@@ -222,8 +222,10 @@ export type Database = {
         Row: {
           accent_color: string
           created_at: string
+          dark_surface_shift: number
           display_name: string
           id: string
+          light_surface_shift: number
           sidebar_open: boolean
           theme: string
           updated_at: string
@@ -233,8 +235,10 @@ export type Database = {
         Insert: {
           accent_color?: string
           created_at?: string
+          dark_surface_shift?: number
           display_name?: string
           id?: string
+          light_surface_shift?: number
           sidebar_open?: boolean
           theme?: string
           updated_at?: string
@@ -244,8 +248,10 @@ export type Database = {
         Update: {
           accent_color?: string
           created_at?: string
+          dark_surface_shift?: number
           display_name?: string
           id?: string
+          light_surface_shift?: number
           sidebar_open?: boolean
           theme?: string
           updated_at?: string
