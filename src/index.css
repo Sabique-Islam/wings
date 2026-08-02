@@ -1169,6 +1169,12 @@
 .nw-dash-recent-row:hover {
   background: hsl(var(--accent-soft) / 0.12);
 }
+.nw-dash-recent-row:hover .nw-dash-recent-title {
+  color: hsl(var(--accent-strong));
+}
+.nw-dash-recent-title {
+  transition: color 0.1s ease;
+}
 .nw-dash-recent-row:focus-visible {
   @apply outline-none ring-1 ring-accent-strong/50;
 }
