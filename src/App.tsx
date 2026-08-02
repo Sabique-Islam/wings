@@ -26,7 +26,7 @@ import { LoadingScreen } from "@/components/ui/spinner";
 import { Analytics } from "@vercel/analytics/react";
 import { useEffect, useState } from "react";
 import { getMyUsername } from "@/lib/profile";
-import { getCookieConsent, type CookieConsent } from "@/components/CookieBanner";
+import { isAnalyticsEnabled, type CookieConsent } from "@/components/CookieBanner";
 
 const queryClient = new QueryClient();
 
@@ -51,13 +51,13 @@ function LegacyHashRedirect() {
   return null;
 }
 
-/** Only load Vercel Analytics after the user opts in to analytics cookies. */
+/** Load Vercel Analytics unless the user rejected analytics in the consent banner. */
 function ConsentedAnalytics() {
-  const [enabled, setEnabled] = useState(() => getCookieConsent()?.analytics === true);
+  const [enabled, setEnabled] = useState(() => isAnalyticsEnabled());
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<CookieConsent | null>).detail;
-      setEnabled(detail?.analytics === true);
+      setEnabled(detail ? detail.analytics : isAnalyticsEnabled());
     };
     window.addEventListener("wings:cookie-consent", handler);
     return () => window.removeEventListener("wings:cookie-consent", handler);

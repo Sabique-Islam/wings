@@ -13,7 +13,14 @@ export interface CookieConsent {
   marketing: boolean;
 }
 
-const DEFAULT_DENY: CookieConsent = {
+const DEFAULT_CONSENT: CookieConsent = {
+  decidedAt: 0,
+  essential: true,
+  analytics: true,
+  marketing: false,
+};
+
+const REJECT_ALL: CookieConsent = {
   decidedAt: 0,
   essential: true,
   analytics: false,
@@ -40,15 +47,21 @@ export function clearCookieConsent() {
   window.dispatchEvent(new CustomEvent("wings:cookie-consent", { detail: null }));
 }
 
+/** Analytics runs unless the user explicitly rejected it in the consent banner. */
+export function isAnalyticsEnabled(): boolean {
+  const consent = getCookieConsent();
+  if (!consent) return true;
+  return consent.analytics;
+}
+
 /**
- * EU-compliant cookie consent banner. Defaults to "deny non-essential" —
- * nothing optional fires until the user clicks Accept. Choices are stored
- * locally and broadcast on a custom event so loaders can react in real time.
+ * Cookie consent banner. Analytics is on by default; marketing stays off until
+ * the user opts in. Choices are stored locally and broadcast so loaders react.
  */
 export function CookieBanner() {
   const [open, setOpen] = useState(false);
   const [details, setDetails] = useState(false);
-  const [draft, setDraft] = useState<CookieConsent>({ ...DEFAULT_DENY });
+  const [draft, setDraft] = useState<CookieConsent>({ ...DEFAULT_CONSENT });
 
   useEffect(() => {
     const existing = getCookieConsent();
@@ -56,7 +69,12 @@ export function CookieBanner() {
   }, []);
 
   useEffect(() => {
-    const reopen = () => setOpen(true);
+    const reopen = () => {
+      const existing = getCookieConsent();
+      setDraft(existing ?? { ...DEFAULT_CONSENT });
+      setDetails(Boolean(existing));
+      setOpen(true);
+    };
     window.addEventListener("wings:open-cookie-prefs", reopen);
     return () => window.removeEventListener("wings:open-cookie-prefs", reopen);
   }, []);
@@ -87,12 +105,12 @@ export function CookieBanner() {
               <div className="flex-1 min-w-0">
                 <div id="cookie-title" className="text-[11px] uppercase tracking-widest text-muted-foreground">cookies</div>
                 <p id="cookie-desc" className="text-xs text-foreground/85 mt-1 leading-relaxed">
-                  Wings uses a single essential session cookie to keep you signed in. Everything else is opt-in.
+                  Wings uses a single essential session cookie to keep you signed in. Anonymous analytics are on by default; marketing cookies stay off unless you opt in.
                   Read the <Link to="/legal/cookies" className="underline hover:text-foreground">cookie policy</Link>.
                 </p>
               </div>
               <button
-                onClick={() => decide({ ...DEFAULT_DENY })}
+                onClick={() => decide({ ...DEFAULT_CONSENT })}
                 aria-label="dismiss"
                 className="p-1 text-muted-foreground hover:text-foreground"
               ><X className="w-3.5 h-3.5" /></button>
@@ -105,7 +123,7 @@ export function CookieBanner() {
                   checked disabled
                 />
                 <CookieRow
-                  k="analytics" label="analytics" desc="anonymous usage stats. off by default."
+                  k="analytics" label="analytics" desc="anonymous usage stats. on by default."
                   checked={draft.analytics}
                   onChange={(v) => setDraft((d) => ({ ...d, analytics: v }))}
                 />
@@ -119,11 +137,11 @@ export function CookieBanner() {
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <button
-                onClick={() => decide({ ...DEFAULT_DENY, analytics: true, marketing: true } as CookieConsent)}
+                onClick={() => decide({ ...DEFAULT_CONSENT, marketing: true } as CookieConsent)}
                 className="flex-1 min-w-[7rem] bg-foreground text-background text-[11px] uppercase tracking-widest rounded-md px-3 py-2 hover:opacity-90 transition-opacity"
               >accept all</button>
               <button
-                onClick={() => decide({ ...DEFAULT_DENY })}
+                onClick={() => decide({ ...REJECT_ALL })}
                 className="flex-1 min-w-[7rem] border border-border text-[11px] uppercase tracking-widest rounded-md px-3 py-2 hover:bg-accent/40 transition-colors"
               >reject all</button>
               {details ? (
