@@ -66,3 +66,56 @@ export function computeDashboardStats(
     recent,
   };
 }
+
+export interface ActivityPoint {
+  label: string;
+  count: number;
+  date: string;
+}
+
+export interface WeekPoint {
+  day: string;
+  count: number;
+  isToday: boolean;
+}
+
+/** Map 14-day activity array (oldest first) to chart rows with date labels. */
+export function buildActivitySeries(dailyActivity: number[], now = new Date()): ActivityPoint[] {
+  return dailyActivity.map((count, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - (dailyActivity.length - 1 - i));
+    const date = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString("default", { month: "short", day: "numeric" });
+    return { label, count, date };
+  });
+}
+
+/** Map Mon–Sun activity to bar chart rows; flags today's column. */
+export function buildWeekSeries(weekActivity: number[], now = new Date()): WeekPoint[] {
+  const days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  const weekday = now.getDay();
+  const todayIndex = weekday === 0 ? 6 : weekday - 1;
+  return weekActivity.map((count, i) => ({
+    day: days[i]!,
+    count,
+    isToday: i === todayIndex,
+  }));
+}
+
+/** Dates (YYYY-MM-DD) when at least one page was created. */
+export function buildActiveDates(entries: Entry[]): Set<string> {
+  const dates = new Set<string>();
+  for (const e of entries) {
+    if (!e.deleted_at) dates.add(e.created_at.slice(0, 10));
+  }
+  return dates;
+}
+
+/** Percent change: last 7 days vs prior 7 days of page creations. */
+export function activityTrend(dailyActivity: number[]): number | null {
+  if (dailyActivity.length < 14) return null;
+  const prior = dailyActivity.slice(0, 7).reduce((sum, n) => sum + n, 0);
+  const recent = dailyActivity.slice(7).reduce((sum, n) => sum + n, 0);
+  if (prior === 0) return recent > 0 ? 100 : 0;
+  return ((recent - prior) / prior) * 100;
+}
