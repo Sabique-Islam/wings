@@ -3,6 +3,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { turnInto, type TurnIntoType } from "./blockCommands";
 import { findTopLevelDepth } from "./blockUtils";
 import { openLinkHref } from "./editorLinkClick";
+import { normalizeCodeLanguage } from "./codeLanguages";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WritingExperience — the "Notion-parity" keymap.
@@ -38,11 +39,11 @@ function applyEnterMarkdownShortcut(editor: any): boolean {
 
   const text = block.text.trim();
 
-  const codeFence = text.match(/^(```|~~~)([\w-]+)?$/);
+  const codeFence = text.match(/^(```|~~~)([\w#+.+-]+)?$/);
   if (codeFence) {
-    const language = codeFence[2] || null;
+    const language = normalizeCodeLanguage(codeFence[2] || null);
     let chain = editor.chain().deleteRange({ from: block.from, to: block.to });
-    chain = language ? chain.setCodeBlock({ language }) : chain.setCodeBlock();
+    chain = language === "plaintext" ? chain.setCodeBlock() : chain.setCodeBlock({ language });
     return chain.run();
   }
 
