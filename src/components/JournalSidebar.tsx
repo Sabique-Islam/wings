@@ -240,7 +240,7 @@ export const JournalSidebar = memo(function JournalSidebar({
       <li key={entry.id}>
         <div
           className={cn(
-            "flex items-center gap-0 px-2 group relative",
+            "flex items-center group relative",
             drop === "before" && "before:absolute before:inset-x-0 before:-top-px before:h-0.5 before:bg-accent-strong before:rounded-full",
             drop === "after" && "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-accent-strong after:rounded-full",
             drop === "inside" && "ring-1 ring-accent-strong/60 rounded-lg",
@@ -279,14 +279,13 @@ export const JournalSidebar = memo(function JournalSidebar({
               <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
             </button>
           ) : (
-            <span className="w-4 shrink-0" aria-hidden />
+            <span className="w-4 shrink-0" />
           )}
           <EntryRow
             title={preview}
             active={isActive}
             pinned={entry.pinned}
             onClick={() => onSelect(entry.id)}
-            className="min-w-0 flex-1"
           />
         </div>
         {hasChildren && isExpanded && !q && (
@@ -301,11 +300,11 @@ export const JournalSidebar = memo(function JournalSidebar({
   const sidebarBody = (
     <SidebarProvider
       defaultOpen
-      className="min-h-0! h-full w-full! flex-col! items-stretch!"
+      className="min-h-0! h-full w-fit"
       style={{ "--sidebar-width": EXPANDED } as React.CSSProperties}
     >
       <div
-        className="shrink-0 overflow-hidden h-full w-full"
+        className="shrink-0 overflow-hidden h-full"
         style={{
           width: isMobile ? EXPANDED : railCollapsed ? COLLAPSED : EXPANDED,
           transition: isMobile ? undefined : `width ${DURATION}ms ${EASE}`,
@@ -313,21 +312,13 @@ export const JournalSidebar = memo(function JournalSidebar({
       >
         <Sidebar
           collapsible="none"
-          className="flex h-full min-h-0 w-full flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border"
+          className="flex h-full min-h-0 w-full! flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border"
         >
-          <SidebarHeader
-            className={cn(
-              "flex-row! w-full items-center gap-0! p-0! h-12 shrink-0 border-b border-sidebar-border",
-              isMobile ? "justify-between" : "justify-start",
-            )}
-          >
+          <SidebarHeader className="flex-row! w-full items-center justify-between gap-2 p-2! pt-2 h-12 shrink-0">
             <button
               type="button"
               onClick={onHome}
-              className={cn(
-                "flex h-12 min-w-0 items-center gap-2 overflow-hidden text-left hover:opacity-90 transition-opacity",
-                railCollapsed ? "w-full justify-start px-2.5" : "justify-start px-3",
-              )}
+              className="flex min-w-0 items-center gap-1.5 pl-1 h-8 overflow-clip"
             >
               <Logo
                 size={22}
@@ -340,14 +331,14 @@ export const JournalSidebar = memo(function JournalSidebar({
                 type="button"
                 aria-label="Close sidebar"
                 onClick={onToggle}
-                className="mr-2 grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:text-foreground"
+                className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </SidebarHeader>
 
-          <SidebarMenu className="gap-px! pt-2 px-0 w-full">
+          <SidebarMenu className="gap-px! pt-2 px-2">
             {navItems.map((it) => (
               <SidebarMenuItem key={it.id} className="list-none!">
                 <NavRow item={it} collapsed={railCollapsed} />
@@ -365,10 +356,10 @@ export const JournalSidebar = memo(function JournalSidebar({
             aria-hidden={railCollapsed}
           >
             <div
-              className="pb-2"
+              className="px-2 pb-2"
               style={{ display: railCollapsed ? "none" : undefined }}
             >
-              <div className="relative mb-3 px-2">
+              <div className="relative mb-3">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <input
                   ref={searchRef}
@@ -505,29 +496,39 @@ function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       aria-label={item.label}
       title={collapsed ? item.label : undefined}
       className={cn(
-        "group relative flex h-9 w-full items-center justify-start text-sm transition-colors duration-75 active:scale-[0.99] overflow-visible",
-        collapsed ? "px-2.5" : "px-2",
+        "group relative flex h-9 w-full items-center px-3 text-sm transition-colors duration-75 active:scale-[0.99] overflow-visible",
         item.active ? "text-accent-strong" : "text-sidebar-foreground/80 hover:text-foreground",
       )}
     >
       <SharpHighlight active={item.active} />
-      <span className="relative z-10 grid size-5 shrink-0 place-items-center">{item.icon}</span>
-      <span className={cn("relative z-10 truncate text-left", collapsed ? "sr-only" : "flex-1 ml-3")}>
-        {item.label}
-      </span>
-      {item.shortcut && !collapsed && (
-        <span className="relative z-10 ml-auto text-[11px] text-muted-foreground opacity-0 transition-opacity duration-75 group-hover:opacity-100">
-          {item.shortcut}
+      <div className="relative z-10 flex w-full items-center gap-3">
+        <span className="grid size-5 shrink-0 place-items-center">{item.icon}</span>
+        <span
+          className="flex-1 truncate text-left"
+          style={{
+            transition: `opacity 150ms ${EASE}`,
+            opacity: collapsed ? 0 : 1,
+          }}
+        >
+          {item.label}
         </span>
-      )}
+        {item.shortcut && (
+          <span
+            className="text-[11px] text-muted-foreground opacity-0 transition-opacity duration-75 group-hover:opacity-100"
+            style={{ display: collapsed ? "none" : undefined }}
+          >
+            {item.shortcut}
+          </span>
+        )}
+      </div>
     </button>
   );
 }
 
 function SidebarSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="mb-4 px-2">
-      <h3 className="pb-1 text-[11px] font-medium tracking-wide text-muted-foreground select-none">{title}</h3>
+    <div className="mb-4">
+      <h3 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground select-none">{title}</h3>
       <ul className="flex flex-col gap-px">{children}</ul>
     </div>
   );
@@ -538,22 +539,19 @@ function EntryRow({
   active,
   pinned,
   onClick,
-  className,
 }: {
   title: string;
   active: boolean;
   pinned: boolean;
   onClick: () => void;
-  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "group relative flex h-8 w-full items-center justify-start pl-0 pr-0 text-[13px] transition-colors duration-75 overflow-visible",
+        "group relative flex h-8 w-full items-center px-2 text-[13px] transition-colors duration-75 overflow-visible",
         active ? "text-accent-strong" : "text-sidebar-foreground/80 hover:text-foreground",
-        className,
       )}
     >
       <SharpHighlight active={active} />
