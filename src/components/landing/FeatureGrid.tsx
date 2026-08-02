@@ -52,7 +52,7 @@ const MORE: CompactFeature[] = [
 
 export function FeatureGrid() {
   return (
-    <section id="features" className="relative py-20 sm:py-28 md:py-32 px-4 sm:px-6">
+    <section className="relative py-20 sm:py-28 md:py-32 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial="hidden"

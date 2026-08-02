@@ -10,7 +10,7 @@ const CARDS = [
 
 export function StackedScroll() {
   return (
-    <section id="showcase" className="relative">
+    <section className="relative">
       {CARDS.map((c, i) => (
         <div key={i} className="sticky top-0 min-h-screen flex items-center justify-center px-4 sm:px-6 py-16" style={{ zIndex: i + 1 }}>
           <motion.div

@@ -33,7 +33,7 @@ export function Hero({ ctaHref }: Props) {
           transition={{ duration: 0.9, delay: 0.2, ease: motionEase }}
           className="text-sm sm:text-base md:text-lg text-ink-1 font-sans max-w-xl mx-auto leading-relaxed px-2"
         >
-          nested pages, slash commands, LaTeX, Excalidraw, and an AI panel that reads the page you have open. sign in with Google or a magic link.
+          nested pages, slash commands, LaTeX, Excalidraw, and an AI panel that reads the page you have open.
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 12 }}

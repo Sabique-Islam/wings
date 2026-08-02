@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useParams, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useParams, useLocation, useNavigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,8 @@ import AuthCallback from "./pages/AuthCallback";
 import SharedEntry from "./pages/SharedEntry";
 import NotFound from "./pages/NotFound";
 import Landing from "./pages/Landing";
+import LandingFeatures from "./pages/LandingFeatures";
+import LandingShowcase from "./pages/LandingShowcase";
 import Pricing from "./pages/Pricing";
 import Legal from "./pages/Legal";
 import EditorE2E from "./pages/EditorE2E";
@@ -27,6 +29,27 @@ import { getMyUsername } from "@/lib/profile";
 import { getCookieConsent, type CookieConsent } from "@/components/CookieBanner";
 
 const queryClient = new QueryClient();
+
+/** Scroll to top on every client-side route change. */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
+/** Old bookmarked hash links → dedicated marketing routes. */
+function LegacyHashRedirect() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (location.pathname !== "/") return;
+    const target = { features: "/features", showcase: "/showcase" }[location.hash.slice(1)];
+    if (target) navigate(target, { replace: true });
+  }, [location.pathname, location.hash, navigate]);
+  return null;
+}
 
 /** Only load Vercel Analytics after the user opts in to analytics cookies. */
 function ConsentedAnalytics() {
@@ -111,6 +134,8 @@ function AppRoutes() {
     <Routes>
       {/* Public marketing */}
       <Route path="/" element={<Landing />} />
+      <Route path="/features" element={<LandingFeatures />} />
+      <Route path="/showcase" element={<LandingShowcase />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/about" element={<About />} />
       <Route path="/careers" element={<Careers />} />
@@ -164,6 +189,8 @@ const App = () => (
         <Sonner />
         <AuthProvider>
           <BrowserRouter>
+            <ScrollToTop />
+            <LegacyHashRedirect />
             <ErrorBoundary>
               <AppRoutes />
             </ErrorBoundary>

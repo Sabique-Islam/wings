@@ -23,9 +23,7 @@ export function NavBar({ ctaHref, ctaLabel }: Props) {
         </Link>
         <nav className="hidden md:flex items-center gap-7 text-xs font-mono text-ink-2">
           {NAV_LINKS.map((l) => (
-            l.to.startsWith("/#")
-              ? <a key={l.l} href={l.to} className="hover:text-foreground transition-colors">{l.l}</a>
-              : <Link key={l.l} to={l.to} className="hover:text-foreground transition-colors">{l.l}</Link>
+            <Link key={l.l} to={l.to} className="hover:text-foreground transition-colors">{l.l}</Link>
           ))}
         </nav>
         <div className="flex items-center gap-2">
@@ -51,9 +49,7 @@ export function NavBar({ ctaHref, ctaLabel }: Props) {
         <div id="mobile-nav" className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur">
           <nav className="px-4 py-4 flex flex-col gap-3 text-sm font-mono">
             {NAV_LINKS.map((l) => (
-              l.to.startsWith("/#")
-                ? <a key={l.l} href={l.to} onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">{l.l}</a>
-                : <Link key={l.l} to={l.to} onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">{l.l}</Link>
+              <Link key={l.l} to={l.to} onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">{l.l}</Link>
             ))}
           </nav>
         </div>
