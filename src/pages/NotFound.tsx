@@ -2,6 +2,7 @@ import { useLocation, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { Ascii } from "@/lib/ascii";
 import { Dither } from "@/components/ui/Dither";
+import { GyroscopeRings } from "@/components/ui/spinner";
 import { Seo } from "@/components/Seo";
 
 const NotFound = () => {
@@ -16,6 +17,7 @@ const NotFound = () => {
       <Seo title="page not found" path={location.pathname} noIndex description="This page does not exist on Wings." />
       <Dither variant="grain" fade="radial" density="sparse" />
       <div className="relative text-center space-y-6">
+        <GyroscopeRings className="mx-auto opacity-80" />
         <Ascii size="text-[10px] sm:text-xs" className="text-ink-2 inline-block text-left">
 {`┌────────────────────┐
 │   4 0 4            │

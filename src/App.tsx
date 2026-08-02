@@ -22,7 +22,7 @@ import BlogPost from "./pages/BlogPost";
 import { CookieBanner } from "@/components/CookieBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DitherFilterDefs } from "@/lib/dither/filters";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { Analytics } from "@vercel/analytics/react";
 import { useEffect, useState } from "react";
 import { getMyUsername } from "@/lib/profile";
@@ -104,11 +104,7 @@ function UsernameGate() {
   }, [user, username, authLoading]);
 
   if (authLoading || state === "loading") {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="gyro" />;
   }
   if (!user) {
     const returnTo = encodeURIComponent(location.pathname + location.search);
@@ -123,11 +119,7 @@ function AppRoutes() {
   const { loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="gyro" />;
   }
 
   return (

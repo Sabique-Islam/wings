@@ -8,7 +8,7 @@ import { GoogleLogo } from "@/components/GoogleLogo";
 import { Dither } from "@/components/ui/Dither";
 import { Link } from "react-router-dom";
 import { useRedirectIfAuthed } from "@/hooks/useRedirectIfAuthed";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/useAuth";
 
 type Stage = "request" | "sent";
@@ -22,11 +22,7 @@ export default function Auth() {
   useRedirectIfAuthed();
 
   if (authLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="helix" />;
   }
 
   const handleRequest = async (e: React.FormEvent) => {

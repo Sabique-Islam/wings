@@ -1,5 +1,5 @@
 import { Seo } from "@/components/Seo";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
 import { InfiniteMarquee } from "@/components/landing/InfiniteMarquee";
 import { LandingCta } from "@/components/landing/LandingCta";
@@ -10,11 +10,7 @@ export default function LandingFeatures() {
   const { ready } = usePublicMarketingPage();
 
   if (!ready) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="flip" />;
   }
 
   return (

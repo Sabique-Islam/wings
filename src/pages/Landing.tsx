@@ -8,7 +8,7 @@ import { StackedScroll } from "@/components/landing/StackedScroll";
 import { LandingCta } from "@/components/landing/LandingCta";
 import { MarketingLayout } from "@/components/landing/MarketingLayout";
 import { Seo } from "@/components/Seo";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 export default function Landing() {
   const { ready } = usePublicMarketingPage();
@@ -19,11 +19,7 @@ export default function Landing() {
   }, [ready]);
 
   if (!ready) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="flip" />;
   }
 
   const ctaHref = "/auth";

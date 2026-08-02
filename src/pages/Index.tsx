@@ -24,7 +24,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { AIAssistant } from "@/components/AIAssistant";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 function resolveEntryOwnerId(
   parentId: string | undefined,
@@ -761,11 +761,7 @@ export default function Index() {
   const openAI = useCallback(() => setAiOpen(true), []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="gyro" />;
   }
 
   return (

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getDashboardPath } from "@/lib/auth/redirect";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { WingsLoader } from "@/components/ui/spinner";
 import { Seo } from "@/components/Seo";
 import { Dither } from "@/components/ui/Dither";
 
@@ -71,7 +71,7 @@ export default function AuthCallback() {
           </>
         ) : (
           <>
-            <AsciiSpinner />
+            <WingsLoader variant="helix" />
             <p className="text-xs text-ink-2 font-mono">finishing sign-in…</p>
           </>
         )}

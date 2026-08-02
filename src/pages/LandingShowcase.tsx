@@ -1,5 +1,5 @@
 import { Seo } from "@/components/Seo";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { LandingCta } from "@/components/landing/LandingCta";
 import { MarketingLayout } from "@/components/landing/MarketingLayout";
 import { StackedScroll } from "@/components/landing/StackedScroll";
@@ -9,11 +9,7 @@ export default function LandingShowcase() {
   const { ready } = usePublicMarketingPage();
 
   if (!ready) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="flip" />;
   }
 
   return (

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
-import { AsciiSpinner } from "@/components/AsciiAnimation";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { Seo } from "@/components/Seo";
 import { fetchSharedEntry, isValidShareToken } from "@/lib/sharedEntry";
 
@@ -49,11 +49,7 @@ export default function SharedEntry() {
   }, [token]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <AsciiSpinner />
-      </div>
-    );
+    return <LoadingScreen variant="gyro" />;
   }
 
   if (notFound) {
