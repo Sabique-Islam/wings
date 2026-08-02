@@ -56,6 +56,21 @@ export function DitherFilterDefs() {
           </feComponentTransfer>
         </filter>
 
+        {/* Text dither — thresholds glyph fill; composites with SourceGraphic */}
+        <filter id="nw-dither-text" x="-5%" y="-5%" width="110%" height="110%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.62" numOctaves="3" stitchTiles="stitch" result="noise" />
+          <feColorMatrix
+            in="noise"
+            type="matrix"
+            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 14 -4.5"
+            result="thresh"
+          />
+          <feComponentTransfer in="thresh" result="mask">
+            <feFuncA type="discrete" tableValues="0 1" />
+          </feComponentTransfer>
+          <feComposite in="SourceGraphic" in2="mask" operator="in" />
+        </filter>
+
         {/* Shape dither — binarizes gradients inside black viewboxes */}
         <filter id="nw-dither-shape" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" result="noise" />

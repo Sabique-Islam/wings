@@ -3,12 +3,12 @@ import { Mail } from "lucide-react";
 import { FOOTER_LINKS, SOCIAL } from "@/config/navigation";
 import { Logo } from "@/components/Logo";
 import { SITE } from "@/config/site";
+import { FooterWordmark } from "@/components/landing/FooterWordmark";
 
 export function Footer() {
   const year = new Date().getFullYear();
   return (
-    <footer className="relative border-t border-border-subtle bg-background pt-16 sm:pt-20 pb-10 px-4 sm:px-6 overflow-hidden">
-      <div className="dither dither--grain dither--fade-up pointer-events-none absolute inset-x-0 top-0 h-24 opacity-100" aria-hidden />
+    <footer className="relative border-t border-border-subtle bg-background pt-16 sm:pt-20 pb-0 px-4 sm:px-6 overflow-hidden">
       <div className="relative max-w-6xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-8 sm:gap-10 mb-12 sm:mb-16">
           <div className="col-span-2 space-y-3">
@@ -36,6 +36,7 @@ export function Footer() {
             </div>
           ))}
         </div>
+
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pt-8 border-t border-border-subtle">
           <div className="text-[10px] font-mono text-ink-2">© {year} {SITE.brand}</div>
           <div className="flex items-center gap-4">
@@ -48,7 +49,10 @@ export function Footer() {
             <Link to="/status" className="text-[10px] font-mono text-ink-2 hover:text-foreground transition-colors">{SITE.domain}</Link>
           </div>
         </div>
+
+        <div className="mt-8 sm:mt-10 pt-8 border-t border-border-subtle" aria-hidden />
       </div>
+      <FooterWordmark />
     </footer>
   );
 }
