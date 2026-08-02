@@ -577,7 +577,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
             }}
             placeholder="Ask AI to write, edit, create, or generate images…"
             rows={2}
-            className="nw-ai-input pl-9"
+            className="nw-ai-input"
           />
           <button
             type="button"
