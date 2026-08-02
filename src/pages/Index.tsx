@@ -80,12 +80,27 @@ export default function Index() {
   const [roleMap, setRoleMap] = useState<Record<string, ShareRole>>({});
   const [activeId, setActiveIdRaw] = useState<string | null>(routeId ?? null);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== "undefined" ? window.innerWidth >= 768 : true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("nw:sidebarCollapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
   const [aiOpen, setAiOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   // Distinct from `loading`: the cached paint clears `loading` early, but a
   // page missing from the mirror is not yet proof the page is gone.
   const [serverSynced, setServerSynced] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  useEffect(() => {
+    try {
+      localStorage.setItem("nw:sidebarCollapsed", sidebarCollapsed ? "1" : "0");
+    } catch {
+      /* private browsing */
+    }
+  }, [sidebarCollapsed]);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
   const savedFlashRef = useRef<ReturnType<typeof setTimeout>>();
@@ -687,6 +702,14 @@ export default function Index() {
     setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
   }, []);
 
+  const toggleSidebar = useCallback(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setSidebarOpen((s) => !s);
+    } else {
+      setSidebarCollapsed((c) => !c);
+    }
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -696,12 +719,17 @@ export default function Index() {
         if (e.key === "b" || e.key === "B") return;
       }
       if (e.key === "n" || e.key === "N") { e.preventDefault(); handleNew(); }
-      if (e.key === "b" || e.key === "B") { e.preventDefault(); setSidebarOpen((s) => !s); }
-      if (e.key === "/") { e.preventDefault(); setSidebarOpen(true); window.dispatchEvent(new CustomEvent("nw:search")); }
+      if (e.key === "b" || e.key === "B") { e.preventDefault(); toggleSidebar(); }
+      if (e.key === "/") {
+        e.preventDefault();
+        if (typeof window !== "undefined" && window.innerWidth < 768) setSidebarOpen(true);
+        else setSidebarCollapsed(false);
+        window.dispatchEvent(new CustomEvent("nw:search"));
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleNew]);
+  }, [handleNew, toggleSidebar]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -731,7 +759,6 @@ export default function Index() {
   }, []);
 
   const openAI = useCallback(() => setAiOpen(true), []);
-  const toggleSidebar = useCallback(() => setSidebarOpen((s) => !s), []);
 
   if (loading) {
     return (
@@ -751,7 +778,9 @@ export default function Index() {
         onSelect={setActiveId}
         onNew={handleNew}
         sidebarOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onToggle={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
         onRefetch={() => void loadEntries({ refreshShares: true }).catch((err) => toast.error("Couldn't refresh pages", { description: entryErrorMessage(err) }))}
         onHome={() => setActiveId(null)}
         onReorder={handleReorderPages}
@@ -793,7 +822,7 @@ export default function Index() {
         entries={entries}
         onSelect={setActiveId}
         onNew={handleNew}
-        onToggleSidebar={() => setSidebarOpen((s) => !s)}
+        onToggleSidebar={toggleSidebar}
       />
       <KeyboardPalette />
       <GraphView entries={entries} activeId={activeId} userId={userId} onNavigate={setActiveId} />
