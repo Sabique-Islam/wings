@@ -44,6 +44,17 @@
             ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
             : t;
           document.documentElement.setAttribute('data-theme', resolved);
+
+          function parseShift(raw) {
+            if (raw == null || raw === '') return 0;
+            var n = parseInt(raw, 10);
+            if (isNaN(n)) return 0;
+            return Math.min(20, Math.max(-20, n));
+          }
+          var darkShift = parseShift(localStorage.getItem('nw-dark-surface-shift'));
+          var lightShift = parseShift(localStorage.getItem('nw-light-surface-shift'));
+          var shift = resolved === 'dark' ? darkShift : lightShift;
+          document.documentElement.style.setProperty('--surface-l-shift', shift + '%');
         } catch (e) {}
       })();
     </script>

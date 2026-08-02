@@ -20,48 +20,64 @@
      ============================================================ */
   :root,
   [data-theme="dark"] {
+    /* User-tunable surface brightness (ThemeProvider sets inline at runtime). */
+    --surface-l-shift: 0%;
+
     /* Layered monochrome surfaces (bg) + text (fg) */
-    --bg-0: 0 0% 7%;    /* canvas */
-    --bg-1: 0 0% 10%;   /* surface */
-    --bg-2: 0 0% 13%;   /* raised */
-    --bg-3: 0 0% 16%;   /* overlay */
-    --fg-0: 0 0% 92%;   /* primary text */
-    --fg-1: 0 0% 72%;   /* secondary */
-    --fg-2: 0 0% 50%;   /* tertiary / muted */
-    --fg-3: 0 0% 32%;   /* disabled */
-    --fg-inverse: 0 0% 7%;
-    --border-subtle: 0 0% 16%;
-    --border-strong: 0 0% 26%;
-    --border-focus: 0 0% 45%;
+    --l-bg-0: clamp(0%, calc(7% + var(--surface-l-shift)), 100%);
+    --l-bg-1: clamp(0%, calc(10% + var(--surface-l-shift)), 100%);
+    --l-bg-2: clamp(0%, calc(13% + var(--surface-l-shift)), 100%);
+    --l-bg-3: clamp(0%, calc(16% + var(--surface-l-shift)), 100%);
+    --l-fg-0: clamp(10%, calc(92% - var(--surface-l-shift)), 100%);
+    --l-fg-1: clamp(10%, calc(72% - var(--surface-l-shift)), 100%);
+    --l-fg-2: clamp(10%, calc(50% - var(--surface-l-shift)), 100%);
+    --l-fg-3: clamp(0%, calc(32% - var(--surface-l-shift)), 100%);
+    --l-fg-inverse: clamp(0%, calc(7% - var(--surface-l-shift)), 100%);
+    --l-border-subtle: clamp(0%, calc(16% + var(--surface-l-shift)), 100%);
+    --l-border-strong: clamp(0%, calc(26% + var(--surface-l-shift)), 100%);
+    --l-border-focus: clamp(0%, calc(45% + var(--surface-l-shift)), 100%);
+
+    --bg-0: 0 0% var(--l-bg-0);    /* canvas */
+    --bg-1: 0 0% var(--l-bg-1);   /* surface */
+    --bg-2: 0 0% var(--l-bg-2);   /* raised */
+    --bg-3: 0 0% var(--l-bg-3);   /* overlay */
+    --fg-0: 0 0% var(--l-fg-0);   /* primary text */
+    --fg-1: 0 0% var(--l-fg-1);   /* secondary */
+    --fg-2: 0 0% var(--l-fg-2);   /* tertiary / muted */
+    --fg-3: 0 0% var(--l-fg-3);   /* disabled */
+    --fg-inverse: 0 0% var(--l-fg-inverse);
+    --border-subtle: 0 0% var(--l-border-subtle);
+    --border-strong: 0 0% var(--l-border-strong);
+    --border-focus: 0 0% var(--l-border-focus);
 
     /* shadcn semantic tokens (values mirror the prior dark theme) */
-    --background: 0 0% 7%;
-    --foreground: 0 0% 85%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 85%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 85%;
-    --primary: 0 0% 85%;
-    --primary-foreground: 0 0% 7%;
-    --secondary: 0 0% 14%;
-    --secondary-foreground: 0 0% 70%;
-    --muted: 0 0% 14%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 18%;
-    --accent-foreground: 0 0% 85%;
+    --background: 0 0% var(--l-bg-0);
+    --foreground: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
+    --card: 0 0% var(--l-bg-1);
+    --card-foreground: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
+    --popover: 0 0% var(--l-bg-1);
+    --popover-foreground: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
+    --primary: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
+    --primary-foreground: 0 0% var(--l-bg-0);
+    --secondary: 0 0% clamp(0%, calc(14% + var(--surface-l-shift)), 100%);
+    --secondary-foreground: 0 0% clamp(10%, calc(70% - var(--surface-l-shift)), 100%);
+    --muted: 0 0% clamp(0%, calc(14% + var(--surface-l-shift)), 100%);
+    --muted-foreground: 0 0% clamp(10%, calc(45% - var(--surface-l-shift)), 100%);
+    --accent: 0 0% clamp(0%, calc(18% + var(--surface-l-shift)), 100%);
+    --accent-foreground: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
     --destructive: 0 60% 50%;
     --destructive-foreground: 0 0% 95%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 40%;
-    --sidebar-background: 0 0% 5%;
-    --sidebar-foreground: 0 0% 65%;
-    --sidebar-primary: 0 0% 85%;
-    --sidebar-primary-foreground: 0 0% 5%;
-    --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 0 0% 85%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 0 0% 40%;
+    --border: 0 0% clamp(0%, calc(18% + var(--surface-l-shift)), 100%);
+    --input: 0 0% clamp(0%, calc(18% + var(--surface-l-shift)), 100%);
+    --ring: 0 0% clamp(0%, calc(40% + var(--surface-l-shift)), 100%);
+    --sidebar-background: 0 0% clamp(0%, calc(5% + var(--surface-l-shift)), 100%);
+    --sidebar-foreground: 0 0% clamp(10%, calc(65% - var(--surface-l-shift)), 100%);
+    --sidebar-primary: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
+    --sidebar-primary-foreground: 0 0% clamp(0%, calc(5% + var(--surface-l-shift)), 100%);
+    --sidebar-accent: 0 0% clamp(0%, calc(12% + var(--surface-l-shift)), 100%);
+    --sidebar-accent-foreground: 0 0% clamp(10%, calc(85% - var(--surface-l-shift)), 100%);
+    --sidebar-border: 0 0% clamp(0%, calc(15% + var(--surface-l-shift)), 100%);
+    --sidebar-ring: 0 0% clamp(0%, calc(40% + var(--surface-l-shift)), 100%);
 
     /* Accent fallback channels — monochrome until the user picks a hex.
        ThemeProvider overrides --accent-h/s/l (+ fg) inline at runtime. */
@@ -81,46 +97,61 @@
   }
 
   [data-theme="light"] {
-    --bg-0: 0 0% 100%;
-    --bg-1: 0 0% 98%;
-    --bg-2: 0 0% 95%;
-    --bg-3: 0 0% 92%;
-    --fg-0: 0 0% 10%;
-    --fg-1: 0 0% 30%;
-    --fg-2: 0 0% 45%;
-    --fg-3: 0 0% 62%;
-    --fg-inverse: 0 0% 100%;
-    --border-subtle: 0 0% 90%;
-    --border-strong: 0 0% 80%;
-    --border-focus: 0 0% 55%;
+    --surface-l-shift: 0%;
 
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 98%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 0 0% 15%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 93%;
-    --secondary-foreground: 0 0% 30%;
-    --muted: 0 0% 93%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 90%;
-    --accent-foreground: 0 0% 10%;
+    --l-bg-0: clamp(0%, calc(100% + var(--surface-l-shift)), 100%);
+    --l-bg-1: clamp(0%, calc(98% + var(--surface-l-shift)), 100%);
+    --l-bg-2: clamp(0%, calc(95% + var(--surface-l-shift)), 100%);
+    --l-bg-3: clamp(0%, calc(92% + var(--surface-l-shift)), 100%);
+    --l-fg-0: clamp(0%, calc(10% - var(--surface-l-shift)), 100%);
+    --l-fg-1: clamp(0%, calc(30% - var(--surface-l-shift)), 100%);
+    --l-fg-2: clamp(0%, calc(45% - var(--surface-l-shift)), 100%);
+    --l-fg-3: clamp(0%, calc(62% - var(--surface-l-shift)), 100%);
+    --l-fg-inverse: clamp(0%, calc(100% - var(--surface-l-shift)), 100%);
+    --l-border-subtle: clamp(0%, calc(90% + var(--surface-l-shift)), 100%);
+    --l-border-strong: clamp(0%, calc(80% + var(--surface-l-shift)), 100%);
+    --l-border-focus: clamp(0%, calc(55% + var(--surface-l-shift)), 100%);
+
+    --bg-0: 0 0% var(--l-bg-0);
+    --bg-1: 0 0% var(--l-bg-1);
+    --bg-2: 0 0% var(--l-bg-2);
+    --bg-3: 0 0% var(--l-bg-3);
+    --fg-0: 0 0% var(--l-fg-0);
+    --fg-1: 0 0% var(--l-fg-1);
+    --fg-2: 0 0% var(--l-fg-2);
+    --fg-3: 0 0% var(--l-fg-3);
+    --fg-inverse: 0 0% var(--l-fg-inverse);
+    --border-subtle: 0 0% var(--l-border-subtle);
+    --border-strong: 0 0% var(--l-border-strong);
+    --border-focus: 0 0% var(--l-border-focus);
+
+    --background: 0 0% var(--l-bg-0);
+    --foreground: 0 0% var(--l-fg-0);
+    --card: 0 0% var(--l-bg-1);
+    --card-foreground: 0 0% var(--l-fg-0);
+    --popover: 0 0% var(--l-bg-1);
+    --popover-foreground: 0 0% var(--l-fg-0);
+    --primary: 0 0% clamp(0%, calc(15% - var(--surface-l-shift)), 100%);
+    --primary-foreground: 0 0% clamp(0%, calc(98% + var(--surface-l-shift)), 100%);
+    --secondary: 0 0% clamp(0%, calc(93% + var(--surface-l-shift)), 100%);
+    --secondary-foreground: 0 0% clamp(0%, calc(30% - var(--surface-l-shift)), 100%);
+    --muted: 0 0% clamp(0%, calc(93% + var(--surface-l-shift)), 100%);
+    --muted-foreground: 0 0% clamp(0%, calc(45% - var(--surface-l-shift)), 100%);
+    --accent: 0 0% clamp(0%, calc(90% + var(--surface-l-shift)), 100%);
+    --accent-foreground: 0 0% var(--l-fg-0);
     --destructive: 0 60% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 0 0% 60%;
-    --sidebar-background: 0 0% 96%;
-    --sidebar-foreground: 0 0% 35%;
-    --sidebar-primary: 0 0% 15%;
-    --sidebar-primary-foreground: 0 0% 96%;
-    --sidebar-accent: 0 0% 92%;
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 0 0% 88%;
-    --sidebar-ring: 0 0% 60%;
+    --border: 0 0% clamp(0%, calc(88% + var(--surface-l-shift)), 100%);
+    --input: 0 0% clamp(0%, calc(88% + var(--surface-l-shift)), 100%);
+    --ring: 0 0% clamp(0%, calc(60% + var(--surface-l-shift)), 100%);
+    --sidebar-background: 0 0% clamp(0%, calc(96% + var(--surface-l-shift)), 100%);
+    --sidebar-foreground: 0 0% clamp(0%, calc(35% - var(--surface-l-shift)), 100%);
+    --sidebar-primary: 0 0% clamp(0%, calc(15% - var(--surface-l-shift)), 100%);
+    --sidebar-primary-foreground: 0 0% clamp(0%, calc(96% + var(--surface-l-shift)), 100%);
+    --sidebar-accent: 0 0% clamp(0%, calc(92% + var(--surface-l-shift)), 100%);
+    --sidebar-accent-foreground: 0 0% var(--l-fg-0);
+    --sidebar-border: 0 0% clamp(0%, calc(88% + var(--surface-l-shift)), 100%);
+    --sidebar-ring: 0 0% clamp(0%, calc(60% + var(--surface-l-shift)), 100%);
 
     --accent-h: 0;
     --accent-s: 0%;
