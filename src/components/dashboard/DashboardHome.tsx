@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Sparkles, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 import type { Entry } from "@/lib/journal";
 import { computeDashboardStats } from "@/lib/dashboardStats";
 import { asciiBox, toBlocks, toMeter } from "@/lib/ascii/art";
@@ -119,7 +119,7 @@ export function DashboardHome({ entries, roleMap, onSelect, onNew, onOpenAI }: P
               <Plus className="h-4 w-4" /> New page
             </button>
             <button type="button" onClick={onOpenAI} className="nw-dash-btn">
-              <Sparkles className="h-4 w-4" /> Ask AI
+              Ask AI
             </button>
           </div>
         </header>
