@@ -12,6 +12,7 @@ import {
   Loader2,
   LayoutGrid,
   MoreHorizontal,
+  PinOff,
 } from "lucide-react";
 import {
   Sidebar,
@@ -20,6 +21,12 @@ import {
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SharpHighlight } from "@/components/ui/sharp";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -59,6 +66,8 @@ interface Props {
   onHome?: () => void;
   onReorder?: (draggedId: string, targetId: string, placement: DropPlacement) => void;
   onMove?: (draggedId: string, parentId: string | null) => void;
+  onDelete?: (id: string) => void;
+  onTogglePin?: (id: string, pinned: boolean) => void;
 }
 
 type DropZone = DropPlacement | "inside";
@@ -96,6 +105,8 @@ export const JournalSidebar = memo(function JournalSidebar({
   onHome,
   onReorder,
   onMove,
+  onDelete,
+  onTogglePin,
 }: Props) {
   const isMobile = useIsMobile();
   const railCollapsed = !isMobile && collapsed;
@@ -234,6 +245,8 @@ export const JournalSidebar = memo(function JournalSidebar({
     const hasChildren = children.length > 0;
     const isExpanded = expanded.has(entry.id);
     const drop = dropTarget?.id === entry.id ? dropTarget.zone : null;
+    const role = roleMap[entry.id] || "owner";
+    const canManage = role === "owner" || role === "admin";
 
     return (
       <li key={entry.id}>
@@ -284,7 +297,10 @@ export const JournalSidebar = memo(function JournalSidebar({
             title={preview}
             active={isActive}
             pinned={entry.pinned}
+            canManage={canManage}
             onClick={() => onSelect(entry.id)}
+            onTogglePin={canManage ? () => onTogglePin?.(entry.id, !entry.pinned) : undefined}
+            onDelete={canManage ? () => onDelete?.(entry.id) : undefined}
           />
         </div>
         {hasChildren && isExpanded && !q && (
@@ -525,33 +541,78 @@ function EntryRow({
   title,
   active,
   pinned,
+  canManage,
   onClick,
+  onTogglePin,
+  onDelete,
 }: {
   title: string;
   active: boolean;
   pinned: boolean;
+  canManage: boolean;
   onClick: () => void;
+  onTogglePin?: () => void;
+  onDelete?: () => void;
 }) {
+  const showMenu = canManage && (onTogglePin || onDelete);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
       className={cn(
-        "group relative flex h-8 w-full items-center px-2 text-[13px] transition-colors duration-75 overflow-visible",
+        "group relative flex h-8 w-full min-w-0 items-center text-[13px] transition-colors duration-75 overflow-visible",
         active ? "text-accent-strong" : "text-sidebar-foreground/80 hover:text-foreground",
       )}
     >
       <SharpHighlight active={active} />
-      <span className="relative z-10 grid size-4 shrink-0 place-items-center mr-2">
-        {pinned ? <Pin className="h-3 w-3" /> : <FileText className="h-3 w-3 opacity-60" />}
-      </span>
-      <span className="relative z-10 flex-1 truncate text-left group-hover:mask-[linear-gradient(to_right,black_78%,transparent_95%)]">
-        {title}
-      </span>
-      <span className="absolute right-1 top-1/2 z-10 -translate-y-1/2 grid size-7 place-items-center text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 pointer-events-none">
-        <MoreHorizontal className="h-3.5 w-3.5" />
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        className="relative z-10 flex min-w-0 flex-1 items-center px-2"
+      >
+        <span className="grid size-4 shrink-0 place-items-center mr-2">
+          {pinned ? <Pin className="h-3 w-3" /> : <FileText className="h-3 w-3 opacity-60" />}
+        </span>
+        <span className="flex-1 truncate text-left group-hover:mask-[linear-gradient(to_right,black_78%,transparent_95%)]">
+          {title}
+        </span>
+      </button>
+      {showMenu && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              draggable={false}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              className="relative z-10 mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-sidebar-accent data-[state=open]:opacity-100"
+              aria-label="Page actions"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="font-mono text-xs">
+            {onTogglePin && (
+              <DropdownMenuItem onClick={onTogglePin}>
+                {pinned ? (
+                  <>
+                    <PinOff className="h-3.5 w-3.5 mr-2" /> unpin
+                  </>
+                ) : (
+                  <>
+                    <Pin className="h-3.5 w-3.5 mr-2" /> pin
+                  </>
+                )}
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                <Trash2 className="h-3.5 w-3.5 mr-2" /> move to trash
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
   );
 }
 

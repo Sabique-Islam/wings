@@ -781,6 +781,8 @@ export default function Index() {
         onHome={() => setActiveId(null)}
         onReorder={handleReorderPages}
         onMove={handleMovePage}
+        onDelete={handleDelete}
+        onTogglePin={handleTogglePin}
       />
       <JournalEditor
         entry={activeEntry}
