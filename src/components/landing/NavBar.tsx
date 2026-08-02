@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motionEase } from "./constants";
 import { NAV_LINKS } from "@/config/navigation";
 import { Logo } from "@/components/Logo";
+import { GitHubStarsBadge } from "@/components/landing/GitHubStarsBadge";
 
 interface Props { ctaHref: string; ctaLabel: string }
 
@@ -27,6 +28,7 @@ export function NavBar({ ctaHref, ctaLabel }: Props) {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <GitHubStarsBadge className="hidden sm:inline-flex" />
           <Link
             to={ctaHref}
             className="inline-flex items-center gap-1.5 rounded-full bg-accent-strong text-accent-strong-foreground text-[10px] sm:text-[11px] font-mono uppercase tracking-widest px-3 sm:px-4 py-1.5 hover:scale-[1.03] transition-transform"
@@ -51,6 +53,7 @@ export function NavBar({ ctaHref, ctaLabel }: Props) {
             {NAV_LINKS.map((l) => (
               <Link key={l.l} to={l.to} onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">{l.l}</Link>
             ))}
+            <GitHubStarsBadge className="mt-1" />
           </nav>
         </div>
       )}
