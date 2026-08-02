@@ -1061,40 +1061,130 @@
   overflow: visible;
 }
 
-/* ============ Dashboard home (Laz Media–clean) ============ */
+/* ============ Dashboard home — sharp minimal ============ */
 .nw-dashboard-home {
   background: hsl(var(--bg-0));
 }
 
-.nw-dash-metric {
-  @apply rounded-2xl p-5 border border-border-subtle;
-  box-shadow: var(--shadow-1);
-}
-.nw-dash-metric--a { background: hsl(var(--bg-1)); }
-.nw-dash-metric--b { background: hsl(var(--accent-soft) / 0.35); }
-.nw-dash-metric--c { background: hsl(var(--bg-2)); }
-.nw-dash-metric--d { background: hsl(var(--bg-1)); }
-
-.nw-dash-panel {
-  @apply rounded-2xl border border-border-subtle bg-surface-1;
-  box-shadow: var(--shadow-1);
+.nw-dash-kpi-strip {
+  @apply grid grid-cols-2 lg:grid-cols-4 border border-dashed border-ink-2/45 bg-surface-0/25;
 }
 
-.nw-dash-btn {
-  @apply inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border border-border-subtle bg-surface-1 text-ink-0 hover:bg-surface-2 transition-colors;
-}
-.nw-dash-btn--primary {
-  @apply bg-accent-strong text-accent-strong-foreground border-transparent hover:opacity-90;
+.nw-dash-kpi-cell {
+  @apply relative p-5 md:p-6 overflow-hidden;
 }
 
-.nw-dash-table th {
-  @apply text-[10px] font-mono uppercase tracking-wider text-ink-2 pb-3 font-normal;
+.nw-dash-chart-header {
+  @apply flex items-start justify-between gap-3;
 }
-.nw-dash-table td {
-  @apply py-3 border-t border-border-subtle align-middle;
+
+.nw-dash-chart-area {
+  @apply h-[200px] md:h-[220px] w-full aspect-auto;
 }
-.nw-dash-table tbody tr:hover td {
-  background: hsl(var(--bg-2) / 0.5);
+
+.nw-dash-trend {
+  @apply inline-flex items-center border border-dashed px-2 py-0.5 text-[10px] font-mono tabular-nums shrink-0 tracking-wide;
+}
+.nw-dash-trend--up {
+  @apply border-emerald-500/40 text-emerald-600 dark:text-emerald-400;
+}
+.nw-dash-trend--down {
+  @apply border-rose-500/40 text-rose-600 dark:text-rose-400;
+}
+
+.nw-dash-recent-row {
+  @apply flex items-center gap-3 px-1 py-3.5 text-left transition-colors overflow-visible;
+}
+.nw-dash-recent-row:hover {
+  background: hsl(var(--accent-soft) / 0.12);
+}
+
+.nw-dash-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border: 1px dashed hsl(var(--border-subtle) / 0.9);
+  padding: 2px;
+}
+
+.nw-dash-cal-weekday {
+  @apply flex h-7 items-center justify-center text-[9px] text-ink-3 font-mono uppercase tracking-wider;
+}
+
+.nw-dash-cal-day {
+  @apply flex h-9 items-center justify-center;
+}
+.nw-dash-cal-day--empty {
+  @apply pointer-events-none;
+}
+
+.nw-dash-cal-inner {
+  display: grid;
+  grid-template-rows: 22px 10px;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  justify-items: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.nw-dash-cal-num {
+  grid-row: 1;
+  align-self: center;
+  font-size: 11px;
+  line-height: 11px;
+  height: 11px;
+  @apply font-mono tabular-nums text-ink-2;
+}
+
+.nw-dash-cal-today .nw-dash-cal-num {
+  @apply text-accent-strong font-medium;
+}
+
+.nw-dash-cal-dot {
+  grid-row: 2;
+  align-self: center;
+  width: 4px;
+  height: 4px;
+  flex-shrink: 0;
+  background: hsl(var(--accent-strong));
+}
+
+.nw-dash-cal-dot--empty {
+  visibility: hidden;
+}
+
+.nw-dash-ring-track {
+  fill: none;
+  stroke: hsl(var(--border-subtle));
+  stroke-width: 4;
+}
+.nw-dash-ring-fill {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: butt;
+  transition: stroke-dashoffset 0.4s ease;
+}
+.nw-dash-ring--a .nw-dash-ring-fill {
+  stroke: hsl(var(--accent-strong));
+}
+.nw-dash-ring--b .nw-dash-ring-fill {
+  stroke: hsl(var(--accent-strong) / 0.65);
+}
+.nw-dash-ring--c .nw-dash-ring-fill {
+  stroke: hsl(var(--fg-2));
+}
+
+@media (max-width: 768px) {
+  .nw-dash-kpi-cell:nth-child(odd) {
+    border-right: 1px dashed hsl(var(--border-subtle) / 0.8);
+  }
+  .nw-dash-kpi-cell:nth-child(n + 3) {
+    border-top: 1px dashed hsl(var(--border-subtle) / 0.8);
+  }
+  .nw-dash-kpi-cell.border-l {
+    border-left: none;
+  }
 }
 
 .nw-sidebar-search {
@@ -1112,12 +1202,6 @@
 }
 .nw-pill--accent {
   @apply border-accent-strong/30 bg-accent-soft text-accent-strong;
-}
-
-@media (max-width: 768px) {
-  .nw-dash-metric {
-    @apply p-4;
-  }
 }
 
 @media (max-width: 768px) {
