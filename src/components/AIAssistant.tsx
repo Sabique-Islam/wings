@@ -369,7 +369,7 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
         title="Drag to resize"
       />
 
-      <div className="h-11 flex items-center px-3 border-b border-border gap-2 shrink-0 bg-gradient-to-b from-card to-card/80">
+      <div className="h-12 flex items-center px-3 border-b border-border-subtle gap-2 shrink-0 bg-gradient-to-b from-card to-card/80">
         <Sparkles className={`h-3.5 w-3.5 text-foreground ${streaming ? "nw-sparkle-anim" : ""}`} />
         <div className="flex flex-col leading-tight min-w-0">
           <span className="text-[11px] font-semibold tracking-tight">AI Assistant</span>
