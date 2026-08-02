@@ -1,19 +1,17 @@
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import { common, createLowlight } from "lowlight";
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-
-const lowlight = createLowlight(common);
-
-const LANGUAGES = [
-  "plaintext", "javascript", "typescript", "python", "rust", "go", "java",
-  "css", "html", "json", "sql", "bash", "markdown",
-];
+import {
+  codeBlockLowlight,
+  formatCodeLanguageLabel,
+  getCodeBlockLanguageOptions,
+} from "./codeLanguages";
 
 function CodeBlockView({ node, updateAttributes, extension }: NodeViewProps) {
   const [copied, setCopied] = useState(false);
   const lang = node.attrs.language || "plaintext";
+  const languages = getCodeBlockLanguageOptions(lang);
 
   const copy = async () => {
     const text = node.textContent;
@@ -30,8 +28,8 @@ function CodeBlockView({ node, updateAttributes, extension }: NodeViewProps) {
           onChange={(e) => updateAttributes({ language: e.target.value })}
           className="code-lang-select"
         >
-          {LANGUAGES.map((l) => (
-            <option key={l} value={l}>{l}</option>
+          {languages.map((l) => (
+            <option key={l} value={l}>{formatCodeLanguageLabel(l)}</option>
           ))}
         </select>
         <button type="button" onClick={copy} className="code-copy-btn" title="Copy code">
@@ -50,7 +48,7 @@ export const CodeBlockExtension = CodeBlockLowlight.extend({
     return ReactNodeViewRenderer(CodeBlockView);
   },
 }).configure({
-  lowlight,
+  lowlight: codeBlockLowlight,
   defaultLanguage: "plaintext",
   HTMLAttributes: { class: "code-block" },
 });

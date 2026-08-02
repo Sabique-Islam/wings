@@ -21,6 +21,7 @@ import type { PageOption } from "./PageMentionExtension";
 import type { PagePreview } from "./PageEmbedExtension";
 import { toast } from "sonner";
 import { Fragment, Slice } from "@tiptap/pm/model";
+import { isSelectionInCodeBlock } from "./blockUtils";
 
 const SERIALIZE_DEBOUNCE_MS = 200;
 const URL_ONLY = /^https?:\/\/[^\s]+$/i;
@@ -221,6 +222,18 @@ export const BlockEditor = memo(function BlockEditor({
 
         const html = event.clipboardData?.getData("text/html")?.trim() ?? "";
         const text = event.clipboardData?.getData("text/plain")?.trim() ?? "";
+
+        // Multi-line / HTML / markdown paste handlers create paragraph nodes, which
+        // break code blocks. Keep clipboard content as plain text inside fences.
+        if (isSelectionInCodeBlock(view.state.selection.$from)) {
+          const plain = event.clipboardData?.getData("text/plain") ?? "";
+          if (plain.length > 0) {
+            event.preventDefault();
+            view.dispatch(view.state.tr.insertText(plain));
+            return true;
+          }
+          return false;
+        }
 
         const urlFromText = text && URL_ONLY.test(text) && isSafeHttpUrl(text) ? text : null;
         const urlFromHtml = extractSingleLinkFromHtml(html);

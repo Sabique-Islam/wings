@@ -20,6 +20,14 @@ export interface BlockDoc {
   resolve(pos: number): BlockPos;
 }
 
+/** True when the caret or selection sits inside a code block. */
+export function isSelectionInCodeBlock($from: BlockPos): boolean {
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name === "codeBlock") return true;
+  }
+  return false;
+}
+
 /** Depth of the block that is a direct child of the document. */
 export function findTopLevelDepth($from: BlockPos): number {
   let depth = $from.depth;
