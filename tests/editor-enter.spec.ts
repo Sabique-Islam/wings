@@ -67,6 +67,35 @@ test("Enter, Shift+Enter, Markdown rendering, and AI parity survive the full edi
   await expectParity(page);
 });
 
+test("pasting multi-line code stays inside the code block", async ({ page }) => {
+  await page.goto("/__editor-e2e");
+  const editor = await focusEditor(page);
+
+  await page.keyboard.type("```");
+  await page.keyboard.press("Enter");
+  await expect(editor.locator("pre .code-block-content")).toBeVisible();
+
+  const code = "class Solution {\npublic:\n    int x;\n};";
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(async (pasteText) => {
+    await navigator.clipboard.writeText(pasteText);
+  }, code);
+  await page.keyboard.press("Meta+v");
+
+  await expect(editor.locator("pre .code-block-content")).toBeVisible();
+  await expect(editor.locator("pre .code-block-content")).toContainText("class Solution");
+  await expect(editor.locator("pre .code-block-content")).toContainText("public:");
+
+  const codeEscapedToParagraph = await page.evaluate(() => {
+    const root = document.querySelector(".ProseMirror");
+    if (!root) return false;
+    return Array.from(root.children).some(
+      (el) => el.tagName === "P" && (el.textContent ?? "").includes("class Solution"),
+    );
+  });
+  expect(codeEscapedToParagraph).toBe(false);
+});
+
 test("Enter mid-paragraph splits the block (regression: createParagraphNear was jumping the cursor)", async ({ page }) => {
   await page.goto("/__editor-e2e");
   const editor = await focusEditor(page);

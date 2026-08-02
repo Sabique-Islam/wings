@@ -127,6 +127,19 @@ describe("BlockEditor wiring", () => {
     editor.destroy();
   });
 
+  it("multi-line paste inside a code block stays in the fence", () => {
+    const editor = makeEditor("<p></p>");
+    editor.chain().focus().setCodeBlock().run();
+
+    const pasted = "class Solution {\npublic:\n    int x;\n};";
+    editor.view.dispatch(editor.state.tr.insertText(pasted));
+
+    expect(textblockCount(editor, "codeBlock")).toBe(1);
+    expect(editor.state.doc.textContent).toContain("class Solution");
+    expect(editor.state.doc.textContent).toContain("public:");
+    editor.destroy();
+  });
+
   it("Markdown shortcut input rules are active for live browser typing", () => {
     const editor = makeEditor("<p></p>");
     expect(editor.extensionManager.extensions.some((e) => e.name === "heading" && typeof e.config.addInputRules === "function")).toBe(true);
