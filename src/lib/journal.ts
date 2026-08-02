@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { JSONContent } from "@tiptap/core";
+import { isEmptyDoc } from "@/lib/editorContent";
 import { EntryLayoutMap, normalizeLayout } from "./layout";
 import { logError } from "./logger";
 import { sortSiblings } from "./pageOrder";
@@ -71,6 +72,26 @@ export function getBreadcrumbTrail(entries: Entry[], entryId: string): Entry[] {
 
 export function getEntryTitle(entry: Entry): string {
   return entry.title || entry.content.split("\n")[0].replace(/^#+\s*/, "").slice(0, 40) || "Untitled";
+}
+
+/** True when the page has no saved title or body — a fresh "Untitled" draft. */
+export function isBlankDraftPage(entry: Entry): boolean {
+  if (entry.deleted_at) return false;
+  if (entry.title.trim()) return false;
+  if (entry.content.trim()) return false;
+  return isEmptyDoc(entry.content_json);
+}
+
+/** Most recent empty untitled draft under the same parent, if any. */
+export function findReusableBlankDraft(
+  entries: Entry[],
+  ownerId: string,
+  parentId: string | null,
+): Entry | null {
+  const match = entries
+    .filter((e) => e.user_id === ownerId && e.parent_id === parentId && isBlankDraftPage(e))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return match[0] ?? null;
 }
 
 /** Columns for entries the caller owns (includes share_token for ShareMenu / public link). */

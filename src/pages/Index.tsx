@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, syncWorkspaceEntries, createEntry, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, ShareRole } from "@/lib/journal";
+import { fetchEntries, syncWorkspaceEntries, createEntry, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, findReusableBlankDraft, ShareRole } from "@/lib/journal";
 import { reorderSiblings, type DropPlacement } from "@/lib/pageOrder";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
 import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
@@ -263,6 +263,13 @@ export default function Index() {
 
   const handleNew = useCallback(async () => {
     if (!user || creatingRef.current) return;
+
+    const existing = findReusableBlankDraft(entries, user.id, null);
+    if (existing) {
+      setActiveId(existing.id);
+      return;
+    }
+
     creatingRef.current = true;
     try {
       const entry = await createEntry(user.id, "");
@@ -274,13 +281,20 @@ export default function Index() {
     } finally {
       creatingRef.current = false;
     }
-  }, [user, setActiveId, addCreatedEntry]);
+  }, [user, entries, setActiveId, addCreatedEntry]);
 
   const handleNewSubpage = useCallback(async (parentId: string) => {
     if (!user || creatingRef.current) return;
+
+    const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
+    const existing = findReusableBlankDraft(entries, ownerId, parentId);
+    if (existing) {
+      setActiveId(existing.id);
+      return;
+    }
+
     creatingRef.current = true;
     try {
-      const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
       const entry = await createEntry(ownerId, "", parentId);
       addCreatedEntry(entry, user.id);
       setActiveId(entry.id);
