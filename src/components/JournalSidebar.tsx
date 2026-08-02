@@ -4,15 +4,12 @@ import {
   FileText,
   Search,
   X,
-  LogOut,
-  Download,
   Pin,
   ChevronRight,
   Settings,
   Trash2,
   RotateCcw,
   Loader2,
-  PanelLeft,
   LayoutGrid,
   MoreHorizontal,
 } from "lucide-react";
@@ -21,13 +18,11 @@ import {
   SidebarProvider,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/hooks/useAuth";
+import { SharpHighlight } from "@/components/ui/sharp";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { exportAllEntries } from "@/lib/export";
 import {
   Entry,
   ShareRole,
@@ -115,7 +110,6 @@ export const JournalSidebar = memo(function JournalSidebar({
   const [trash, setTrash] = useState<Entry[]>([]);
   const [trashLoading, setTrashLoading] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
-  const { user, signOut } = useAuth();
 
   const isShared = useCallback(
     (e: Entry) => !!roleMap[e.id] && roleMap[e.id] !== "owner",
@@ -126,11 +120,6 @@ export const JournalSidebar = memo(function JournalSidebar({
   const pinned = getPinnedEntries(owned);
   const sharedRoots = allEntries.filter((e) => isShared(e) && !e.parent_id);
   const months = groupByMonth(getRootEntries(owned));
-  const recentRoots = getRootEntries(owned).slice(0, 8);
-
-  const email = user?.email ?? "";
-  const displayName = email.split("@")[0] || "you";
-  const initial = displayName[0]?.toUpperCase() ?? "?";
 
   useEffect(() => {
     if (searching && searchRef.current) searchRef.current.focus();
@@ -229,7 +218,6 @@ export const JournalSidebar = memo(function JournalSidebar({
     : months;
   const filteredPinned = q ? pinned.filter(match) : pinned;
   const filteredShared = q ? sharedRoots.filter(match) : sharedRoots;
-  const filteredRecent = q ? recentRoots.filter(match) : recentRoots;
 
   const canDrop = (entry: Entry) =>
     dragging != null && !q && dragging !== entry.id && !isDescendantOf(allEntries, dragging, entry.id);
@@ -326,36 +314,24 @@ export const JournalSidebar = memo(function JournalSidebar({
           collapsible="none"
           className="flex h-full min-h-0 w-full! flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border"
         >
-          <SidebarHeader className="relative flex-row! w-full items-center gap-0! p-2! pt-2 h-12 shrink-0">
+          <SidebarHeader className="flex-row! w-full items-center justify-between gap-2 p-2! pt-2 h-12 shrink-0">
             <button
               type="button"
               onClick={onHome}
-              className="flex items-center gap-1.5 pl-2 h-8 overflow-clip"
-              style={{
-                transition: `opacity 150ms ${EASE}`,
-                opacity: railCollapsed ? 0 : 1,
-                pointerEvents: railCollapsed ? "none" : "auto",
-              }}
+              className="flex min-w-0 items-center gap-1.5 pl-1 h-8 overflow-clip"
             >
-              <Logo size={22} withWordmark wordmarkClassName="text-sm font-display font-semibold" />
+              <Logo
+                size={22}
+                withWordmark={!railCollapsed}
+                wordmarkClassName="text-sm font-display font-semibold"
+              />
             </button>
-            {!isMobile && (
-              <button
-                type="button"
-                aria-label={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                onClick={() => onCollapsedChange(!collapsed)}
-                className="absolute right-2 top-2 z-10 grid size-8 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              >
-                <PanelLeft className="h-[18px] w-[18px]" />
-              </button>
-            )}
             {isMobile && (
               <button
                 type="button"
                 aria-label="Close sidebar"
                 onClick={onToggle}
-                className="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-sidebar-accent"
+                className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -417,21 +393,6 @@ export const JournalSidebar = memo(function JournalSidebar({
               {filteredPinned.length > 0 && (
                 <SidebarSection title="Pinned">
                   {filteredPinned.map((e) => renderEntry(e))}
-                </SidebarSection>
-              )}
-
-              {filteredRecent.length > 0 && !q && (
-                <SidebarSection title="Recents">
-                  {filteredRecent.map((e) => (
-                    <li key={e.id}>
-                      <EntryRow
-                        title={getEntryTitle(e)}
-                        active={e.id === activeId}
-                        pinned={e.pinned}
-                        onClick={() => onSelect(e.id)}
-                      />
-                    </li>
-                  ))}
                 </SidebarSection>
               )}
 
@@ -509,49 +470,6 @@ export const JournalSidebar = memo(function JournalSidebar({
               )}
             </div>
           </SidebarContent>
-
-          <SidebarFooter className="p-0! gap-0! border-t border-sidebar-border mt-auto shrink-0">
-            <div className="group flex h-16 w-full items-center gap-3 px-2 transition-colors duration-150 hover:bg-sidebar-accent/50 overflow-hidden">
-              <div className="grid size-9 shrink-0 place-items-center rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-                {initial}
-              </div>
-              <div
-                className="flex flex-1 flex-col items-start min-w-0"
-                style={{
-                  transition: `opacity 150ms ${EASE}`,
-                  opacity: railCollapsed ? 0 : 1,
-                }}
-              >
-                <span className="truncate text-sm font-medium">{displayName}</span>
-                <span className="truncate text-[11px] text-muted-foreground">{email || "signed in"}</span>
-              </div>
-              <div
-                className="flex items-center gap-0.5"
-                style={{
-                  transition: `opacity 150ms ${EASE}`,
-                  opacity: railCollapsed ? 0 : 1,
-                  pointerEvents: railCollapsed ? "none" : "auto",
-                }}
-              >
-                {owned.length > 0 && (
-                  <button
-                    onClick={() => exportAllEntries(owned)}
-                    className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    title="Export all"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                )}
-                <button
-                  onClick={() => void signOut()}
-                  className="grid size-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  title="Sign out"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          </SidebarFooter>
         </Sidebar>
       </div>
     </SidebarProvider>
@@ -578,14 +496,13 @@ function NavRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
       aria-label={item.label}
       title={collapsed ? item.label : undefined}
       className={cn(
-        "group relative flex h-9 w-full items-center rounded-lg px-4 text-sm transition-colors duration-75 active:scale-[0.99] overflow-hidden",
-        item.active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+        "group relative flex h-9 w-full items-center px-3 text-sm transition-colors duration-75 active:scale-[0.99] overflow-visible",
+        item.active ? "text-accent-strong" : "text-sidebar-foreground/80 hover:text-foreground",
       )}
     >
-      <div className="flex w-full -translate-x-2 items-center gap-3">
-        <span className="grid size-5 shrink-0 place-items-center text-sidebar-foreground">{item.icon}</span>
+      <SharpHighlight active={item.active} />
+      <div className="relative z-10 flex w-full items-center gap-3">
+        <span className="grid size-5 shrink-0 place-items-center">{item.icon}</span>
         <span
           className="flex-1 truncate text-left"
           style={{
@@ -633,19 +550,18 @@ function EntryRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "group relative flex h-8 w-full items-center rounded-lg px-3 text-[13px] transition-colors duration-75 overflow-hidden",
-        active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+        "group relative flex h-8 w-full items-center px-2 text-[13px] transition-colors duration-75 overflow-visible",
+        active ? "text-accent-strong" : "text-sidebar-foreground/80 hover:text-foreground",
       )}
     >
-      <span className="grid size-4 shrink-0 place-items-center mr-2">
+      <SharpHighlight active={active} />
+      <span className="relative z-10 grid size-4 shrink-0 place-items-center mr-2">
         {pinned ? <Pin className="h-3 w-3" /> : <FileText className="h-3 w-3 opacity-60" />}
       </span>
-      <span className="flex-1 truncate text-left group-hover:mask-[linear-gradient(to_right,black_78%,transparent_95%)]">
+      <span className="relative z-10 flex-1 truncate text-left group-hover:mask-[linear-gradient(to_right,black_78%,transparent_95%)]">
         {title}
       </span>
-      <span className="absolute right-1 top-1/2 -translate-y-1/2 grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:bg-sidebar-accent pointer-events-none">
+      <span className="absolute right-1 top-1/2 z-10 -translate-y-1/2 grid size-7 place-items-center text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 pointer-events-none">
         <MoreHorizontal className="h-3.5 w-3.5" />
       </span>
     </button>
