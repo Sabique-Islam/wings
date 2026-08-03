@@ -17,10 +17,11 @@ import {
   getModelFor, setModelFor,
 } from "@/lib/ai/storage";
 import { collectDrawingsFromContent, snapshotsAsAttachments } from "@/lib/ai/excalidrawContext";
+import { collectImagesFromContent, imagesAsAttachments, MAX_PAGE_IMAGES } from "@/lib/ai/pageImageContext";
 import { filesToImageAttachments, isAllowedImageFile } from "@/lib/ai/imageAttachments";
 import {
   buildPromptContext,
-  mentionsDrawing,
+  mentionsVisual,
   NO_CONTEXT_SENT,
   type ActivePage,
   type SentContext,
@@ -251,6 +252,10 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
         elementCount: d.elementCount,
         hasImage: Boolean(d.imageUrl),
       })),
+      images: collectImagesFromContent(liveContent).map((img) => ({
+        alt: img.alt,
+        hasUrl: Boolean(img.url),
+      })),
     };
   }, [activeEntry]);
 
@@ -259,7 +264,11 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
     const hasImages = pendingImages.length > 0;
     if ((!text && !hasImages) || streaming) return;
     if (!getApiKeyFor(getActiveProvider())) { setShowSettings(true); return; }
-    if (hasImages && !activeModelSupportsVision()) {
+
+    const page = activePageContext();
+    const wantsVisual = mentionsVisual(text);
+    const needsPageVision = wantsVisual && (page?.images.length ?? 0) > 0;
+    if ((hasImages || needsPageVision) && !activeModelSupportsVision()) {
       toast.error("This model doesn't support images", {
         description: "Switch to a vision-capable model in AI settings (marked with 👁).",
       });
@@ -285,7 +294,6 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    const page = activePageContext();
     const { context, sent } = buildPromptContext(
       allEntries.map((e) => ({ id: e.id, title: getEntryTitle(e) })),
       page,
@@ -293,15 +301,28 @@ export function AIAssistant({ open, onClose, activeEntry, allEntries, onCreateEn
     );
     sentContextRef.current = sent;
 
-    // Drawing snapshots are large, so they only go out when the message is
-    // about them — the text context always lists what drawings exist.
+    // Vision pixels are large — text context always lists drawings/images;
+    // attach pixels only when the message is about them (or the user attached).
     let images: { base64: string; mimeType: string }[] | undefined;
-    if (userAttachments.length) images = userAttachments;
-    if (page?.drawings.length && mentionsDrawing(text)) {
-      const attachments = await snapshotsAsAttachments(
-        collectDrawingsFromContent(page.content),
-      );
-      if (attachments.length) images = [...(images || []), ...attachments];
+    if (userAttachments.length) images = [...userAttachments];
+
+    if (wantsVisual && activeModelSupportsVision()) {
+      const room = () => MAX_PAGE_IMAGES - (images?.length ?? 0);
+
+      if (page?.images.length && room() > 0) {
+        const pageImgs = await imagesAsAttachments(collectImagesFromContent(page.content));
+        if (pageImgs.length) {
+          images = [...(images || []), ...pageImgs].slice(0, MAX_PAGE_IMAGES);
+        }
+      }
+      if (page?.drawings.length && room() > 0) {
+        const attachments = await snapshotsAsAttachments(
+          collectDrawingsFromContent(page.content),
+        );
+        if (attachments.length) {
+          images = [...(images || []), ...attachments].slice(0, MAX_PAGE_IMAGES);
+        }
+      }
     }
 
     const history: ChatMessage[] = [

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPromptContext,
   mentionsDrawing,
+  mentionsVisual,
   NO_CONTEXT_SENT,
   type ActivePage,
 } from "./promptContext";
@@ -17,6 +18,7 @@ function page(overrides: Partial<ActivePage> = {}): ActivePage {
     title: "Roadmap",
     content: "# Roadmap\n\nShip the local store.",
     drawings: [],
+    images: [],
     ...overrides,
   };
 }
@@ -72,6 +74,17 @@ describe("buildPromptContext", () => {
     expect(context).toContain("sceneId=s1, elements=4 (image available)");
   });
 
+  it("lists page images without their pixels or URLs", () => {
+    const { context } = buildPromptContext(
+      pages,
+      page({ images: [{ alt: "receipt", hasUrl: true }] }),
+      NO_CONTEXT_SENT,
+    );
+    expect(context).toContain("## Images on this page");
+    expect(context).toContain("image 1: receipt (image available)");
+    expect(context).not.toContain("http");
+  });
+
   it("handles the home view with no open page", () => {
     const { context, sent } = buildPromptContext(pages, null);
     expect(context).toContain("(none — user is on the home view)");
@@ -79,15 +92,22 @@ describe("buildPromptContext", () => {
   });
 });
 
-describe("mentionsDrawing", () => {
-  it("matches messages about drawings", () => {
-    expect(mentionsDrawing("what does my diagram show?")).toBe(true);
-    expect(mentionsDrawing("Describe the sketch above")).toBe(true);
-    expect(mentionsDrawing("explain this drawing")).toBe(true);
+describe("mentionsVisual", () => {
+  it("matches messages about drawings and images", () => {
+    expect(mentionsVisual("what does my diagram show?")).toBe(true);
+    expect(mentionsVisual("Describe the sketch above")).toBe(true);
+    expect(mentionsVisual("explain this drawing")).toBe(true);
+    expect(mentionsVisual("what's in this image?")).toBe(true);
+    expect(mentionsVisual("look at the photo")).toBe(true);
   });
 
   it("ignores ordinary writing requests", () => {
-    expect(mentionsDrawing("summarize this page in 3 bullets")).toBe(false);
+    expect(mentionsVisual("summarize this page in 3 bullets")).toBe(false);
+    expect(mentionsVisual("continue writing")).toBe(false);
+  });
+
+  it("mentionsDrawing aliases mentionsVisual", () => {
+    expect(mentionsDrawing("what's in this picture?")).toBe(true);
     expect(mentionsDrawing("continue writing")).toBe(false);
   });
 });

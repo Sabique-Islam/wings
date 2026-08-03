@@ -51,9 +51,11 @@ AI reads/writes via window globals:
 
 **Parity requirement:** E2E tests assert stored === preview === AI text.
 
-## Excalidraw context
+## Excalidraw + page image context
 
 `src/lib/ai/excalidrawContext.ts` — collects drawing snapshots from entry content for vision attachments.
+
+`src/lib/ai/pageImageContext.ts` — collects pasted/uploaded page images (`![](url)`) for vision attachments. Text context always lists them; pixels attach only when `mentionsVisual` matches (same cost gate as drawings).
 
 ## Storage keys
 
