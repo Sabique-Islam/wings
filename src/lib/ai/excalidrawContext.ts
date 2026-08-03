@@ -2,6 +2,7 @@
 // AI can "see" the drawings the user has placed in the same session.
 
 import { loadScene } from "@/lib/drawingStore";
+import { urlToImageAttachment } from "@/lib/ai/imageAttachments";
 import { ImageAttachment } from "@/lib/ai/types";
 
 export interface DrawingSnapshot {
@@ -68,28 +69,8 @@ export async function snapshotsAsAttachments(snaps: DrawingSnapshot[]): Promise<
   const out: ImageAttachment[] = [];
   for (const s of snaps) {
     if (!s.imageUrl) continue;
-    try {
-      const resp = await fetch(s.imageUrl);
-      if (!resp.ok) continue;
-      const blob = await resp.blob();
-      const b64 = await blobToBase64(blob);
-      out.push({ base64: b64, mimeType: blob.type || "image/png" });
-    } catch {
-      // ignore — drawing simply won't be in context
-    }
+    const attachment = await urlToImageAttachment(s.imageUrl);
+    if (attachment) out.push(attachment);
   }
   return out;
-}
-
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => {
-      const s = (r.result as string) || "";
-      const i = s.indexOf("base64,");
-      resolve(i >= 0 ? s.slice(i + "base64,".length) : "");
-    };
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(blob);
-  });
 }

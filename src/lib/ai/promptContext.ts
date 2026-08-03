@@ -15,6 +15,8 @@ export interface ActivePage {
   title: string;
   content: string;
   drawings: { sceneId: string; elementCount: number; hasImage: boolean }[];
+  /** Pasted/uploaded page images — listed in text; pixels attach on visual intent. */
+  images: { alt: string; hasUrl: boolean }[];
 }
 
 /** Revisions of what the model has already seen in this conversation. */
@@ -99,6 +101,16 @@ export function buildPromptContext(
     sections.push(`## Excalidraw drawings on this page\n${lines}`);
   }
 
+  if (activePage.images.length) {
+    const lines = activePage.images
+      .map(
+        (img, i) =>
+          `- image ${i + 1}${img.alt ? `: ${img.alt}` : ""}${img.hasUrl ? " (image available)" : ""}`,
+      )
+      .join("\n");
+    sections.push(`## Images on this page\n${lines}`);
+  }
+
   return {
     context: sections.join("\n\n"),
     sent: {
@@ -109,13 +121,18 @@ export function buildPromptContext(
   };
 }
 
-const DRAWING_INTENT =
-  /\b(draw(ing|ings)?|sketch(es)?|diagram(s)?|canvas|excalidraw|whiteboard|flow ?chart|wireframe(s)?|image(s)?|picture(s)?|screenshot(s)?|visual(s)?)\b/i;
+const VISUAL_INTENT =
+  /\b(draw(ing|ings)?|sketch(es)?|diagram(s)?|canvas|excalidraw|whiteboard|flow ?chart|wireframe(s)?|image(s)?|picture(s)?|screenshot(s)?|photo(s)?|visual(s)?)\b/i;
 
 /**
- * Drawing snapshots are the most expensive thing we can attach, so they go out
+ * Vision attachments (drawings + page images) are expensive, so they go out
  * only when the user's message is actually about them.
  */
+export function mentionsVisual(userMessage: string): boolean {
+  return VISUAL_INTENT.test(userMessage);
+}
+
+/** @deprecated Prefer mentionsVisual — same gate for drawings and page images. */
 export function mentionsDrawing(userMessage: string): boolean {
-  return DRAWING_INTENT.test(userMessage);
+  return mentionsVisual(userMessage);
 }

@@ -5,7 +5,7 @@ export function isAllowedImageFile(file: File): boolean {
   return ALLOWED_IMAGE_MIMES.has(file.type) && file.size <= MAX_IMAGE_BYTES;
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
+export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
     r.onload = () => {
@@ -16,6 +16,37 @@ function blobToBase64(blob: Blob): Promise<string> {
     r.onerror = () => reject(r.error);
     r.readAsDataURL(blob);
   });
+}
+
+/** Decode a `data:image/...;base64,...` URL into an ImageAttachment. */
+export function dataUrlToImageAttachment(dataUrl: string): ImageAttachment | null {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s.exec(dataUrl);
+  if (!match) return null;
+  const mimeType = match[1];
+  const base64 = match[2];
+  if (!base64 || !ALLOWED_IMAGE_MIMES.has(mimeType)) return null;
+  return { base64, mimeType };
+}
+
+/**
+ * Fetch an http(s) image URL (or decode a data URL) into an ImageAttachment.
+ * Returns null on failure — callers skip silently.
+ */
+export async function urlToImageAttachment(url: string): Promise<ImageAttachment | null> {
+  if (!url) return null;
+  if (url.startsWith("data:")) return dataUrlToImageAttachment(url);
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    if (blob.size > MAX_IMAGE_BYTES) return null;
+    const base64 = await blobToBase64(blob);
+    if (!base64) return null;
+    const mimeType = blob.type && ALLOWED_IMAGE_MIMES.has(blob.type) ? blob.type : "image/png";
+    return { base64, mimeType };
+  } catch {
+    return null;
+  }
 }
 
 export async function fileToImageAttachment(file: File): Promise<ImageAttachment | null> {
