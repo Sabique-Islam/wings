@@ -1,16 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const maybeSingle = vi.fn();
+const updateChain = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       update: () => ({
-        eq: () => ({
-          select: () => ({
-            maybeSingle,
-          }),
-        }),
+        eq: updateChain,
       }),
     }),
   },
@@ -20,25 +16,19 @@ import { updateEntry } from "./journal";
 
 describe("updateEntry", () => {
   beforeEach(() => {
-    maybeSingle.mockReset();
+    updateChain.mockReset();
   });
 
-  it("throws when RLS blocks the update (0 rows returned)", async () => {
-    maybeSingle.mockResolvedValue({ data: null, error: null });
-    await expect(
-      updateEntry("entry-id", { markdown: "hello", json: { type: "doc", content: [] } }),
-    ).rejects.toThrow(/did not apply/i);
-  });
-
-  it("resolves when a row is updated", async () => {
-    maybeSingle.mockResolvedValue({ data: { id: "entry-id" }, error: null });
+  it("updates without a returning row (shared editors may not SELECT entries)", async () => {
+    updateChain.mockResolvedValue({ error: null });
     await expect(
       updateEntry("entry-id", { markdown: "hello", json: { type: "doc", content: [] } }),
     ).resolves.toBeUndefined();
+    expect(updateChain).toHaveBeenCalledWith("id", "entry-id");
   });
 
   it("propagates Supabase errors", async () => {
-    maybeSingle.mockResolvedValue({ data: null, error: { message: "row-level security" } });
+    updateChain.mockResolvedValue({ error: { message: "row-level security" } });
     await expect(
       updateEntry("entry-id", { markdown: "hello", json: { type: "doc", content: [] } }),
     ).rejects.toEqual({ message: "row-level security" });

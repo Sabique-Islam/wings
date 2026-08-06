@@ -403,16 +403,24 @@ export async function createEntry(userId: string, content: string, parentId?: st
 }
 
 export async function updateEntry(id: string, payload: FullEditorChangePayload): Promise<void> {
-  const { data, error } = await supabase
+  /**
+   * Content updates use PostgREST UPDATE without RETURNING / `.select()`.
+   *
+   * Entry reads are split by role: owners SELECT their rows; collaborators
+   * read through RPC (`fetch_share_workspace`, `fetch_collaborator_entries`)
+   * so `share_token` never crosses the client boundary. Collaborators still
+   * have an UPDATE policy on `entries` for `content` / `content_json`.
+   *
+   * PostgREST only returns rows the caller may SELECT. A `.select()` after
+   * UPDATE therefore looks like failure for shared editors even when the write
+   * succeeded. Treat a null `error` as success; failed RLS/policy violations
+   * surface as PostgREST errors.
+   */
+  const { error } = await supabase
     .from("entries")
     .update({ content: payload.markdown, content_json: payload.json })
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
+    .eq("id", id);
   if (error) throw error;
-  if (!data) {
-    throw new Error("Entry update did not apply — you may not have permission to edit this page.");
-  }
 }
 
 export async function entryHasShares(entryId: string): Promise<boolean> {

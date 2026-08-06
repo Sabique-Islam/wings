@@ -123,6 +123,9 @@ export default function Index() {
     setActiveIdRaw(routeId ?? null);
   }, [routeId]);
 
+  // Offline queue: replay failed saves once entries are in memory, drop rows
+  // already reflected on the server, and clear the error badge when the active
+  // page no longer has outstanding work.
   useEffect(() => {
     if (!userId || loading) return;
     void (async () => {
@@ -131,6 +134,17 @@ export default function Index() {
       for (const pw of pending) {
         const server = entriesRef.current.find((e) => e.id === pw.entryId);
         const serverContent = server?.content ?? "";
+        if (
+          server &&
+          isSameEditorPayload(server, {
+            markdown: pw.content,
+            json: pw.contentJson ?? { type: "doc", content: [] },
+          })
+        ) {
+          clearPendingWrite(pw.entryId);
+          clearDraft(pw.entryId);
+          continue;
+        }
         if (!shouldReplayPendingWrite(serverContent, pw.content)) {
           clearPendingWrite(pw.entryId);
           clearDraft(pw.entryId);
@@ -144,11 +158,12 @@ export default function Index() {
           clearPendingWrite(pw.entryId);
           clearDraft(pw.entryId);
         } catch {
-          // Still offline, will retry next load
+          // Network or auth still down — leave queued for the next session.
         }
       }
+      if (activeId) setSaveStatus("idle");
     })();
-  }, [userId, loading]);
+  }, [userId, loading, activeId]);
 
   const loadEntries = useCallback(async (opts: { refreshShares?: boolean } = {}) => {
     if (!userId) return;
@@ -572,9 +587,8 @@ export default function Index() {
     [loadEntries],
   );
 
-  // Runs again once loading clears and after server sync: on a cold start the
-  // entries list is still empty when `activeId` first arrives, and a later
-  // `loadEntries` must not leave a fresher draft unapplied.
+  // Draft merge for the open page: runs when loading finishes and again after
+  // server sync so a mid-flight `loadEntries` cannot leave local work unapplied.
   useEffect(() => {
     if (!activeId || loading) return;
     const draft = getDraft(activeId);
