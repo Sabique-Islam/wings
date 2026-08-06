@@ -71,8 +71,15 @@ export interface DraftOverlay {
 }
 
 /**
- * Merge a local draft into a server/cached entry when the draft is allowed to win.
- * Used after fetch and on cold start so fresher local work is not wiped.
+ * Merge a local draft into an entry row when the draft is allowed to win.
+ *
+ * Drafts are a client-side cache (see `draftCache.ts`), not source of truth.
+ * Call after every path that replaces in-memory entries from server or
+ * IndexedDB — initial hydrate, `loadEntries`, and active-page restore — so
+ * fresher local work is not overwritten by a stale fetch.
+ *
+ * The typing path often stores JSON without markdown; preserve server
+ * markdown in that case so empty-save guards still measure real content length.
  */
 export function applyDraftToEntry<T extends { content: string; content_json?: JSONContent | null }>(
   entry: T,
@@ -91,7 +98,14 @@ function jsonSnapshot(json: JSONContent | null | undefined): string {
   return JSON.stringify(json ?? null);
 }
 
-/** True when incoming props carry a non-empty JSON doc that differs from what the editor last emitted. */
+/**
+ * Whether BlockEditor should adopt new `content` / `contentJson` props.
+ *
+ * Persistence keeps `content` and `content_json` in sync on save, but between
+ * saves the typing path emits JSON only (`BlockEditor.scheduleJsonEmit`).
+ * After reload or draft merge, markdown may be unchanged while `content_json`
+ * carries the latest document — prop sync must not key off markdown alone.
+ */
 export function shouldSyncEditorFromProps(
   content: string,
   contentJson: JSONContent | null | undefined,

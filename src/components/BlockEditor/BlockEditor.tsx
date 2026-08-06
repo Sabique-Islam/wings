@@ -183,7 +183,8 @@ export const BlockEditor = memo(function BlockEditor({
     serializeTimer.current = setTimeout(() => {
       const json = editor.getJSON();
       lastEmittedJson.current = json;
-      // JSON moved forward — cached markdown no longer describes this document.
+      // Typing updates JSON ahead of markdown (`serializeFull` is deferred).
+      // Invalidate the markdown cache so the next full serialize re-renders HTML.
       markdownVersion.current = -1;
       onChangeRef.current({ json });
     }, SERIALIZE_DEBOUNCE_MS);
@@ -326,6 +327,9 @@ export const BlockEditor = memo(function BlockEditor({
   useEffect(() => {
     if (!editor) return;
     if (editor.isFocused) return;
+    // External entry state changed (fetch, draft merge, version restore).
+    // See `shouldSyncEditorFromProps` — markdown alone is not enough while typing
+    // emits JSON-only drafts between full serializes.
     if (
       !shouldSyncEditorFromProps(
         content,
