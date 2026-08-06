@@ -10,7 +10,7 @@ import { mirrorEntryToVault } from "@/lib/vault/write";
 import { appendMarkdown, payloadFromMarkdown } from "@/lib/entryContent";
 import { deleteBlocksAtPositions } from "@/components/BlockEditor/blockUtils";
 import { isFullPayload, isSameEditorPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
-import { resolveInitialEditorContent, shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
+import { applyDraftToEntry, resolveInitialEditorContent, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
 import { getEntryVersion, recordEntryVersion } from "@/lib/entryVersions";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
@@ -159,7 +159,7 @@ export default function Index() {
       entriesRef.current,
       { refreshShares: opts.refreshShares },
     );
-    setEntries(data);
+    setEntries(data.map((e) => applyDraftToEntry(e, getDraft(e.id))));
     setRoleMap(roles);
     setSharedEntryIds(shared);
     reindexEntries(data);
@@ -179,7 +179,7 @@ export default function Index() {
       ]);
       if (cancelled) return;
       if (cached.length > 0 && meta) {
-        setEntries(cached);
+        setEntries(cached.map((e) => applyDraftToEntry(e, getDraft(e.id))));
         setRoleMap(meta.roleMap);
         setSharedEntryIds(new Set(meta.sharedEntryIds));
         setLoading(false);
@@ -572,23 +572,17 @@ export default function Index() {
     [loadEntries],
   );
 
-  // Runs again once loading clears: on a cold start the entries list is still
-  // empty when `activeId` first arrives, so a draft written just before the tab
-  // closed would otherwise never be restored.
+  // Runs again once loading clears and after server sync: on a cold start the
+  // entries list is still empty when `activeId` first arrives, and a later
+  // `loadEntries` must not leave a fresher draft unapplied.
   useEffect(() => {
     if (!activeId || loading) return;
     const draft = getDraft(activeId);
     if (draft == null) return;
-    setEntries((prev) => prev.map((e) => {
-      if (e.id !== activeId) return e;
-      if (!shouldApplyDraft(e.content, draft.markdown, draft.json)) return e;
-      if (e.content === draft.markdown && e.content_json === draft.json) return e;
-      // A JSON-only draft has no markdown to restore — keep the server copy so
-      // the empty-save guard still measures against the real content length.
-      const content = draft.markdown.trim().length > 0 ? draft.markdown : e.content;
-      return { ...e, content, content_json: draft.json ?? e.content_json };
-    }));
-  }, [activeId, loading]);
+    setEntries((prev) =>
+      prev.map((e) => (e.id === activeId ? applyDraftToEntry(e, draft) : e)),
+    );
+  }, [activeId, loading, serverSynced]);
 
   useEffect(() => {
     const onSharesChanged = () => {

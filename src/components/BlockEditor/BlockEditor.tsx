@@ -14,7 +14,7 @@ import { isSafeHttpUrl } from "@/lib/safeUrl";
 import { applyEditorLinkAction, resolveEditorLinkAction } from "./editorLinkClick";
 import { fetchLinkPreview } from "@/lib/linkPreview";
 import type { EditorChangePayload, FullEditorChangePayload } from "@/lib/editorPayload";
-import { resolveInitialEditorContent } from "@/lib/editorContent";
+import { resolveInitialEditorContent, shouldSyncEditorFromProps } from "@/lib/editorContent";
 import { createCollabExtensions } from "@/lib/collab/collabExtensions";
 import type { CollabSession } from "@/lib/collab/useCollabProvider";
 import type { PageOption } from "./PageMentionExtension";
@@ -183,6 +183,8 @@ export const BlockEditor = memo(function BlockEditor({
     serializeTimer.current = setTimeout(() => {
       const json = editor.getJSON();
       lastEmittedJson.current = json;
+      // JSON moved forward — cached markdown no longer describes this document.
+      markdownVersion.current = -1;
       onChangeRef.current({ json });
     }, SERIALIZE_DEBOUNCE_MS);
   }, []);
@@ -324,7 +326,16 @@ export const BlockEditor = memo(function BlockEditor({
   useEffect(() => {
     if (!editor) return;
     if (editor.isFocused) return;
-    if (content === lastEmittedMarkdown.current) return;
+    if (
+      !shouldSyncEditorFromProps(
+        content,
+        contentJson,
+        lastEmittedMarkdown.current,
+        lastEmittedJson.current,
+      )
+    ) {
+      return;
+    }
     if (localVersion.current !== acceptedVersion.current) return;
     const next = resolveInitialContent(content, contentJson, resolvePageIdByTitle);
     editor.commands.setContent(next, { emitUpdate: false });

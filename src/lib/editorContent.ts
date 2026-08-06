@@ -64,3 +64,41 @@ export function shouldBlockEmptySave(existingContent: string, nextMarkdown: stri
 export function shouldReplayPendingWrite(serverContent: string, pendingMarkdown: string): boolean {
   return !shouldBlockEmptySave(serverContent, pendingMarkdown);
 }
+
+export interface DraftOverlay {
+  markdown: string;
+  json?: JSONContent | null;
+}
+
+/**
+ * Merge a local draft into a server/cached entry when the draft is allowed to win.
+ * Used after fetch and on cold start so fresher local work is not wiped.
+ */
+export function applyDraftToEntry<T extends { content: string; content_json?: JSONContent | null }>(
+  entry: T,
+  draft: DraftOverlay | null | undefined,
+): T {
+  if (draft == null) return entry;
+  if (!shouldApplyDraft(entry.content, draft.markdown, draft.json)) return entry;
+  if (entry.content === draft.markdown && entry.content_json === draft.json) return entry;
+  // A JSON-only draft has no markdown to restore — keep the server copy so
+  // the empty-save guard still measures against the real content length.
+  const content = draft.markdown.trim().length > 0 ? draft.markdown : entry.content;
+  return { ...entry, content, content_json: draft.json ?? entry.content_json };
+}
+
+function jsonSnapshot(json: JSONContent | null | undefined): string {
+  return JSON.stringify(json ?? null);
+}
+
+/** True when incoming props carry a non-empty JSON doc that differs from what the editor last emitted. */
+export function shouldSyncEditorFromProps(
+  content: string,
+  contentJson: JSONContent | null | undefined,
+  lastEmittedMarkdown: string,
+  lastEmittedJson: JSONContent | null,
+): boolean {
+  if (content !== lastEmittedMarkdown) return true;
+  if (isEmptyDoc(contentJson)) return false;
+  return jsonSnapshot(contentJson) !== jsonSnapshot(lastEmittedJson);
+}

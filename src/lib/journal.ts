@@ -403,11 +403,16 @@ export async function createEntry(userId: string, content: string, parentId?: st
 }
 
 export async function updateEntry(id: string, payload: FullEditorChangePayload): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("entries")
     .update({ content: payload.markdown, content_json: payload.json })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!data) {
+    throw new Error("Entry update did not apply — you may not have permission to edit this page.");
+  }
 }
 
 export async function entryHasShares(entryId: string): Promise<boolean> {

@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { isEmptyDoc, resolveInitialEditorContent, shouldApplyDraft, shouldBlockEmptySave, shouldReplayPendingWrite } from "./editorContent";
+import {
+  applyDraftToEntry,
+  isEmptyDoc,
+  resolveInitialEditorContent,
+  shouldApplyDraft,
+  shouldBlockEmptySave,
+  shouldReplayPendingWrite,
+  shouldSyncEditorFromProps,
+} from "./editorContent";
 
 describe("editorContent", () => {
   it("detects empty TipTap docs", () => {
@@ -54,5 +62,37 @@ describe("editorContent", () => {
     expect(shouldReplayPendingWrite("saved notes with enough text here", "")).toBe(false);
     expect(shouldReplayPendingWrite("", "")).toBe(true);
     expect(shouldReplayPendingWrite("saved", "offline edit")).toBe(true);
+  });
+
+  it("re-applies a fresher JSON-only draft over server content", () => {
+    const server = {
+      content: "old server text",
+      content_json: {
+        type: "doc" as const,
+        content: [{ type: "paragraph", content: [{ type: "text", text: "old server text" }] }],
+      },
+    };
+    const draft = {
+      markdown: "",
+      json: {
+        type: "doc" as const,
+        content: [{ type: "paragraph", content: [{ type: "text", text: "typed after share" }] }],
+      },
+    };
+    expect(applyDraftToEntry(server, draft)).toEqual({
+      content: "old server text",
+      content_json: draft.json,
+    });
+  });
+
+  it("syncs editor from props when markdown is unchanged but content_json differs", () => {
+    const lastJson = { type: "doc" as const, content: [{ type: "paragraph" }] };
+    const incomingJson = {
+      type: "doc" as const,
+      content: [{ type: "paragraph", content: [{ type: "text", text: "restored" }] }],
+    };
+    expect(shouldSyncEditorFromProps("same markdown", incomingJson, "same markdown", lastJson)).toBe(true);
+    expect(shouldSyncEditorFromProps("same markdown", lastJson, "same markdown", lastJson)).toBe(false);
+    expect(shouldSyncEditorFromProps("a", incomingJson, "b", lastJson)).toBe(true);
   });
 });
