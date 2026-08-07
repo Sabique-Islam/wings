@@ -37,6 +37,8 @@
 - LaTeX math and Excalidraw drawings in the same note
 - BYOK AI panel (⌘J) with page context; keys stay in the browser
 - Public share links and email invites
+- Local vault: new pages can keep bodies on device (connected folder) [or opt for cloud storage too :)]
+- Account backup: zip download and folder import
 - Markdown / JSON export and local draft cache
 - Guards against empty overwrites of substantial notes
 
