@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, FolderDown, FolderOpen, FolderUp, RefreshCw, Unplug, Upload, FileDown } from "lucide-react";
+import {
+  AlertTriangle,
+  Cloud,
+  CircleHelp,
+  FolderDown,
+  FolderOpen,
+  FolderUp,
+  HardDrive,
+  RefreshCw,
+  Unplug,
+  Upload,
+  FileDown,
+} from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   importVaultExportFiles,
   vaultFilesFromFileList,
@@ -23,6 +36,32 @@ import { importNotionFiles } from "@/lib/notionImport";
 function publishEntries(entries: Entry[]): void {
   window.dispatchEvent(new CustomEvent("nw:vault-synced", { detail: entries }));
 }
+
+const DEFAULT_STORAGE_OPTIONS: Array<{
+  value: DefaultContentStorage;
+  label: string;
+  description: string;
+  Icon: typeof Cloud;
+}> = [
+  {
+    value: "cloud",
+    label: "Always cloud",
+    description: "Shareable · synced across devices",
+    Icon: Cloud,
+  },
+  {
+    value: "local",
+    label: "Always local",
+    description: "Private · requires a vault folder",
+    Icon: HardDrive,
+  },
+  {
+    value: "ask",
+    label: "Ask each time",
+    description: "Pick cloud or local when you create a page",
+    Icon: CircleHelp,
+  },
+];
 
 export function VaultSettings({ userId }: { userId: string | null }) {
   const [meta, setMeta] = useState<VaultMetaRow | null>(null);
@@ -336,7 +375,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
   };
 
   const handleDefaultStorageChange = async (value: DefaultContentStorage) => {
-    if (!userId) return;
+    if (!userId || value === defaultStorage) return;
     setDefaultStorage(value);
     const result = await updateUserPreferences(userId, { default_content_storage: value });
     if (!result.ok) {
@@ -344,10 +383,59 @@ export function VaultSettings({ userId }: { userId: string | null }) {
     }
   };
 
+  const defaultStorageSection = (
+    <div className="rounded-lg border border-border-subtle p-3 space-y-3">
+      <div>
+        <p className="text-sm font-mono text-ink-1">Default storage for new pages</p>
+        <p className="text-xs font-sans text-ink-2 mt-1">
+          Where page bodies go by default. You can still override per page when set to &quot;Ask each time&quot;.
+        </p>
+      </div>
+      <div className="space-y-2" role="radiogroup" aria-label="Default storage for new pages">
+        {DEFAULT_STORAGE_OPTIONS.map(({ value, label, description, Icon }) => {
+          const selected = defaultStorage === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              disabled={!userId || busy != null}
+              onClick={() => void handleDefaultStorageChange(value)}
+              className={cn(
+                "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors",
+                selected
+                  ? "border-accent-strong bg-accent-soft/40 ring-1 ring-accent-strong/20"
+                  : "border-border-subtle hover:border-border hover:bg-accent-soft/20",
+                (!userId || busy != null) && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <span
+                className={cn(
+                  "mt-0.5 grid size-8 shrink-0 place-items-center rounded-md border",
+                  selected
+                    ? "border-accent-strong/30 bg-accent-strong/10 text-accent-strong"
+                    : "border-border-subtle bg-surface-0 text-ink-2",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="min-w-0 space-y-0.5">
+                <span className="block text-sm font-mono text-ink-0">{label}</span>
+                <span className="block text-xs font-sans text-ink-2">{description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   if (!isVaultSupported()) {
     return (
       <div className="space-y-3">
         {accountBackupSection}
+        {defaultStorageSection}
         <p className="text-sm text-ink-1 font-sans">
           Export happens per-page from the editor toolbar, or export everything from the sidebar.
         </p>
@@ -378,22 +466,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
   return (
     <div className="space-y-4">
       {accountBackupSection}
-      <div className="rounded-lg border border-border-subtle p-3 space-y-2">
-        <p className="text-sm font-mono text-ink-1">Default storage for new pages</p>
-        <p className="text-xs font-sans text-ink-2">
-          Choose where new page bodies are stored. You can still pick per page when set to &quot;ask&quot;.
-        </p>
-        <select
-          value={defaultStorage}
-          disabled={!userId}
-          onChange={(e) => void handleDefaultStorageChange(e.target.value as DefaultContentStorage)}
-          className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs font-mono"
-        >
-          <option value="cloud">Always cloud (shareable)</option>
-          <option value="local">Always local (private)</option>
-          <option value="ask">Ask each time</option>
-        </select>
-      </div>
+      {defaultStorageSection}
       <p className="text-sm text-ink-1 font-sans">
         Connect a local folder to mirror pages as <span className="font-mono">.md</span> files. Wings stays
         authoritative — sync pulls only when files are newer.
