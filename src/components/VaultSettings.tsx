@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, FolderOpen, RefreshCw, Unplug, Upload, FileDown } from "lucide-react";
+import { AlertTriangle, FolderDown, FolderOpen, FolderUp, RefreshCw, Unplug, Upload, FileDown } from "lucide-react";
 import { toast } from "sonner";
+import {
+  importVaultExportFiles,
+  vaultFilesFromFileList,
+  writeAccountExportToDirectory,
+} from "@/lib/accountExport";
 import { putVaultMeta, type VaultMetaRow } from "@/lib/localStore";
 import { fetchEntries, type Entry } from "@/lib/journal";
 import { hydrateLocalEntries } from "@/lib/localContent";
@@ -8,6 +13,7 @@ import type { DefaultContentStorage } from "@/lib/localContent";
 import { updateUserPreferences } from "@/lib/profile";
 import { supabase } from "@/integrations/supabase/client";
 import { isVaultSupported, type VaultConflict } from "@/lib/vault/types";
+import { scanVaultFolder } from "@/lib/vault/read";
 import { connectVault, disconnectVault, ensureVaultPermission, getVaultMeta } from "@/lib/vault/store";
 import { resolveVaultConflict, syncFromVault } from "@/lib/vault/sync";
 import { writeAllEntriesToVault } from "@/lib/vault/write";
@@ -24,6 +30,159 @@ export function VaultSettings({ userId }: { userId: string | null }) {
   const [conflicts, setConflicts] = useState<VaultConflict[]>([]);
   const [defaultStorage, setDefaultStorage] = useState<DefaultContentStorage>("cloud");
   const notionInputRef = useRef<HTMLInputElement>(null);
+  const accountImportRef = useRef<HTMLInputElement>(null);
+
+  const loadExportableEntries = useCallback(async (): Promise<Entry[]> => {
+    if (!userId) return [];
+    const { entries } = await fetchEntries(userId);
+    return hydrateLocalEntries(
+      userId,
+      entries.filter((e) => !e.deleted_at),
+    );
+  }, [userId]);
+
+  const handleAccountExport = async () => {
+    if (!userId || !isVaultSupported()) return;
+    setBusy("export");
+    try {
+      const handle = await window.showDirectoryPicker({ mode: "readwrite" });
+      const permission = await handle.requestPermission({ mode: "readwrite" });
+      if (permission !== "granted") {
+        toast.error("Folder permission denied");
+        return;
+      }
+      const entries = await loadExportableEntries();
+      const count = await writeAccountExportToDirectory(handle, entries);
+      toast.success(`Exported ${count} page${count === 1 ? "" : "s"}`, {
+        description: "Markdown files with page links and hierarchy — re-import from this folder anytime.",
+      });
+    } catch (err) {
+      if ((err as DOMException)?.name === "AbortError") return;
+      console.error(err);
+      toast.error("Couldn't export your pages");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleAccountImportPicker = async () => {
+    if (!userId || !isVaultSupported()) return;
+    setBusy("import");
+    try {
+      const handle = await window.showDirectoryPicker();
+      const files = await scanVaultFolder(handle);
+      if (!files.length) {
+        toast.error("No markdown files found in that folder");
+        return;
+      }
+      const { entries: existing } = await fetchEntries(userId);
+      const hydrated = await hydrateLocalEntries(userId, existing);
+      const { entries, created, updated } = await importVaultExportFiles(
+        files,
+        userId,
+        hydrated,
+        { allEntriesForLocalSave: hydrated },
+      );
+      publishEntries(entries);
+      toast.success(`Imported folder · ${created} new · ${updated} updated`);
+    } catch (err) {
+      if ((err as DOMException)?.name === "AbortError") return;
+      console.error(err);
+      toast.error("Couldn't import that folder");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleAccountImportFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!userId) return;
+    const picked = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!picked.length) return;
+    setBusy("import");
+    try {
+      const files = await vaultFilesFromFileList(picked);
+      if (!files.length) {
+        toast.error("No markdown files found");
+        return;
+      }
+      const { entries: existing } = await fetchEntries(userId);
+      const hydrated = await hydrateLocalEntries(userId, existing);
+      const { entries, created, updated } = await importVaultExportFiles(
+        files,
+        userId,
+        hydrated,
+        { allEntriesForLocalSave: hydrated },
+      );
+      publishEntries(entries);
+      toast.success(`Imported folder · ${created} new · ${updated} updated`);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Couldn't import that folder");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const accountBackupSection = (
+    <div className="rounded-lg border border-border-subtle p-3 space-y-3">
+      <div>
+        <p className="text-sm font-mono text-ink-1">Account backup</p>
+        <p className="text-xs font-sans text-ink-2 mt-1">
+          Export every page as <span className="font-mono">.md</span> files in vault layout — nested folders,
+          <span className="font-mono"> wings_id</span> frontmatter, and <span className="font-mono">#page:</span>{" "}
+          links. Import the same folder to restore hierarchy and connections.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={!userId || busy != null || !isVaultSupported()}
+          onClick={() => void handleAccountExport()}
+          className="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs font-mono hover:bg-accent-soft/40 disabled:opacity-50"
+        >
+          <FolderDown className="h-3.5 w-3.5" />
+          {busy === "export" ? "exporting…" : "export all pages to folder"}
+        </button>
+        {isVaultSupported() ? (
+          <button
+            type="button"
+            disabled={!userId || busy != null}
+            onClick={() => void handleAccountImportPicker()}
+            className="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs font-mono hover:bg-accent-soft/40 disabled:opacity-50"
+          >
+            <FolderUp className="h-3.5 w-3.5" />
+            {busy === "import" ? "importing…" : "import account folder"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!userId || busy != null}
+            onClick={() => accountImportRef.current?.click()}
+            className="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs font-mono hover:bg-accent-soft/40 disabled:opacity-50"
+          >
+            <FolderUp className="h-3.5 w-3.5" />
+            {busy === "import" ? "importing…" : "import account folder"}
+          </button>
+        )}
+      </div>
+      {!isVaultSupported() && (
+        <p className="text-xs font-mono text-ink-3">
+          Folder export needs Chrome or Edge. You can still import an exported folder here, or pick files below.
+        </p>
+      )}
+      <input
+        ref={accountImportRef}
+        type="file"
+        className="hidden"
+        accept=".md,.markdown,text/markdown"
+        multiple
+        // @ts-expect-error webkitdirectory is non-standard but widely supported for folder pick
+        webkitdirectory=""
+        onChange={(e) => void handleAccountImportFiles(e)}
+      />
+    </div>
+  );
 
   const loadEntriesHydrated = useCallback(async () => {
     if (!userId) return [];
@@ -188,6 +347,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
   if (!isVaultSupported()) {
     return (
       <div className="space-y-3">
+        {accountBackupSection}
         <p className="text-sm text-ink-1 font-sans">
           Export happens per-page from the editor toolbar, or export everything from the sidebar.
         </p>
@@ -217,6 +377,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
 
   return (
     <div className="space-y-4">
+      {accountBackupSection}
       <div className="rounded-lg border border-border-subtle p-3 space-y-2">
         <p className="text-sm font-mono text-ink-1">Default storage for new pages</p>
         <p className="text-xs font-sans text-ink-2">
