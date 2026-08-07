@@ -15,6 +15,7 @@ const own = (id: string, userId = "user-a"): Entry => ({
   parent_id: null,
   title: id,
   share_token: null,
+  content_storage: "cloud",
   layout: {},
   sort_order: null,
   deleted_at: null,

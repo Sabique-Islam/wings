@@ -11,7 +11,8 @@ import { planVaultFileSync } from "./syncPlan";
 import type { Entry } from "@/lib/journal";
 
 const createEntry = vi.fn();
-const updateEntry = vi.fn();
+const persistEntryBody = vi.fn();
+const saveLocalContent = vi.fn();
 const moveEntry = vi.fn();
 const putVaultMeta = vi.fn();
 const writeEntryToVault = vi.fn();
@@ -22,8 +23,16 @@ vi.mock("@/lib/journal", async () => {
   return {
     ...actual,
     createEntry: (...args: unknown[]) => createEntry(...args),
-    updateEntry: (...args: unknown[]) => updateEntry(...args),
     moveEntry: (...args: unknown[]) => moveEntry(...args),
+  };
+});
+
+vi.mock("@/lib/localContent", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/localContent")>("@/lib/localContent");
+  return {
+    ...actual,
+    persistEntryBody: (...args: unknown[]) => persistEntryBody(...args),
+    saveLocalContent: (...args: unknown[]) => saveLocalContent(...args),
   };
 });
 
@@ -57,6 +66,7 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     parent_id: null,
     title: "Hello",
     share_token: null,
+    content_storage: "cloud",
     layout: {},
     sort_order: null,
     deleted_at: null,
@@ -90,7 +100,8 @@ describe("vault sync integration", () => {
     vi.resetAllMocks();
     writeEntryToVault.mockImplementation(async (_h, _e, _all, meta) => meta);
     putVaultMeta.mockResolvedValue(undefined);
-    updateEntry.mockResolvedValue(undefined);
+    persistEntryBody.mockResolvedValue(undefined);
+    saveLocalContent.mockResolvedValue(undefined);
     moveEntry.mockResolvedValue(undefined);
   });
 
@@ -117,7 +128,7 @@ describe("vault sync integration", () => {
       }),
     ]);
     createEntry.mockResolvedValue(
-      entry({ id: "c1", title: "Notes", content: "# Notes\n\nnested body", parent_id: "p1" }),
+      entry({ id: "c1", title: "Notes", content: "", content_storage: "local", parent_id: "p1" }),
     );
 
     const onEntriesChanged = vi.fn();
@@ -129,7 +140,8 @@ describe("vault sync integration", () => {
       onEntriesChanged,
     );
 
-    expect(createEntry).toHaveBeenCalledWith("u1", "# Notes\n\nnested body", "p1");
+    expect(createEntry).toHaveBeenCalledWith("u1", "", { parentId: "p1", storage: "local" });
+    expect(saveLocalContent).toHaveBeenCalled();
     expect(result.created).toBe(1);
     expect(writeEntryToVault).toHaveBeenCalled();
   });
@@ -156,7 +168,7 @@ describe("vault sync integration", () => {
       vi.fn(),
     );
 
-    expect(updateEntry).toHaveBeenCalled();
+    expect(persistEntryBody).toHaveBeenCalled();
     expect(moveEntry).toHaveBeenCalledWith("c1", "p1");
     expect(result.updated).toBe(1);
   });
@@ -180,7 +192,7 @@ describe("vault sync integration", () => {
       vi.fn(),
     );
 
-    expect(updateEntry).not.toHaveBeenCalled();
+    expect(persistEntryBody).not.toHaveBeenCalled();
     expect(result.conflicts).toHaveLength(1);
     expect(result.conflicts[0].entryId).toBe("e1");
   });

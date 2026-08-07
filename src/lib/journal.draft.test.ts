@@ -13,6 +13,7 @@ function draft(overrides: Partial<Entry> = {}): Entry {
     parent_id: null,
     title: "",
     share_token: null,
+    content_storage: "cloud",
     layout: {},
     sort_order: null,
     deleted_at: null,
