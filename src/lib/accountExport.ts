@@ -1,3 +1,4 @@
+import { zipSync } from "fflate";
 import type { Entry } from "@/lib/journal";
 import { createEntry, updateEntry, moveEntry } from "@/lib/journal";
 import { payloadFromMarkdown } from "@/lib/entryContent";
@@ -47,24 +48,35 @@ export function buildAccountExportFiles(entries: Entry[]): AccountExportFile[] {
   }));
 }
 
-export async function writeAccountExportToDirectory(
-  handle: FileSystemDirectoryHandle,
-  entries: Entry[],
-): Promise<number> {
+export function buildAccountExportZipBlob(entries: Entry[]): {
+  blob: Blob;
+  count: number;
+  filename: string;
+} {
   const files = buildAccountExportFiles(entries);
+  const zipInput: Record<string, Uint8Array> = {};
+  const enc = new TextEncoder();
   for (const { relativePath, markdown } of files) {
-    const parts = relativePath.split("/");
-    const fileName = parts.pop()!;
-    let dir = handle;
-    for (const part of parts) {
-      dir = await dir.getDirectoryHandle(part, { create: true });
-    }
-    const fileHandle = await dir.getFileHandle(fileName, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(markdown);
-    await writable.close();
+    zipInput[relativePath] = enc.encode(markdown);
   }
-  return files.length;
+  const date = new Date().toISOString().slice(0, 10);
+  return {
+    blob: new Blob([zipSync(zipInput)], { type: "application/zip" }),
+    count: files.length,
+    filename: `wings-account-${date}.zip`,
+  };
+}
+
+/** Download every page as a zip of vault-layout markdown files. */
+export function downloadAccountExport(entries: Entry[]): number {
+  const { blob, count, filename } = buildAccountExportZipBlob(entries);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  return count;
 }
 
 /** Turn a folder/file pick into vault scan rows. */

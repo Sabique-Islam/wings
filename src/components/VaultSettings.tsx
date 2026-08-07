@@ -15,9 +15,9 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
+  downloadAccountExport,
   importVaultExportFiles,
   vaultFilesFromFileList,
-  writeAccountExportToDirectory,
 } from "@/lib/accountExport";
 import { putVaultMeta, type VaultMetaRow } from "@/lib/localStore";
 import { fetchEntries, type Entry } from "@/lib/journal";
@@ -81,22 +81,15 @@ export function VaultSettings({ userId }: { userId: string | null }) {
   }, [userId]);
 
   const handleAccountExport = async () => {
-    if (!userId || !isVaultSupported()) return;
+    if (!userId) return;
     setBusy("export");
     try {
-      const handle = await window.showDirectoryPicker({ mode: "readwrite" });
-      const permission = await handle.requestPermission({ mode: "readwrite" });
-      if (permission !== "granted") {
-        toast.error("Folder permission denied");
-        return;
-      }
       const entries = await loadExportableEntries();
-      const count = await writeAccountExportToDirectory(handle, entries);
-      toast.success(`Exported ${count} page${count === 1 ? "" : "s"}`, {
-        description: "Markdown files with page links and hierarchy — re-import from this folder anytime.",
+      const count = downloadAccountExport(entries);
+      toast.success(`Downloaded ${count} page${count === 1 ? "" : "s"}`, {
+        description: "Unzip the file, then import the folder to restore hierarchy and page links.",
       });
     } catch (err) {
-      if ((err as DOMException)?.name === "AbortError") return;
       console.error(err);
       toast.error("Couldn't export your pages");
     } finally {
@@ -168,20 +161,20 @@ export function VaultSettings({ userId }: { userId: string | null }) {
       <div>
         <p className="text-sm font-mono text-ink-1">Account backup</p>
         <p className="text-xs font-sans text-ink-2 mt-1">
-          Export every page as <span className="font-mono">.md</span> files in vault layout — nested folders,
-          <span className="font-mono"> wings_id</span> frontmatter, and <span className="font-mono">#page:</span>{" "}
-          links. Import the same folder to restore hierarchy and connections.
+          Download every page as a zip of <span className="font-mono">.md</span> files in vault layout — nested
+          folders, <span className="font-mono">wings_id</span> frontmatter, and <span className="font-mono">#page:</span>{" "}
+          links. Unzip and import the folder to restore hierarchy and connections.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={!userId || busy != null || !isVaultSupported()}
+          disabled={!userId || busy != null}
           onClick={() => void handleAccountExport()}
           className="inline-flex items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs font-mono hover:bg-accent-soft/40 disabled:opacity-50"
         >
           <FolderDown className="h-3.5 w-3.5" />
-          {busy === "export" ? "exporting…" : "export all pages to folder"}
+          {busy === "export" ? "downloading…" : "download account backup"}
         </button>
         {isVaultSupported() ? (
           <button
@@ -207,7 +200,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
       </div>
       {!isVaultSupported() && (
         <p className="text-xs font-mono text-ink-3">
-          Folder export needs Chrome or Edge. You can still import an exported folder here, or pick files below.
+          Folder import needs Chrome or Edge, or pick files below after unzipping your backup.
         </p>
       )}
       <input

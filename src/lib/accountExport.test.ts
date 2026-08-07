@@ -1,6 +1,7 @@
+import { unzipSync, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import type { Entry } from "@/lib/journal";
-import { buildAccountExportFiles, rewritePageLinkIds } from "@/lib/accountExport";
+import { buildAccountExportFiles, buildAccountExportZipBlob, rewritePageLinkIds } from "@/lib/accountExport";
 import { parseVaultMarkdown } from "@/lib/vault/frontmatter";
 
 function entry(overrides: Partial<Entry> = {}): Entry {
@@ -61,5 +62,30 @@ describe("accountExport", () => {
     ]);
     expect(files).toHaveLength(1);
     expect(files[0].markdown).toContain("wings_id: live");
+  });
+
+  it("packs export files into a zip blob", () => {
+    const parent = entry({ id: "p1", title: "Projects", content: "# Projects" });
+    const child = entry({
+      id: "c1",
+      title: "Notes",
+      content: "# Notes\n\nBody",
+      parent_id: "p1",
+    });
+    const entries = [parent, child];
+    const { blob, count, filename } = buildAccountExportZipBlob(entries);
+    expect(count).toBe(2);
+    expect(filename).toMatch(/^wings-account-\d{4}-\d{2}-\d{2}\.zip$/);
+    expect(blob.type).toBe("application/zip");
+
+    const enc = new TextEncoder();
+    const zipInput = Object.fromEntries(
+      buildAccountExportFiles(entries).map((f) => [f.relativePath, enc.encode(f.markdown)]),
+    );
+    const decoded = unzipSync(zipSync(zipInput));
+    const dec = new TextDecoder();
+    expect(Object.keys(decoded).sort()).toEqual(["Projects.md", "Projects/Notes.md"]);
+    expect(dec.decode(decoded["Projects.md"])).toContain("wings_id: p1");
+    expect(dec.decode(decoded["Projects/Notes.md"])).toContain("wings_id: c1");
   });
 });
