@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           content: string
           content_json: Json | null
+          content_storage: string
           created_at: string
           deleted_at: string | null
           id: string
@@ -35,6 +36,7 @@ export type Database = {
         Insert: {
           content?: string
           content_json?: Json | null
+          content_storage?: string
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -52,6 +54,7 @@ export type Database = {
         Update: {
           content?: string
           content_json?: Json | null
+          content_storage?: string
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -223,6 +226,7 @@ export type Database = {
           accent_color: string
           created_at: string
           dark_surface_shift: number
+          default_content_storage: string
           display_name: string
           id: string
           light_surface_shift: number
@@ -236,6 +240,7 @@ export type Database = {
           accent_color?: string
           created_at?: string
           dark_surface_shift?: number
+          default_content_storage?: string
           display_name?: string
           id?: string
           light_surface_shift?: number
@@ -249,6 +254,7 @@ export type Database = {
           accent_color?: string
           created_at?: string
           dark_surface_shift?: number
+          default_content_storage?: string
           display_name?: string
           id?: string
           light_surface_shift?: number
@@ -321,6 +327,7 @@ export type Database = {
           id: string
           content: string
           content_json: Json | null
+          content_storage: string
           created_at: string
           user_id: string
           pinned: boolean
