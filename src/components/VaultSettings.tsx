@@ -3,6 +3,10 @@ import { AlertTriangle, FolderOpen, RefreshCw, Unplug, Upload, FileDown } from "
 import { toast } from "sonner";
 import { putVaultMeta, type VaultMetaRow } from "@/lib/localStore";
 import { fetchEntries, type Entry } from "@/lib/journal";
+import { hydrateLocalEntries } from "@/lib/localContent";
+import type { DefaultContentStorage } from "@/lib/localContent";
+import { updateUserPreferences } from "@/lib/profile";
+import { supabase } from "@/integrations/supabase/client";
 import { isVaultSupported, type VaultConflict } from "@/lib/vault/types";
 import { connectVault, disconnectVault, ensureVaultPermission, getVaultMeta } from "@/lib/vault/store";
 import { resolveVaultConflict, syncFromVault } from "@/lib/vault/sync";
@@ -18,7 +22,28 @@ export function VaultSettings({ userId }: { userId: string | null }) {
   const [meta, setMeta] = useState<VaultMetaRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<VaultConflict[]>([]);
+  const [defaultStorage, setDefaultStorage] = useState<DefaultContentStorage>("cloud");
   const notionInputRef = useRef<HTMLInputElement>(null);
+
+  const loadEntriesHydrated = useCallback(async () => {
+    if (!userId) return [];
+    const { entries } = await fetchEntries(userId);
+    return hydrateLocalEntries(userId, entries);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("user_preferences")
+        .select("default_content_storage")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) return;
+      const pref = data?.default_content_storage;
+      if (pref === "local" || pref === "ask") setDefaultStorage(pref);
+    })();
+  }, [userId]);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -67,7 +92,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
       // Read from the server rather than the local mirror: the mirror lags a
       // second behind typing, and comparing against stale content is what makes
       // a sync overwrite work the user just did.
-      const { entries } = await fetchEntries(userId);
+      const entries = await loadEntriesHydrated();
       const { result } = await syncFromVault(userId, meta.handle, entries, meta, publishEntries);
       setConflicts(result.conflicts);
       await refresh();
@@ -91,8 +116,8 @@ export function VaultSettings({ userId }: { userId: string | null }) {
     if (!userId || !meta?.handle) return;
     setBusy(conflict.entryId);
     try {
-      const { entries } = await fetchEntries(userId);
-      const resolved = await resolveVaultConflict(meta.handle, conflict, winner, entries, meta);
+      const entries = await loadEntriesHydrated();
+      const resolved = await resolveVaultConflict(userId, meta.handle, conflict, winner, entries, meta);
       publishEntries(resolved.entries);
       setMeta(resolved.meta);
       setConflicts((current) => current.filter((c) => c.entryId !== conflict.entryId));
@@ -113,7 +138,7 @@ export function VaultSettings({ userId }: { userId: string | null }) {
         toast.error("Vault folder permission denied");
         return;
       }
-      const { entries } = await fetchEntries(userId);
+      const entries = await loadEntriesHydrated();
       const next = await writeAllEntriesToVault(meta.handle, entries, meta);
       setMeta(next);
       toast.success(`Wrote ${entries.length} pages to vault`);
@@ -151,6 +176,15 @@ export function VaultSettings({ userId }: { userId: string | null }) {
     setMeta(cleared);
   };
 
+  const handleDefaultStorageChange = async (value: DefaultContentStorage) => {
+    if (!userId) return;
+    setDefaultStorage(value);
+    const result = await updateUserPreferences(userId, { default_content_storage: value });
+    if (!result.ok) {
+      toast.error("Couldn't save preference", { description: result.error });
+    }
+  };
+
   if (!isVaultSupported()) {
     return (
       <div className="space-y-3">
@@ -183,6 +217,22 @@ export function VaultSettings({ userId }: { userId: string | null }) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-border-subtle p-3 space-y-2">
+        <p className="text-sm font-mono text-ink-1">Default storage for new pages</p>
+        <p className="text-xs font-sans text-ink-2">
+          Choose where new page bodies are stored. You can still pick per page when set to &quot;ask&quot;.
+        </p>
+        <select
+          value={defaultStorage}
+          disabled={!userId}
+          onChange={(e) => void handleDefaultStorageChange(e.target.value as DefaultContentStorage)}
+          className="w-full rounded border border-border bg-background px-2 py-1.5 text-xs font-mono"
+        >
+          <option value="cloud">Always cloud (shareable)</option>
+          <option value="local">Always local (private)</option>
+          <option value="ask">Ask each time</option>
+        </select>
+      </div>
       <p className="text-sm text-ink-1 font-sans">
         Connect a local folder to mirror pages as <span className="font-mono">.md</span> files. Wings stays
         authoritative — sync pulls only when files are newer.

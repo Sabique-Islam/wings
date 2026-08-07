@@ -5,7 +5,7 @@ import { buildPagePreview, refreshPageEmbeds } from "@/components/BlockEditor/Pa
 import type { EditorChangePayload } from "@/lib/editorPayload";
 import { useCollabProvider } from "@/lib/collab/useCollabProvider";
 import { useAuth } from "@/hooks/useAuth";
-import { Trash2, PanelLeft, Download, Pin, PinOff, FilePlus, History, Keyboard, Sparkles, PenTool, Hash, Upload, FileJson, FileText } from "lucide-react";
+import { Trash2, PanelLeft, Download, Pin, PinOff, FilePlus, History, Keyboard, Sparkles, PenTool, Hash, Upload, FileJson, FileText, Lock, Cloud } from "lucide-react";
 import { EmptyStateAscii } from "@/components/AsciiAnimation";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { BlockEditor } from "@/components/BlockEditor/BlockEditor";
@@ -13,6 +13,9 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BacklinksPanel } from "@/components/BacklinksPanel";
 import { VersionHistory } from "@/components/VersionHistory";
 import { ShareMenu } from "@/components/ShareMenu";
+import { PromoteToCloudDialog } from "@/components/StorageChoiceDialog";
+import { isLocalEntry } from "@/lib/localContent";
+import { requestEditorSerialize } from "@/lib/editorPayload";
 import { exportSingleEntry, exportSingleAsJson, importFile } from "@/lib/export";
 import { importNotionFiles } from "@/lib/notionImport";
 import { toast } from "sonner";
@@ -50,6 +53,7 @@ interface Props {
   onOpenAI: () => void;
   onImported?: () => void;
   onNew?: () => void;
+  onPromoteToCloud?: (entryId: string, payload: EditorChangePayload) => Promise<void>;
   saveStatus?: "idle" | "saving" | "saved" | "error";
   collabEnabled?: boolean;
 }
@@ -60,7 +64,7 @@ function canEditRole(role: ShareRole): boolean {
   return role === "owner" || role === "admin" || role === "editor";
 }
 
-export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, saveStatus = "idle", collabEnabled = false }: Props) {
+export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, onChange, onTitleChange, onDelete, onTogglePin, sidebarOpen, onToggleSidebar, breadcrumbTrail, onNavigate, onNewSubpage, onUpdateEntry, userRole, onNewSubpageWithTitle, onRestoreVersion, onOpenAI, onImported, onNew, onPromoteToCloud, saveStatus = "idle", collabEnabled = false }: Props) {
   const { user } = useAuth();
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +96,8 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
 
   const [uploading, setUploading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const [promoteBusy, setPromoteBusy] = useState(false);
   const [drawingOpen, setDrawingOpen] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [showLineNumbers, setShowLineNumbers] = useState<boolean>(() => {
@@ -134,6 +140,25 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
   );
   const canDelete = userRole === "owner" || userRole === "admin";
   const canManage = userRole === "owner" || userRole === "admin";
+  const entryIsLocal = entry ? isLocalEntry(entry) : false;
+
+  const handlePromoteConfirm = useCallback(async () => {
+    if (!entry || !onPromoteToCloud) return;
+    const payload = requestEditorSerialize(entry.id);
+    if (!payload) {
+      toast.error("Couldn't read page content");
+      return;
+    }
+    setPromoteBusy(true);
+    try {
+      await onPromoteToCloud(entry.id, payload);
+      setPromoteOpen(false);
+    } catch {
+      /* toast from parent */
+    } finally {
+      setPromoteBusy(false);
+    }
+  }, [entry, onPromoteToCloud]);
 
   // The editor rebuilds its extension list whenever its handler props change
   // identity, so the upload handler reads the entry through a ref rather than
@@ -249,6 +274,11 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                 live
               </span>
             )}
+            {entryIsLocal && (
+              <span className="text-[10px] text-muted-foreground/60 ml-2 font-mono flex items-center gap-1" title="Stored on this device only">
+                <Lock className="h-3 w-3" /> local
+              </span>
+            )}
             {saveStatus === "saving" && !collabSession && (
               <span className="text-[10px] text-muted-foreground/60 ml-2 font-mono flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-foreground/40 animate-pulse" />
@@ -272,7 +302,7 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
               {userRole === "editor" && (
                 <span className="text-[10px] text-muted-foreground/50 font-mono px-2">editor</span>
               )}
-              {canManage && <ShareMenu entry={entry} onUpdate={onUpdateEntry} />}
+              {canManage && !entryIsLocal && <ShareMenu entry={entry} onUpdate={onUpdateEntry} />}
               {canManage && (
                 <button
                   onClick={() => onNewSubpage(entry.id)}
@@ -300,13 +330,16 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                   <PenTool className="h-3.5 w-3.5" />
                 </button>
               )}
-              <button
-                onClick={() => setHistoryOpen(true)}
-                className="p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors"
-                title="Version history"
-              >
-                <History className="h-3.5 w-3.5" />
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => !entryIsLocal && setHistoryOpen(true)}
+                  disabled={entryIsLocal}
+                  className={`p-1.5 rounded transition-colors ${entryIsLocal ? "text-muted-foreground/30 cursor-not-allowed" : "text-muted-foreground hover:text-foreground"}`}
+                  title={entryIsLocal ? "Version history isn't available for local pages" : "Version history"}
+                >
+                  <History className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button
                 onClick={() => setShowLineNumbers((s) => !s)}
                 className={`p-1.5 rounded transition-colors ${showLineNumbers ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
@@ -337,6 +370,11 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
                   <DropdownMenuItem onClick={() => exportSingleAsJson(entry)}>
                     <FileJson className="h-3.5 w-3.5 mr-2" /> export as JSON
                   </DropdownMenuItem>
+                  {canManage && entryIsLocal && onPromoteToCloud && (
+                    <DropdownMenuItem onClick={() => setPromoteOpen(true)}>
+                      <Cloud className="h-3.5 w-3.5 mr-2" /> move to cloud…
+                    </DropdownMenuItem>
+                  )}
                   {canManage && (
                     <DropdownMenuItem onClick={() => importInputRef.current?.click()}>
                       <Upload className="h-3.5 w-3.5 mr-2" /> import file(s)…
@@ -449,13 +487,21 @@ export function JournalEditor({ entry, allEntries = [], roleMap = {}, userId, on
           </div>
         )}
       </div>
-      {entry && (
+      {entry && !entryIsLocal && (
         <VersionHistory
           open={historyOpen}
           onClose={() => setHistoryOpen(false)}
           entryId={entry.id}
           canRestore={canEdit}
           onRestore={(versionId) => onRestoreVersion(entry.id, versionId)}
+        />
+      )}
+      {entry && (
+        <PromoteToCloudDialog
+          open={promoteOpen}
+          onOpenChange={setPromoteOpen}
+          onConfirm={() => void handlePromoteConfirm()}
+          busy={promoteBusy}
         />
       )}
       {entry && (

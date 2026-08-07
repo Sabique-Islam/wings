@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   MoreHorizontal,
   PinOff,
+  Lock,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,6 +42,7 @@ import {
   restoreEntry,
   permanentlyDeleteEntry,
 } from "@/lib/journal";
+import { isLocalEntry } from "@/lib/localContent";
 import { isDescendantOf, type DropPlacement } from "@/lib/pageOrder";
 import { Logo } from "@/components/Logo";
 import { cn } from "@/lib/utils";
@@ -297,6 +299,7 @@ export const JournalSidebar = memo(function JournalSidebar({
             title={preview}
             active={isActive}
             pinned={entry.pinned}
+            isLocal={isLocalEntry(entry)}
             canManage={canManage}
             onClick={() => onSelect(entry.id)}
             onTogglePin={canManage ? () => onTogglePin?.(entry.id, !entry.pinned) : undefined}
@@ -541,6 +544,7 @@ function EntryRow({
   title,
   active,
   pinned,
+  isLocal = false,
   canManage,
   onClick,
   onTogglePin,
@@ -549,6 +553,7 @@ function EntryRow({
   title: string;
   active: boolean;
   pinned: boolean;
+  isLocal?: boolean;
   canManage: boolean;
   onClick: () => void;
   onTogglePin?: () => void;
@@ -570,7 +575,15 @@ function EntryRow({
         className="relative z-10 flex min-w-0 flex-1 items-center px-2"
       >
         <span className="grid size-4 shrink-0 place-items-center mr-2">
-          {pinned ? <Pin className="h-3 w-3" /> : <FileText className="h-3 w-3 opacity-60" />}
+          {pinned ? (
+            <Pin className="h-3 w-3" />
+          ) : isLocal ? (
+            <span title="Local only">
+              <Lock className="h-3 w-3 opacity-70" />
+            </span>
+          ) : (
+            <FileText className="h-3 w-3 opacity-60" />
+          )}
         </span>
         <span className="flex-1 truncate text-left group-hover:mask-[linear-gradient(to_right,black_78%,transparent_95%)]">
           {title}
