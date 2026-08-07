@@ -1,6 +1,9 @@
 -- Add content_storage to share RPC projections (SELECT-only change).
+-- Must drop first: PostgreSQL rejects CREATE OR REPLACE when OUT columns change.
 
-CREATE OR REPLACE FUNCTION public.fetch_collaborator_entries(
+DROP FUNCTION IF EXISTS public.fetch_collaborator_entries(uuid[], boolean);
+
+CREATE FUNCTION public.fetch_collaborator_entries(
   _ids uuid[],
   _include_deleted boolean DEFAULT false
 )
