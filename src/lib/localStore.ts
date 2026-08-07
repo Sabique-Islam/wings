@@ -10,6 +10,7 @@
 import Dexie, { type Table } from "dexie";
 import type { JSONContent } from "@tiptap/core";
 import type { Entry, ShareRole } from "./journal";
+import { isLocalEntry } from "./localContent";
 
 /** Cached server row, tagged with the account whose fetch produced it. */
 export interface CachedEntry extends Entry {
@@ -166,18 +167,34 @@ export function readCachedEntries(userId: string): Promise<Entry[]> {
 }
 
 /**
- * Replace this account's cached rows with a fresh server fetch, dropping rows
- * that no longer exist so deletions from another device don't linger.
+ * Replace cached rows from a server fetch, preserving local entry bodies when the
+ * server stub is empty.
  */
-export function replaceCachedEntries(userId: string, entries: Entry[]): Promise<void> {
+export function mergeCachedEntries(userId: string, incoming: Entry[]): Promise<void> {
   return guard(async (instance) => {
-    const keep = new Set(entries.map((e) => e.id));
+    const existing = await instance.entries.where("cacheOwnerId").equals(userId).toArray();
+    const existingById = new Map(existing.map((row) => [row.id, toEntry(row)]));
+    const merged = incoming.map((row) => {
+      if (!isLocalEntry(row)) return row;
+      const prev = existingById.get(row.id);
+      if (row.content.trim().length > 0) return row;
+      if (prev && prev.content.trim().length > 0) {
+        return { ...row, content: prev.content, content_json: prev.content_json ?? row.content_json };
+      }
+      return row;
+    });
+    const keep = new Set(merged.map((e) => e.id));
     await instance.transaction("rw", instance.entries, async () => {
       const stale = await instance.entries.where("cacheOwnerId").equals(userId).primaryKeys();
       await instance.entries.bulkDelete(stale.filter((id) => !keep.has(id)));
-      await instance.entries.bulkPut(entries.map((e) => toCached(e, userId)));
+      await instance.entries.bulkPut(merged.map((e) => toCached(e, userId)));
     });
   }, undefined);
+}
+
+/** @deprecated Prefer mergeCachedEntries for workspace sync. */
+export function replaceCachedEntries(userId: string, entries: Entry[]): Promise<void> {
+  return mergeCachedEntries(userId, entries);
 }
 
 export function putCachedEntry(userId: string, entry: Entry): Promise<void> {

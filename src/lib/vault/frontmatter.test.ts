@@ -19,6 +19,7 @@ function entry(overrides: Partial<Entry> = {}): Entry {
     parent_id: null,
     title: "Hello",
     share_token: null,
+    content_storage: "cloud",
     layout: {},
     sort_order: null,
     deleted_at: null,

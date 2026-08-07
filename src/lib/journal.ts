@@ -5,11 +5,17 @@ import { EntryLayoutMap, normalizeLayout } from "./layout";
 import { logError } from "./logger";
 import { sortSiblings } from "./pageOrder";
 import type { FullEditorChangePayload } from "./editorPayload";
+import { payloadFromMarkdown } from "./entryContent";
+import type { ContentStorage } from "@/lib/localContent";
+import { normalizeContentStorage } from "@/lib/localContent";
+
+export type { ContentStorage } from "@/lib/localContent";
 
 export interface Entry {
   id: string;
   content: string;
   content_json: JSONContent | null;
+  content_storage: ContentStorage;
   created_at: string;
   user_id: string;
   pinned: boolean;
@@ -95,12 +101,48 @@ export function findReusableBlankDraft(
 }
 
 /** Columns for entries the caller owns (includes share_token for ShareMenu / public link). */
-const ENTRY_COLS_OWNER =
+const ENTRY_COLS_OWNER_LEGACY =
   "id, content, content_json, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
 
 /** Columns for entries shared with the caller — never include share_token. */
-const ENTRY_COLS_SHARED =
+const ENTRY_COLS_SHARED_LEGACY =
   "id, content, content_json, created_at, user_id, pinned, parent_id, title, layout, deleted_at, properties, sort_order";
+
+const ENTRY_COLS_OWNER =
+  "id, content, content_json, content_storage, created_at, user_id, pinned, parent_id, title, share_token, layout, deleted_at";
+
+const ENTRY_COLS_SHARED =
+  "id, content, content_json, content_storage, created_at, user_id, pinned, parent_id, title, layout, deleted_at, properties, sort_order";
+
+let contentStorageColumnKnown: boolean | null = null;
+let contentStorageColumnPromise: Promise<boolean> | null = null;
+
+function isMissingColumnError(error: { message?: string } | null, column: string): boolean {
+  const msg = error?.message?.toLowerCase() ?? "";
+  return msg.includes(column.toLowerCase()) && msg.includes("does not exist");
+}
+
+/** Probes once per session — local vault needs migration 20260808120000 applied. */
+export async function contentStorageColumnAvailable(): Promise<boolean> {
+  if (contentStorageColumnKnown !== null) return contentStorageColumnKnown;
+  if (!contentStorageColumnPromise) {
+    contentStorageColumnPromise = (async () => {
+      const { error } = await supabase.from("entries").select("content_storage").limit(0);
+      const available = !error || !isMissingColumnError(error, "content_storage");
+      contentStorageColumnKnown = available;
+      return available;
+    })();
+  }
+  return contentStorageColumnPromise;
+}
+
+async function entryColsOwner(): Promise<string> {
+  return (await contentStorageColumnAvailable()) ? ENTRY_COLS_OWNER : ENTRY_COLS_OWNER_LEGACY;
+}
+
+async function entryColsShared(): Promise<string> {
+  return (await contentStorageColumnAvailable()) ? ENTRY_COLS_SHARED : ENTRY_COLS_SHARED_LEGACY;
+}
 
 export interface FetchedEntries {
   entries: Entry[];
@@ -114,20 +156,22 @@ export interface ShareWorkspacePayload {
   owned_shared_ids: string[];
 }
 
-function mapEntryRow(d: Record<string, unknown>): Entry {
+function mapEntryRow(d: unknown): Entry {
+  const row = d as Record<string, unknown>;
   return {
-    id: String(d.id),
-    content: String(d.content ?? ""),
-    content_json: (d.content_json as JSONContent | null) ?? null,
-    created_at: String(d.created_at),
-    user_id: String(d.user_id),
-    pinned: Boolean(d.pinned),
-    parent_id: (d.parent_id as string | null) ?? null,
-    title: String(d.title ?? ""),
-    share_token: (d.share_token as string | null) ?? null,
-    layout: normalizeLayout(d.layout),
-    sort_order: d.sort_order == null ? null : Number(d.sort_order),
-    deleted_at: (d.deleted_at as string | null) ?? null,
+    id: String(row.id),
+    content: String(row.content ?? ""),
+    content_json: (row.content_json as JSONContent | null) ?? null,
+    content_storage: normalizeContentStorage(row.content_storage),
+    created_at: String(row.created_at),
+    user_id: String(row.user_id),
+    pinned: Boolean(row.pinned),
+    parent_id: (row.parent_id as string | null) ?? null,
+    title: String(row.title ?? ""),
+    share_token: (row.share_token as string | null) ?? null,
+    layout: normalizeLayout(row.layout),
+    sort_order: row.sort_order == null ? null : Number(row.sort_order),
+    deleted_at: (row.deleted_at as string | null) ?? null,
   };
 }
 
@@ -170,13 +214,13 @@ function parseShareWorkspaceJson(data: unknown): ShareWorkspacePayload {
 async function fetchCollaboratorEntries(
   sharedIds: string[],
   includeTrash: boolean,
-): Promise<Record<string, unknown>[]> {
+): Promise<Entry[]> {
   if (sharedIds.length === 0) return [];
   const { data, error } = await supabase.rpc("fetch_collaborator_entries", {
     _ids: sharedIds,
     _include_deleted: includeTrash,
   });
-  if (!error) return (data ?? []) as Record<string, unknown>[];
+  if (!error) return (data ?? []).map(mapEntryRow);
 
   const rpcMissing =
     error.code === "PGRST202" ||
@@ -186,14 +230,14 @@ async function fetchCollaboratorEntries(
     return [];
   }
 
-  let sharedQuery = supabase.from("entries").select(ENTRY_COLS_SHARED).in("id", sharedIds);
+  let sharedQuery = supabase.from("entries").select(await entryColsShared()).in("id", sharedIds);
   if (!includeTrash) sharedQuery = sharedQuery.is("deleted_at", null);
   const { data: legacy, error: legacyError } = await sharedQuery;
   if (legacyError) {
     logError("Failed to fetch collaborator entries (legacy)", legacyError);
     return [];
   }
-  return (legacy ?? []) as Record<string, unknown>[];
+  return (legacy ?? []).map(mapEntryRow);
 }
 
 /** Legacy path when `fetch_share_workspace` is not deployed yet. */
@@ -236,7 +280,7 @@ async function fetchShareWorkspaceLegacy(
   );
 
   return {
-    entries: sharedEntries.map((d) => mapEntryRow(d as Record<string, unknown>)),
+    entries: sharedEntries,
     roleMap,
     sharedEntryIds,
   };
@@ -284,7 +328,7 @@ export async function fetchOwnEntries(
 ): Promise<Entry[]> {
   let query = supabase
     .from("entries")
-    .select(ENTRY_COLS_OWNER)
+    .select(await entryColsOwner())
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (!opts.includeTrash) query = query.is("deleted_at", null);
@@ -293,7 +337,7 @@ export async function fetchOwnEntries(
     logError("Failed to fetch own entries", error);
     throw error;
   }
-  return (data ?? []).map((d) => mapEntryRow(d as Record<string, unknown>));
+  return (data ?? []).map(mapEntryRow);
 }
 
 async function fetchShareWorkspace(
@@ -383,7 +427,7 @@ export async function syncWorkspaceEntries(
 export async function fetchTrash(userId: string): Promise<Entry[]> {
   const { data, error } = await supabase
     .from("entries")
-    .select(ENTRY_COLS_OWNER)
+    .select(await entryColsOwner())
     .eq("user_id", userId)
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false });
@@ -391,15 +435,58 @@ export async function fetchTrash(userId: string): Promise<Entry[]> {
     logError("Failed to fetch trash", error);
     return [];
   }
-  return (data ?? []).map((d) => mapEntryRow(d as Record<string, unknown>));
+  return (data ?? []).map(mapEntryRow);
 }
 
-export async function createEntry(userId: string, content: string, parentId?: string): Promise<Entry> {
-  const insert = { user_id: userId, content, ...(parentId ? { parent_id: parentId } : {}) };
-  const { data, error } = await supabase.from("entries").insert(insert).select(ENTRY_COLS_OWNER).single();
+export interface CreateEntryOptions {
+  parentId?: string;
+  storage?: ContentStorage;
+  initialJson?: JSONContent | null;
+}
+
+export async function createEntry(
+  userId: string,
+  content: string,
+  parentIdOrOpts?: string | CreateEntryOptions,
+  maybeOpts?: CreateEntryOptions,
+): Promise<Entry> {
+  let parentId: string | undefined;
+  let opts: CreateEntryOptions = {};
+  if (typeof parentIdOrOpts === "string") {
+    parentId = parentIdOrOpts;
+    opts = maybeOpts ?? {};
+  } else {
+    opts = parentIdOrOpts ?? {};
+    parentId = opts.parentId;
+  }
+  const storage = opts.storage ?? "cloud";
+  const hasStorageColumn = await contentStorageColumnAvailable();
+  if (storage === "local" && !hasStorageColumn) {
+    throw new Error(
+      "Local pages require a database update. Apply the content_storage migration in Supabase, then reload.",
+    );
+  }
+  const serverContent = storage === "local" ? "" : content;
+  const insert = {
+    user_id: userId,
+    content: serverContent,
+    ...(parentId ? { parent_id: parentId } : {}),
+    ...(storage === "local" ? { content_json: null } : {}),
+    ...(hasStorageColumn ? { content_storage: storage } : {}),
+  };
+  const { data, error } = await supabase
+    .from("entries")
+    .insert(insert)
+    .select(await entryColsOwner())
+    .single();
   if (error) throw error;
   if (!data) throw new Error("Failed to create page");
-  return mapEntryRow(data as Record<string, unknown>);
+  const row = mapEntryRow(data);
+  if (storage === "local" && content.trim()) {
+    const json = opts.initialJson ?? payloadFromMarkdown(content).json;
+    return { ...row, content, content_json: json };
+  }
+  return row;
 }
 
 export async function updateEntry(id: string, payload: FullEditorChangePayload): Promise<void> {
@@ -476,16 +563,20 @@ export async function permanentlyDeleteEntry(id: string): Promise<void> {
 export async function searchEntries(userId: string, q: string, limit = 20): Promise<Entry[]> {
   const query = q.trim();
   if (!query) return [];
-  const { data, error } = await supabase
+  let request = supabase
     .from("entries")
-    .select(ENTRY_COLS_OWNER)
+    .select(await entryColsOwner())
     .eq("user_id", userId)
     .is("deleted_at", null)
     .textSearch("search_tsv", query, { type: "websearch", config: "english" })
     .limit(limit);
+  if (await contentStorageColumnAvailable()) {
+    request = request.eq("content_storage", "cloud");
+  }
+  const { data, error } = await request;
   if (error) {
     logError("Search failed", error);
     return [];
   }
-  return (data ?? []).map((d) => mapEntryRow(d as Record<string, unknown>));
+  return (data ?? []).map(mapEntryRow);
 }

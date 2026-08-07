@@ -13,6 +13,7 @@ function entry(id: string, content: string, title?: string): Entry {
     parent_id: null,
     title: title ?? null,
     share_token: null,
+    content_storage: "cloud",
     layout: null,
     deleted_at: null,
   } as Entry;

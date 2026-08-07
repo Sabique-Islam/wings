@@ -1,6 +1,7 @@
-import { createEntry, getEntryTitle, moveEntry, updateEntry, type Entry } from "@/lib/journal";
+import { createEntry, getEntryTitle, moveEntry, type Entry } from "@/lib/journal";
 import { payloadFromMarkdown } from "@/lib/entryContent";
 import { shouldBlockEmptySave } from "@/lib/editorContent";
+import { getCanonicalContent, persistEntryBody, saveLocalContent } from "@/lib/localContent";
 import { contentHash, normalizeVaultContent, type VaultConflict, type VaultSyncResult } from "./types";
 import { entryToRelativePath } from "./frontmatter";
 import { parentIdChangeForFile, resolveParentIdFromPath } from "./hierarchy";
@@ -76,8 +77,11 @@ export async function syncFromVault(
 
     if (action.kind === "create") {
       const parentId = resolveParentIdFromPath(file.relativePath, idByPath);
-      const created = await createEntry(userId, action.body, parentId ?? undefined);
-      const withParent = await applyVaultParent(created, file.relativePath, idByPath);
+      const payload = payloadFromMarkdown(action.body);
+      const created = await createEntry(userId, "", { parentId: parentId ?? undefined, storage: "local" });
+      const withBody: Entry = { ...created, content: payload.markdown, content_json: payload.json };
+      await saveLocalContent(userId, withBody, nextEntries, payload);
+      const withParent = await applyVaultParent(withBody, file.relativePath, idByPath);
       nextEntries = [withParent, ...nextEntries];
       byId.set(withParent.id, withParent);
       idByPath.set(file.relativePath, withParent.id);
@@ -88,7 +92,7 @@ export async function syncFromVault(
 
     const target = existing!;
     const payload = payloadFromMarkdown(action.body);
-    await updateEntry(target.id, payload);
+    await persistEntryBody(userId, target, nextEntries, payload);
     let updated: Entry = { ...target, content: payload.markdown, content_json: payload.json };
     updated = await applyVaultParent(updated, file.relativePath, idByPath);
     nextEntries = nextEntries.map((e) => (e.id === updated.id ? updated : e));
@@ -104,6 +108,7 @@ export async function syncFromVault(
 }
 
 export async function resolveVaultConflict(
+  userId: string,
   handle: FileSystemDirectoryHandle,
   conflict: VaultConflict,
   winner: "page" | "file",
@@ -120,8 +125,8 @@ export async function resolveVaultConflict(
   }
 
   const payload = payloadFromMarkdown(conflict.fileBody);
-  if (shouldBlockEmptySave(target.content, payload.markdown)) return { entries, meta };
-  await updateEntry(target.id, payload);
+  if (shouldBlockEmptySave(getCanonicalContent(target), payload.markdown)) return { entries, meta };
+  await persistEntryBody(userId, target, entries, payload);
   const updated: Entry = { ...target, content: payload.markdown, content_json: payload.json };
   const nextMeta = markWritten(meta, updated.id, payload.markdown);
   await putVaultMeta(nextMeta);

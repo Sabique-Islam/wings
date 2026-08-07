@@ -6,6 +6,7 @@
 
 import type { Entry } from "@/lib/journal";
 import { shouldBlockEmptySave } from "@/lib/editorContent";
+import { getCanonicalContent } from "@/lib/localContent";
 import { contentHash, normalizeVaultContent, type VaultFileEntry } from "./types";
 
 export type VaultSkipReason = "empty" | "unchanged" | "unknown-page" | "would-empty-page";
@@ -40,7 +41,8 @@ export function planVaultFileSync(
   if (!existing) return { kind: "skip", reason: "unknown-page" };
 
   const fileHash = contentHash(content);
-  if (fileHash === contentHash(existing.content)) return { kind: "skip", reason: "unchanged" };
+  const existingContent = existing ? getCanonicalContent(existing) : "";
+  if (fileHash === contentHash(existingContent)) return { kind: "skip", reason: "unchanged" };
 
   // Wings wrote this page after the file was last touched, so the file is stale
   // and applying it would undo whatever was typed in the app.
@@ -50,7 +52,7 @@ export function planVaultFileSync(
     return { kind: "conflict" };
   }
 
-  if (shouldBlockEmptySave(existing.content, content)) {
+  if (shouldBlockEmptySave(existingContent, content)) {
     return { kind: "skip", reason: "would-empty-page" };
   }
 

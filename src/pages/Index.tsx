@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { fetchEntries, syncWorkspaceEntries, createEntry, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, findReusableBlankDraft, ShareRole } from "@/lib/journal";
+import { fetchEntries, syncWorkspaceEntries, updateEntry, updateEntryTitle, moveEntry, saveEntryOrder, deleteEntry, togglePin, getBreadcrumbTrail, Entry, getEntryTitle, findReusableBlankDraft, ShareRole } from "@/lib/journal";
 import { reorderSiblings, type DropPlacement } from "@/lib/pageOrder";
 import { saveDraft, saveDraftThrottled, getDraft, clearDraft, queuePendingWrite, getPendingWrites, clearPendingWrite, hydrateDraftCache } from "@/lib/draftCache";
-import { readCachedEntries, readWorkspaceMeta, replaceCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
+import { readCachedEntries, readWorkspaceMeta, mergeCachedEntries, putCachedEntry, putWorkspaceMeta } from "@/lib/localStore";
 import { forgetLinkIndex, hydrateLinkIndex, reindexEntries, scheduleLinkIndex } from "@/lib/linkIndex";
 import { mirrorEntryToVault } from "@/lib/vault/write";
 import { appendMarkdown, payloadFromMarkdown } from "@/lib/entryContent";
@@ -12,6 +12,24 @@ import { deleteBlocksAtPositions } from "@/components/BlockEditor/blockUtils";
 import { isFullPayload, isSameEditorPayload, requestEditorSerialize, type EditorChangePayload } from "@/lib/editorPayload";
 import { applyDraftToEntry, resolveInitialEditorContent, shouldBlockEmptySave, shouldReplayPendingWrite } from "@/lib/editorContent";
 import { getEntryVersion, recordEntryVersion } from "@/lib/entryVersions";
+import {
+  getCanonicalContent,
+  hydrateLocalEntries,
+  isLocalEntry,
+  persistEntryBody,
+  promoteEntryToCloud,
+  type ContentStorage,
+  type DefaultContentStorage,
+} from "@/lib/localContent";
+import {
+  canCreateLocalStorage,
+  executeCreatePage,
+  isVaultConnected,
+  mustUseCloudStorage,
+  resolveStorageChoice,
+} from "@/lib/pageCreation";
+import { updateUserPreferences } from "@/lib/profile";
+import { StorageChoiceDialog } from "@/components/StorageChoiceDialog";
 import { isTypingTarget, isEditorFocused } from "@/lib/keyboard";
 
 import { JournalSidebar } from "@/components/JournalSidebar";
@@ -108,6 +126,15 @@ export default function Index() {
   const creatingRef = useRef(false);
   const pendingPayloadRef = useRef<EditorChangePayload | null>(null);
   const [sharedEntryIds, setSharedEntryIds] = useState<Set<string>>(() => new Set());
+  const [defaultStorage, setDefaultStorage] = useState<DefaultContentStorage>("cloud");
+  const [storageDialogOpen, setStorageDialogOpen] = useState(false);
+  const pendingCreateRef = useRef<{
+    ownerId: string;
+    parentId?: string | null;
+    initialContent?: string;
+    onCreated?: (entry: Entry) => void;
+    activate?: boolean;
+  } | null>(null);
   const SAVE_DEBOUNCE_MS = 1500;
   // Read by debounced save work so the callbacks feeding the editor keep a
   // stable identity across the state updates each save produces.
@@ -123,6 +150,20 @@ export default function Index() {
     setActiveIdRaw(routeId ?? null);
   }, [routeId]);
 
+  useEffect(() => {
+    if (!userId) return;
+    void (async () => {
+      const { data, error } = await supabase
+        .from("user_preferences")
+        .select("default_content_storage")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) return;
+      const pref = data?.default_content_storage;
+      if (pref === "local" || pref === "ask") setDefaultStorage(pref);
+    })();
+  }, [userId]);
+
   // Offline queue: replay failed saves once entries are in memory, drop rows
   // already reflected on the server, and clear the error badge when the active
   // page no longer has outstanding work.
@@ -133,7 +174,7 @@ export default function Index() {
       if (!pending.length) return;
       for (const pw of pending) {
         const server = entriesRef.current.find((e) => e.id === pw.entryId);
-        const serverContent = server?.content ?? "";
+        const serverContent = server ? getCanonicalContent(server) : "";
         if (
           server &&
           isSameEditorPayload(server, {
@@ -150,11 +191,21 @@ export default function Index() {
           clearDraft(pw.entryId);
           continue;
         }
+        const payload = {
+          markdown: pw.content,
+          json: pw.contentJson ?? { type: "doc", content: [] },
+        };
         try {
-          await updateEntry(pw.entryId, {
-            markdown: pw.content,
-            json: pw.contentJson ?? { type: "doc", content: [] },
-          });
+          if (server && isLocalEntry(server)) {
+            await persistEntryBody(userId, server, entriesRef.current, payload);
+            setEntries((prev) =>
+              prev.map((e) =>
+                e.id === pw.entryId ? { ...e, content: payload.markdown, content_json: payload.json } : e,
+              ),
+            );
+          } else {
+            await updateEntry(pw.entryId, payload);
+          }
           clearPendingWrite(pw.entryId);
           clearDraft(pw.entryId);
         } catch {
@@ -174,10 +225,11 @@ export default function Index() {
       entriesRef.current,
       { refreshShares: opts.refreshShares },
     );
-    setEntries(data.map((e) => applyDraftToEntry(e, getDraft(e.id))));
+    const hydrated = await hydrateLocalEntries(userId, data);
+    setEntries(hydrated.map((e) => applyDraftToEntry(e, getDraft(e.id))));
     setRoleMap(roles);
     setSharedEntryIds(shared);
-    reindexEntries(data);
+    reindexEntries(hydrated);
   }, [userId]);
 
   // Paint from the IndexedDB mirror before the network answers, then reconcile.
@@ -220,7 +272,7 @@ export default function Index() {
   useEffect(() => {
     if (!userId || loading || entries.length === 0) return;
     const timer = setTimeout(() => {
-      void replaceCachedEntries(userId, entries);
+      void mergeCachedEntries(userId, entries);
       void putWorkspaceMeta({
         userId,
         roleMap,
@@ -277,6 +329,95 @@ export default function Index() {
     }));
   }, []);
 
+  const runCreatePage = useCallback(
+    async (opts: {
+      ownerId: string;
+      parentId?: string | null;
+      initialContent?: string;
+      storage: ContentStorage;
+      onCreated?: (entry: Entry) => void;
+      activate?: boolean;
+    }) => {
+      if (!userId || !user) return null;
+      const vaultConnected = await isVaultConnected(userId);
+      const check = canCreateLocalStorage(userId, opts.storage, vaultConnected);
+      if (check.ok === false) {
+        if (check.reason === "vault") {
+          toast.error("Connect a vault folder first", {
+            description: "Local pages need a connected vault folder on this device.",
+          });
+        } else {
+          toast.error("Sign in to create local pages");
+        }
+        return null;
+      }
+      creatingRef.current = true;
+      try {
+        const entry = await executeCreatePage({
+          userId,
+          ownerId: opts.ownerId,
+          parentId: opts.parentId,
+          initialContent: opts.initialContent,
+          storage: opts.storage,
+          allEntries: entriesRef.current,
+        });
+        addCreatedEntry(entry, user.id);
+        opts.onCreated?.(entry);
+        if (opts.activate) setActiveId(entry.id);
+        return entry;
+      } catch (err) {
+        console.error("Failed to create page:", err);
+        toast.error("Couldn't create page", { description: entryErrorMessage(err) });
+        return null;
+      } finally {
+        creatingRef.current = false;
+      }
+    },
+    [userId, user, addCreatedEntry, setActiveId],
+  );
+
+  const requestCreatePage = useCallback(
+    (opts: {
+      ownerId: string;
+      parentId?: string | null;
+      initialContent?: string;
+      onCreated?: (entry: Entry) => void;
+      activate?: boolean;
+    }) => {
+      if (!user || creatingRef.current) return;
+      const parentEntry = opts.parentId
+        ? entriesRef.current.find((e) => e.id === opts.parentId)
+        : null;
+      const forceCloud = mustUseCloudStorage(parentEntry, roleMap, opts.ownerId);
+      const resolved = resolveStorageChoice({
+        userDefault: defaultStorage,
+        parentEntry,
+        forceCloud,
+      });
+      if (resolved === "ask") {
+        pendingCreateRef.current = opts;
+        setStorageDialogOpen(true);
+        return;
+      }
+      void runCreatePage({ ...opts, storage: resolved });
+    },
+    [user, defaultStorage, roleMap, runCreatePage],
+  );
+
+  const handleStorageChoiceConfirm = useCallback(
+    (storage: ContentStorage, remember: DefaultContentStorage | null) => {
+      if (remember && userId) {
+        setDefaultStorage(remember);
+        void updateUserPreferences(userId, { default_content_storage: remember });
+      }
+      const pending = pendingCreateRef.current;
+      pendingCreateRef.current = null;
+      if (!pending) return;
+      void runCreatePage({ ...pending, storage });
+    },
+    [userId, runCreatePage],
+  );
+
   const handleNew = useCallback(async () => {
     if (!user || creatingRef.current) return;
 
@@ -286,18 +427,8 @@ export default function Index() {
       return;
     }
 
-    creatingRef.current = true;
-    try {
-      const entry = await createEntry(user.id, "");
-      addCreatedEntry(entry, user.id);
-      setActiveId(entry.id);
-    } catch (err) {
-      console.error("Failed to create page:", err);
-      toast.error("Couldn't create page", { description: entryErrorMessage(err) });
-    } finally {
-      creatingRef.current = false;
-    }
-  }, [user, entries, setActiveId, addCreatedEntry]);
+    requestCreatePage({ ownerId: user.id, activate: true });
+  }, [user, entries, setActiveId, requestCreatePage]);
 
   const handleNewSubpage = useCallback(async (parentId: string) => {
     if (!user || creatingRef.current) return;
@@ -309,34 +440,19 @@ export default function Index() {
       return;
     }
 
-    creatingRef.current = true;
-    try {
-      const entry = await createEntry(ownerId, "", parentId);
-      addCreatedEntry(entry, user.id);
-      setActiveId(entry.id);
-    } catch (err) {
-      console.error("Failed to create sub-page:", err);
-      toast.error("Couldn't create sub-page", { description: entryErrorMessage(err) });
-    } finally {
-      creatingRef.current = false;
-    }
-  }, [user, entries, roleMap, setActiveId, addCreatedEntry]);
+    requestCreatePage({ ownerId, parentId, activate: true });
+  }, [user, entries, roleMap, setActiveId, requestCreatePage]);
 
   const handleNewSubpageWithTitle = useCallback(async (parentId: string, title: string) => {
     if (!user || creatingRef.current) return;
-    creatingRef.current = true;
-    try {
-      const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
-      const entry = await createEntry(ownerId, `# ${title}\n\n`, parentId);
-      addCreatedEntry(entry, user.id);
-      insertPageLink(entry.id, title);
-    } catch (err) {
-      console.error("Failed to create sub-page:", err);
-      toast.error("Couldn't create sub-page", { description: entryErrorMessage(err) });
-    } finally {
-      creatingRef.current = false;
-    }
-  }, [user, entries, roleMap, addCreatedEntry]);
+    const ownerId = resolveEntryOwnerId(parentId, user.id, entries, roleMap);
+    requestCreatePage({
+      ownerId,
+      parentId,
+      initialContent: `# ${title}\n\n`,
+      onCreated: (entry) => insertPageLink(entry.id, title),
+    });
+  }, [user, entries, roleMap, requestCreatePage]);
 
   const handleEntryCreated = useCallback((entry: Entry) => {
     if (!user) return;
@@ -364,7 +480,8 @@ export default function Index() {
       if (!toSave) return;
       pendingPayloadRef.current = toSave;
       const existing = entriesRef.current.find((e) => e.id === activeId);
-      if (existing && shouldBlockEmptySave(existing.content, toSave.markdown)) {
+      const existingContent = existing ? getCanonicalContent(existing) : "";
+      if (existing && shouldBlockEmptySave(existingContent, toSave.markdown)) {
         console.warn("[wings] blocked empty autosave over existing content");
         return;
       }
@@ -376,7 +493,11 @@ export default function Index() {
         void putCachedEntry(userId, { ...existing, content: toSave.markdown, content_json: toSave.json });
       }
       try {
-        await updateEntry(activeId, toSave);
+        if (existing && isLocalEntry(existing)) {
+          await persistEntryBody(userId!, existing, entriesRef.current, toSave);
+        } else {
+          await updateEntry(activeId, toSave);
+        }
         setEntries((prev) =>
           prev.map((e) =>
             e.id === activeId
@@ -386,12 +507,14 @@ export default function Index() {
         );
         clearDraft(activeId);
         clearPendingWrite(activeId);
-        void recordEntryVersion(activeId, userId ?? null, {
-          content: toSave.markdown,
-          content_json: toSave.json,
-        });
+        if (!existing || !isLocalEntry(existing)) {
+          void recordEntryVersion(activeId, userId ?? null, {
+            content: toSave.markdown,
+            content_json: toSave.json,
+          });
+        }
         setSaveStatus("saved");
-        if (userId && existing) {
+        if (userId && existing && !isLocalEntry(existing)) {
           void mirrorEntryToVault(
             userId,
             { ...existing, content: toSave.markdown, content_json: toSave.json },
@@ -416,10 +539,15 @@ export default function Index() {
       void (async () => {
         try {
           const ownerId = resolveEntryOwnerId(activeId, user.id, entriesRef.current, roleMap);
-          const entry = await createEntry(ownerId, markdown, activeId);
-          addCreatedEntry(entry, user.id);
-          insertPageLink(entry.id, title);
-          toast.success(`Moved into “${title}”`);
+          requestCreatePage({
+            ownerId,
+            parentId: activeId,
+            initialContent: markdown,
+            onCreated: (entry) => {
+              insertPageLink(entry.id, title);
+              toast.success(`Moved into “${title}”`);
+            },
+          });
         } catch (err) {
           console.error("Failed to turn blocks into a page:", err);
           toast.error("Couldn't create the page", { description: entryErrorMessage(err) });
@@ -428,7 +556,7 @@ export default function Index() {
     };
     window.addEventListener("nw:turnIntoPage", handler);
     return () => window.removeEventListener("nw:turnIntoPage", handler);
-  }, [user, activeId, roleMap, addCreatedEntry]);
+  }, [user, activeId, roleMap, requestCreatePage]);
 
   // The action menu stashes what it wants moved; the page picker supplies where.
   const pendingBlockMoveRef = useRef<{ markdown: string; positions: number[] } | null>(null);
@@ -446,17 +574,21 @@ export default function Index() {
     const move = pendingBlockMoveRef.current;
     pendingBlockMoveRef.current = null;
     if (!move) return;
-    const nextMarkdown = appendMarkdown(target.content, move.markdown);
+    const nextMarkdown = appendMarkdown(getCanonicalContent(target), move.markdown);
     // Appending can only grow the page, so anything shorter means the extraction
     // went wrong and this write would destroy the destination.
-    if (shouldBlockEmptySave(target.content, nextMarkdown)) {
+    if (shouldBlockEmptySave(getCanonicalContent(target), nextMarkdown)) {
       console.warn("[wings] blocked empty block move over existing content");
       toast.error("Couldn't move those blocks");
       return;
     }
     const payload = payloadFromMarkdown(nextMarkdown);
     try {
-      await updateEntry(target.id, payload);
+      if (isLocalEntry(target)) {
+        await persistEntryBody(userId!, target, entriesRef.current, payload);
+      } else {
+        await updateEntry(target.id, payload);
+      }
       setEntries((prev) =>
         prev.map((e) =>
           e.id === target.id ? { ...e, content: payload.markdown, content_json: payload.json } : e,
@@ -482,13 +614,17 @@ export default function Index() {
   const handleRestoreVersion = useCallback(async (entryId: string, versionId: string) => {
     const current = entriesRef.current.find((e) => e.id === entryId);
     if (!current) return;
+    if (isLocalEntry(current)) {
+      toast.error("Version history isn't available for local pages");
+      return;
+    }
     try {
       const snapshot = await getEntryVersion(versionId);
       if (!snapshot) {
         toast.error("That version is no longer available");
         return;
       }
-      if (shouldBlockEmptySave(current.content, snapshot.content)) {
+      if (shouldBlockEmptySave(getCanonicalContent(current), snapshot.content)) {
         toast.error("That snapshot is empty — restoring it would clear the page");
         return;
       }
@@ -674,7 +810,8 @@ export default function Index() {
       const toSave = pendingPayloadRef.current;
       if (!isFullPayload(toSave)) return;
       const existing = entriesRef.current.find((e) => e.id === activeId);
-      if (existing && shouldBlockEmptySave(existing.content, toSave.markdown)) {
+      if (existing && isLocalEntry(existing)) return;
+      if (existing && shouldBlockEmptySave(getCanonicalContent(existing), toSave.markdown)) {
         console.warn("[wings] blocked empty collab flush over existing content");
         return;
       }
@@ -724,6 +861,24 @@ export default function Index() {
   const handleUpdateEntry = useCallback((updated: Entry) => {
     setEntries((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
   }, []);
+
+  const handlePromoteToCloud = useCallback(
+    async (entryId: string, payload: EditorChangePayload) => {
+      if (!userId || !isFullPayload(payload)) return;
+      const existing = entriesRef.current.find((e) => e.id === entryId);
+      if (!existing || !isLocalEntry(existing)) return;
+      try {
+        const promoted = await promoteEntryToCloud(userId, existing, payload);
+        setEntries((prev) => prev.map((e) => (e.id === entryId ? promoted : e)));
+        toast.success("Page moved to the cloud");
+      } catch (err) {
+        console.error("Failed to promote page:", err);
+        toast.error("Couldn't move page to the cloud", { description: entryErrorMessage(err) });
+        throw err;
+      }
+    },
+    [userId],
+  );
 
   const toggleSidebar = useCallback(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
@@ -833,6 +988,7 @@ export default function Index() {
         onOpenAI={openAI}
         onNew={handleNew}
         onImported={() => void loadEntries()}
+        onPromoteToCloud={handlePromoteToCloud}
         saveStatus={saveStatus}
         collabEnabled={collabEnabled}
       />
@@ -860,6 +1016,20 @@ export default function Index() {
         allEntries={entries}
         onCreateEntry={handleEntryCreated}
         onNavigate={setActiveId}
+      />
+      <StorageChoiceDialog
+        open={storageDialogOpen}
+        onOpenChange={setStorageDialogOpen}
+        parentIsLocal={
+          pendingCreateRef.current?.parentId
+            ? isLocalEntry(
+                entries.find((e) => e.id === pendingCreateRef.current?.parentId) ?? {
+                  content_storage: "cloud",
+                },
+              )
+            : false
+        }
+        onConfirm={handleStorageChoiceConfirm}
       />
     </div>
     </>
